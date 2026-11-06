@@ -35,3 +35,13 @@ describe("page-content validation (mirror)", () => {
     assert.equal(isPlainText("Texto limpio", 100), true);
   });
 });
+
+
+describe("home CMS bindings", () => {
+  it("renders the support label from PageContent instead of hardcoding it", () => {
+    const home = readFileSync(join(root, "components/site/HomePage.tsx"), "utf8");
+    assert.ok(/const statSupportLabel = useCopy\("statSupportLabel", "Apoyo técnico"\);/.test(home), "support label must read PageContent");
+    assert.ok(/<span>\{statSupportLabel\}<\/span>/.test(home), "support label must render the CMS value");
+    assert.ok(!/<span>Apoyo técnico<\/span>/.test(home), "support label must not be hardcoded");
+  });
+});

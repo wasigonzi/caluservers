@@ -61,6 +61,7 @@ const faq = [
 
 export default function Home() {
   const { catalog } = useCatalog();
+  const statSupportLabel = useCopy("statSupportLabel", "Apoyo técnico");
   const faq = [
     { q: useCopy("faq1q", "¿Cómo compro un plan?"), a: useCopy("faq1a", "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.") },
     { q: useCopy("faq2q", "¿Cómo recibo soporte si algo falla?"), a: useCopy("faq2a", "El soporte es 24/7 por ticket, en inglés y español. Abre un ticket desde el área de cliente o desde la página de Contacto y el equipo te responde.") },
@@ -132,7 +133,7 @@ export default function Home() {
             <div className="stats">
               <div className="stat glass">
                 <strong>24/7</strong>
-                <span>Apoyo técnico</span>
+                <span>{statSupportLabel}</span>
               </div>
               <div className="stat glass">
                 <strong>
