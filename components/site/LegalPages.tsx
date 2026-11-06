@@ -2,19 +2,37 @@
 import type { LegalSection } from "@/lib/catalog";
 import { LEGAL_AUP, LEGAL_PRIVACY, LEGAL_TERMS } from "@/lib/catalog";
 import { PageHero } from "@/components/site/SiteShell";
+import { useCopy, usePageCopy } from "@/lib/page-content-context";
+
+function sectionsFromCopy(
+  payload: Record<string, string>,
+  fallback: LegalSection[],
+): LegalSection[] {
+  const out: LegalSection[] = [];
+  for (let i = 1; i <= 12; i++) {
+    const heading = payload[`sec${i}Heading`];
+    const text = payload[`sec${i}Text`];
+    if (typeof heading === "string" && heading.trim() && typeof text === "string" && text.trim()) {
+      out.push({ heading, text });
+    }
+  }
+  return out.length ? out : fallback;
+}
 
 function LegalArticle({
-  kicker,
-  title,
-  intro,
-  sections,
+  fallbackSections,
 }: {
-  kicker: string;
-  title: string;
-  intro: string;
-  sections: LegalSection[];
+  fallbackSections: LegalSection[];
 }) {
-    return (
+  const payload = usePageCopy();
+  const kicker = useCopy("kicker", "CaluServers Legal");
+  const title = useCopy("title", "Legal");
+  const intro = useCopy(
+    "lead",
+    "Por favor revisa estas políticas antes de pedir o usar nuestros servicios.",
+  );
+  const sections = sectionsFromCopy(payload, fallbackSections);
+  return (
     <>
       <PageHero kicker={kicker} title={title} lead={intro} />
       <section className="wrap">
@@ -32,34 +50,13 @@ function LegalArticle({
 }
 
 export function Terms() {
-  return (
-    <LegalArticle
-      kicker="CaluServers Legal"
-      title="Términos y Condiciones"
-      intro="Por favor revisa estas políticas antes de pedir o usar nuestros servicios."
-      sections={LEGAL_TERMS}
-    />
-  );
+  return <LegalArticle fallbackSections={LEGAL_TERMS} />;
 }
 
 export function Privacy() {
-  return (
-    <LegalArticle
-      kicker="CaluServers Legal"
-      title="Política de Privacidad"
-      intro="Por favor revisa estas políticas antes de pedir o usar nuestros servicios."
-      sections={LEGAL_PRIVACY}
-    />
-  );
+  return <LegalArticle fallbackSections={LEGAL_PRIVACY} />;
 }
 
 export function Aup() {
-  return (
-    <LegalArticle
-      kicker="CaluServers Legal"
-      title="Política de Uso Aceptable"
-      intro="Por favor revisa estas políticas antes de pedir o usar nuestros servicios."
-      sections={LEGAL_AUP}
-    />
-  );
+  return <LegalArticle fallbackSections={LEGAL_AUP} />;
 }

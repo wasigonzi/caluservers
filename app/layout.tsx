@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./styles.css";
 import "./site-premium.css";
 
@@ -15,6 +15,16 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "CaluServers",
   },
+  icons: {
+    icon: "/assets/monograma-cs.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#070E15",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

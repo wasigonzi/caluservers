@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Plan, PlanCategory } from "@/lib/catalog";
 import type { CatalogPayload } from "@/lib/catalog-validate";
@@ -416,12 +417,52 @@ export default function ProSiteStudio({
               <option value="strong">Fuerte</option>
             </select>
           </label>
+          <label className="field">
+            Densidad / espaciado
+            <select
+              value={settings.appearance.density || "comfortable"}
+              onChange={(e) =>
+                patchSettings("appearance", {
+                  ...settings.appearance,
+                  density: e.target.value as SiteSettings["appearance"]["density"],
+                })
+              }
+            >
+              <option value="compact">Compacta</option>
+              <option value="comfortable">Cómoda</option>
+              <option value="relaxed">Amplia</option>
+            </select>
+          </label>
+          <label className="field">
+            Superficie / textura de fondo
+            <select
+              value={settings.appearance.surface || "glass"}
+              onChange={(e) =>
+                patchSettings("appearance", {
+                  ...settings.appearance,
+                  surface: e.target.value as SiteSettings["appearance"]["surface"],
+                })
+              }
+            >
+              <option value="solid">Sólida</option>
+              <option value="glass">Glass (por defecto)</option>
+              <option value="mesh">Mesh suave</option>
+            </select>
+          </label>
+          <p className="muted">
+            Tipografías son pares heading/body de un set seguro (sin CSS arbitrario).
+            El contraste fondo/texto se valida al guardar (mín. 4.5:1).
+          </p>
         </section>
       ) : null}
 
       {tab === "content" ? (
         <section className="panel-block">
           <h2>Contenido, contacto y CTAs</h2>
+          <p className="muted">
+            Hero home y CTAs globales aquí. Textos por página (FAQ, pasos, about, etc.) en{" "}
+            <Link href="/admin/pages">Páginas / contenido</Link>.
+          </p>
           <label className="field">
             URL portal WHMCS (https)
             <input

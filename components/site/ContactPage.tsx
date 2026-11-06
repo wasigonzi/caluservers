@@ -3,31 +3,40 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useCatalog } from "@/lib/catalog-context";
 import { PageHero, openWhmcsTicket } from "@/components/site/SiteShell";
+import { useCopy } from "@/lib/page-content-context";
 
 export default function Contact() {
-    const { catalog } = useCatalog();
+  const { catalog } = useCatalog();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [dept, setDept] = useState("Ventas");
   const [message, setMessage] = useState("");
+  const kicker = useCopy("kicker", "Contacto");
+  const title = useCopy("title", "Hablemos.");
+  const lead = useCopy("lead", catalog.settings.content.contactLead);
+  const submitLabel = useCopy("submitLabel", "Enviar mensaje");
+  const formNote = useCopy(
+    "formNote",
+    "Tu mensaje abre un ticket en nuestro portal de cliente, donde el equipo te responde.",
+  );
+  const labelName = useCopy("labelName", "Nombre");
+  const labelEmail = useCopy("labelEmail", "Email");
+  const labelDept = useCopy("labelDept", "Departamento");
+  const labelMessage = useCopy("labelMessage", "Mensaje");
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     openWhmcsTicket(catalog.settings.whmcs, [
-      { label: "Nombre", value: name },
-      { label: "Email", value: email },
-      { label: "Departamento", value: dept },
-      { label: "Mensaje", value: message },
+      { label: labelName, value: name },
+      { label: labelEmail, value: email },
+      { label: labelDept, value: dept },
+      { label: labelMessage, value: message },
     ]);
   }
 
   return (
     <>
-      <PageHero
-        kicker="Contacto"
-        title="Hablemos."
-        lead={catalog.settings.content.contactLead}
-      />
+      <PageHero kicker={kicker} title={title} lead={lead} />
       <section className="wrap">
         {(catalog.settings.contact.email ||
           catalog.settings.contact.phone ||
@@ -56,7 +65,7 @@ export default function Contact() {
         )}
         <form className="formbox glass" onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="c-name">Nombre</label>
+            <label htmlFor="c-name">{labelName}</label>
             <input
               id="c-name"
               value={name}
@@ -65,7 +74,7 @@ export default function Contact() {
             />
           </div>
           <div className="field">
-            <label htmlFor="c-email">Email</label>
+            <label htmlFor="c-email">{labelEmail}</label>
             <input
               id="c-email"
               type="email"
@@ -75,7 +84,7 @@ export default function Contact() {
             />
           </div>
           <div className="field">
-            <label htmlFor="c-dept">Departamento</label>
+            <label htmlFor="c-dept">{labelDept}</label>
             <select
               id="c-dept"
               value={dept}
@@ -87,7 +96,7 @@ export default function Contact() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="c-msg">Mensaje</label>
+            <label htmlFor="c-msg">{labelMessage}</label>
             <textarea
               id="c-msg"
               value={message}
@@ -96,12 +105,9 @@ export default function Contact() {
             />
           </div>
           <button className="btn primary" type="submit">
-            Enviar mensaje
+            {submitLabel}
           </button>
-          <p className="muted">
-            Tu mensaje abre un ticket en nuestro portal de cliente, donde el
-            equipo te responde.
-          </p>
+          <p className="muted">{formNote}</p>
         </form>
       </section>
     </>

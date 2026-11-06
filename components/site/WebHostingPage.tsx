@@ -1,4 +1,6 @@
 "use client";
+import { useCopy, usePageCopy } from "@/lib/page-content-context";
+import { pc } from "@/lib/page-content";
 import { INCLUDED_BENEFITS, TECH_SPECS } from "@/lib/catalog";
 const iconHosting = "/icons/servicio-hosting.svg";
 const iconRed = "/icons/servicio-red.svg";
@@ -9,47 +11,36 @@ import { PageHero, PlanCard } from "@/components/site/SiteShell";
 import { HostingQuiz } from "@/components/site/HostingQuiz";
 import { Faq, SectionHead } from "@/components/site/Sections";
 
-const WEB_FAQ = [
-  {
-    q: "¿Qué panel de control incluye el hosting?",
-    a: "Todos los planes incluyen cPanel, con Softaculous Premium para instalar más de 250 scripts (incluido WordPress) en un clic.",
-  },
-  {
-    q: "¿El SSL es gratis?",
-    a: "Sí. Cada dominio y subdominio recibe un certificado SSL de Let's Encrypt que se renueva solo, sin costo adicional.",
-  },
-  {
-    q: "¿Cuántas cuentas de correo puedo crear?",
-    a: "El plan Calu Starter incluye 100 cuentas de correo; Professional y Business incluyen cuentas ilimitadas.",
-  },
-  {
-    q: "¿Puedo migrar mi sitio desde otro proveedor?",
-    a: "Sí. La migración gestionada es gratis: el equipo traslada tu sitio desde cualquier proveedor.",
-  },
-  {
-    q: "¿Qué pasa si mi sitio crece?",
-    a: "Puedes subir de plan dentro del mismo Web Hosting (de Starter a Professional o Business) o escalar a un VPS cuando necesites más recursos y control.",
-  },
-  {
-    q: "¿Hay garantía de devolución?",
-    a: "Sí. Si durante tu primer mes sientes que el hosting no es para ti, se reembolsan las tarifas de hosting.",
-  },
-];
-
 export default function WebHosting() {
-    const { catalog } = useCatalog();
+    
+  const kicker = useCopy("kicker", "Web Hosting");
+  const title = useCopy("title", "Hosting web rápido con cPanel");
+  const titleAccent = useCopy("titleAccent", "y SSL gratis");
+  const lead = useCopy("lead", "Alojamiento sencillo, seguro y rápido para cada etapa de tu trayectoria en línea.");
+  const faqKicker = useCopy("faqKicker", "Preguntas frecuentes");
+  const faqTitle = useCopy("faqTitle", "Hosting sin sorpresas");
+  const payload = usePageCopy();
+  const faq = Array.from({ length: 6 }, (_, idx) => {
+    const i = idx + 1;
+    return {
+      q: pc(payload, `faq${i}q`, ""),
+      a: pc(payload, `faq${i}a`, ""),
+    };
+  }).filter((x) => x.q && x.a);
+
+const { catalog } = useCatalog();
   const plans = catalog.webHosting.filter((p) => p.active);
   return (
     <>
       <PageHero
-        kicker="Web Hosting"
+        kicker={kicker}
         title={
           <>
-            Alojamiento que{" "}
-            <span className="neon-text">te mantiene en marcha.</span>
+            {title}{" "}
+            <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Alojamiento sencillo, seguro y rápido para cada etapa de tu trayectoria en línea."
+        lead={lead}
       />
       <section className="wrap">
         <div className="plan-grid">
@@ -170,15 +161,10 @@ export default function WebHosting() {
         </section>
         <section className="section">
           <SectionHead
-            kicker="Preguntas frecuentes"
-            title={
-              <>
-                Hosting compartido,{" "}
-                <span className="neon-text">sin sorpresas.</span>
-              </>
-            }
+            kicker={faqKicker}
+            title={<>{faqTitle}</>}
           />
-          <Faq items={WEB_FAQ} />
+          <Faq items={faq} />
         </section>
       </section>
     </>

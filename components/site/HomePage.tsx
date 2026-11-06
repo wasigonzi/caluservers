@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import SafeLink from "@/components/site/SafeLink";
 import SplineHero from "@/components/site/SplineHero";
 const iconHosting = "/icons/servicio-hosting.svg";
 const iconVps = "/icons/servicio-vps.svg";
@@ -10,7 +11,6 @@ const iconSeguridad = "/icons/servicio-seguridad.svg";
 const iconSoporte = "/icons/servicio-soporte.svg";
 import { isPriceToConfirm } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
-import { resolveHref } from "@/lib/safe-links";
 import { PlanCard } from "@/components/site/SiteShell";
 import type { HomeSectionId } from "@/lib/site-settings";
 import { AnimatedNumber } from "@/components/site/Interactive";
@@ -21,6 +21,7 @@ import {
   Steps,
   TrustStrip,
 } from "@/components/site/Sections";
+import { useCopy } from "@/lib/page-content-context";
 
 /** Precio mínimo real de una categoría (ignora "$0.00" = precio a confirmar). */
 function minPrice(prices: string[]): string {
@@ -31,7 +32,7 @@ function minPrice(prices: string[]): string {
   return valid.length > 0 ? `$${Math.min(...valid).toFixed(2)}` : "Consultar";
 }
 
-const HOME_FAQ = [
+const faq = [
   {
     q: "¿Cómo compro un plan?",
     a: "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.",
@@ -60,11 +61,40 @@ const HOME_FAQ = [
 
 export default function Home() {
   const { catalog } = useCatalog();
+  const statSupportLabel = useCopy("statSupportLabel", "Apoyo técnico");
+  const faq = [
+    { q: useCopy("faq1q", "¿Cómo compro un plan?"), a: useCopy("faq1a", "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.") },
+    { q: useCopy("faq2q", "¿Cómo recibo soporte si algo falla?"), a: useCopy("faq2a", "El soporte es 24/7 por ticket, en inglés y español. Abre un ticket desde el área de cliente o desde la página de Contacto y el equipo te responde.") },
+    { q: useCopy("faq3q", "¿Dónde están ubicados los servidores?"), a: useCopy("faq3a", "Los VPS están disponibles en cuatro ubicaciones de Estados Unidos: Dallas, Los Angeles, New York y Miami. Puedes elegir la más cercana a tus usuarios para minimizar la latencia.") },
+    { q: useCopy("faq4q", "¿El VPS incluye acceso root?"), a: useCopy("faq4a", "Sí. Los VPS y los servidores dedicados incluyen acceso root / administrador total: instalas lo que quieras, eliges tu sistema operativo y gestionas el entorno a tu manera.") },
+    { q: useCopy("faq5q", "¿Qué sistema operativo puedo elegir?"), a: useCopy("faq5a", "En VPS hay distribuciones Linux disponibles y en los dedicados la selección de sistema operativo es parte de la configuración. También puedes reinstalar y gestionar el servidor desde el panel.") },
+    { q: useCopy("faq6q", "¿Qué incluye el Web Hosting?"), a: useCopy("faq6a", "Todos los planes de hosting incluyen cPanel, Softaculous Premium con más de 250 scripts, SSL gratis, cuentas de correo y almacenamiento NVMe SSD. La migración desde cualquier proveedor es gratis.") },
+  ];
+  const trustItems = [
+    useCopy("trust1", "Desde 2013"),
+    useCopy("trust2", "Ryzen 9 9950X"),
+    useCopy("trust3", "Protección DDoS"),
+    useCopy("trust4", "Soporte en español e inglés"),
+  ];
+  const stepsKicker = useCopy("stepsKicker", "Cómo funciona");
+  const stepsTitle = useCopy("stepsTitle", "De la idea al servidor en tres pasos");
+  const stepsLead = useCopy("stepsLead", "Sin procesos complicados: eliges, compras en el portal seguro y lo gestionas desde tu panel de cliente.");
+  const stepItems = [
+    { title: useCopy("step1Title", "Elige tu plan"), text: useCopy("step1Text", "Compara Web Hosting, VPS y Dedicados y escoge la configuración que se ajuste a tu proyecto y tu presupuesto.") },
+    { title: useCopy("step2Title", "Compra segura en WHMCS"), text: useCopy("step2Text", "El pedido se completa en el portal de cliente de CaluServers, donde también gestionas facturación y renovaciones.") },
+    { title: useCopy("step3Title", "Gestiónalo desde tu panel"), text: useCopy("step3Text", "Accede a cPanel, a tu VPS con root total o a tu servidor dedicado, y abre tickets de soporte 24/7 cuando lo necesites.") },
+  ];
   const { content, visibility, sections, whmcs } = catalog.settings;
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
-  const webMin = minPrice(catalog.webHosting.map((p) => p.price));
-  const vpsMin = minPrice(catalog.vps.map((p) => p.price));
-  const dedMin = minPrice(catalog.dedicated.map((p) => p.price));
+  const webMin = minPrice(
+    catalog.webHosting.filter((p) => p.active).map((p) => p.price),
+  );
+  const vpsMin = minPrice(
+    catalog.vps.filter((p) => p.active).map((p) => p.price),
+  );
+  const dedMin = minPrice(
+    catalog.dedicated.filter((p) => p.active).map((p) => p.price),
+  );
   const featured = [
     ...catalog.webHosting,
     ...catalog.vps,
@@ -85,23 +115,25 @@ export default function Home() {
             </h1>
             <p className="lead">{content.heroLead}</p>
             <div className="hero-ctas">
-              <Link
+              <SafeLink
                 className="btn primary"
-                href={resolveHref(content.heroCtaPrimaryHref, whmcs)}
+                href={content.heroCtaPrimaryHref}
+                whmcs={whmcs}
               >
                 {content.heroCtaPrimary}
-              </Link>
-              <Link
+              </SafeLink>
+              <SafeLink
                 className="btn secondary"
-                href={resolveHref(content.heroCtaSecondaryHref, whmcs)}
+                href={content.heroCtaSecondaryHref}
+                whmcs={whmcs}
               >
                 {content.heroCtaSecondary}
-              </Link>
+              </SafeLink>
             </div>
             <div className="stats">
               <div className="stat glass">
                 <strong>24/7</strong>
-                <span>Apoyo técnico</span>
+                <span>{statSupportLabel}</span>
               </div>
               <div className="stat glass">
                 <strong>
@@ -122,13 +154,7 @@ export default function Home() {
     trustStrip: visibility.trustStrip ? (
       <div className="wrap" key="trust">
         <TrustStrip
-          items={[
-            "Desde 2013",
-            "4 ubicaciones en EE. UU.",
-            "Ryzen 9 9950X",
-            "Protección DDoS",
-            "Soporte en español e inglés",
-          ]}
+            items={trustItems}
         />
       </div>
     ) : null,
@@ -200,31 +226,11 @@ export default function Home() {
       <section className="section" key="steps">
         <div className="wrap">
           <SectionHead
-            kicker="Cómo funciona"
-            title={
-              <>
-                De la idea al servidor en{" "}
-                <span className="neon-text">tres pasos.</span>
-              </>
-            }
-            lead="Sin procesos complicados: eliges, compras en el portal seguro y lo gestionas desde tu panel de cliente."
+            kicker={stepsKicker}
+            title={<>{stepsTitle}</>}
+            lead={stepsLead}
           />
-          <Steps
-            steps={[
-              {
-                title: "Elige tu plan",
-                text: "Compara Web Hosting, VPS y Dedicados y escoge la configuración que se ajuste a tu proyecto y tu presupuesto.",
-              },
-              {
-                title: "Compra segura en WHMCS",
-                text: "El pedido se completa en el portal de cliente de CaluServers, donde también gestionas facturación y renovaciones.",
-              },
-              {
-                title: "Gestiónalo desde tu panel",
-                text: "Accede a cPanel, a tu VPS con root total o a tu servidor dedicado, y abre tickets de soporte 24/7 cuando lo necesites.",
-              },
-            ]}
-          />
+          <Steps steps={stepItems} />
         </div>
       </section>
     ) : null,
@@ -386,7 +392,7 @@ export default function Home() {
               </>
             }
           />
-          <Faq items={HOME_FAQ} />
+          <Faq items={faq} />
         </div>
       </section>
     ) : null,
@@ -399,12 +405,13 @@ export default function Home() {
               <h2>{content.ctaTitle}</h2>
               <p className="muted">{content.ctaLead}</p>
             </div>
-            <Link
+            <SafeLink
               className="btn primary"
-              href={resolveHref(content.ctaButtonHref, whmcs)}
+              href={content.ctaButtonHref}
+              whmcs={whmcs}
             >
               {content.ctaButtonLabel}
-            </Link>
+            </SafeLink>
           </div>
         </div>
       </section>
@@ -416,15 +423,9 @@ export default function Home() {
     <>
       {sections.map((sec) => {
         if (!sec.enabled) return null;
-        if (sec.id === "trustStrip") {
-          // attach under hero if hero immediately precedes — still render block
-          return (
-            <div key="trust-wrap" className="trust-follow">
-              {blocks.trustStrip}
-            </div>
-          );
-        }
-        return blocks[sec.id] ?? null;
+        const node = blocks[sec.id];
+        if (!node) return null;
+        return <div key={sec.id} className={`home-section home-section--${sec.id}`}>{node}</div>;
       })}
     </>
   );

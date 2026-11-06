@@ -5,16 +5,65 @@ import { TLDS } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
 import { PageHero } from "@/components/site/SiteShell";
 import { SectionHead, Steps } from "@/components/site/Sections";
+import { useCopy } from "@/lib/page-content-context";
 
 export default function Domains() {
-    const { catalog } = useCatalog();
+  const { catalog } = useCatalog();
   const [name, setName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState(
+  const searchHint = useCopy(
+    "searchHint",
     "La disponibilidad se verifica en el portal de cliente (WHMCS), con tu registrador de dominios.",
   );
+  const [message, setMessage] = useState(searchHint);
 
-  /** Quita la extensión conocida al final del nombre, si la tiene. */
+  const kicker = useCopy("kicker", "Domain Registration");
+  const title = useCopy("title", "Encuentra");
+  const titleAccent = useCopy("titleAccent", "tu lugar en línea.");
+  const lead = useCopy(
+    "lead",
+    "Busca tu dominio y gestiona registros y transferencias desde un solo lugar.",
+  );
+  const searchPlaceholder = useCopy(
+    "searchPlaceholder",
+    "Escribe tu dominio perfecto",
+  );
+  const searchButton = useCopy("searchButton", "Buscar dominio →");
+  const stepsKicker = useCopy("stepsKicker", "Cómo funciona");
+  const stepsTitle = useCopy("stepsTitle", "Tu dominio,");
+  const stepsTitleAccent = useCopy("stepsTitleAccent", "en tres pasos.");
+  const stepsLead = useCopy(
+    "stepsLead",
+    "La búsqueda y la verificación de disponibilidad se hacen en el portal de cliente, con tu registrador de dominios.",
+  );
+  const stepItems = [
+    {
+      title: useCopy("step1Title", "Busca tu dominio"),
+      text: useCopy(
+        "step1Text",
+        "Escribe el nombre que quieres en el buscador de arriba, con la extensión que prefieras (.com, .net, .org, .online, .info o .store).",
+      ),
+    },
+    {
+      title: useCopy("step2Title", "Verifica la disponibilidad"),
+      text: useCopy(
+        "step2Text",
+        "La disponibilidad se comprueba en el portal de cliente (WHMCS). Si está libre, lo añades al carrito y completas el registro.",
+      ),
+    },
+    {
+      title: useCopy("step3Title", "Gestiona todo en un lugar"),
+      text: useCopy(
+        "step3Text",
+        "Registro, renovación y transferencia se gestionan desde tu panel de cliente, junto a tus planes de hosting y VPS.",
+      ),
+    },
+  ];
+  const tldCardText = useCopy(
+    "tldCardText",
+    "Registro, renovación y transferencia gestionados por tu registrador de dominios.",
+  );
+
   function stripTld(value: string): string {
     const v = value.trim();
     for (const t of TLDS) {
@@ -23,12 +72,9 @@ export default function Domains() {
     return v;
   }
 
-  /** Rellena el buscador con la extensión elegida (reemplaza la anterior). */
   function applyTld(tld: string) {
     const base = stripTld(name);
     if (!base) {
-      // Sin nombre todavía: deja la extensión y el cursor delante para
-      // que se escriba el nombre antes de ella.
       setName(tld);
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -51,13 +97,13 @@ export default function Domains() {
   return (
     <>
       <PageHero
-        kicker="Domain Registration"
+        kicker={kicker}
         title={
           <>
-            Encuentra <span className="neon-text">tu lugar en línea.</span>
+            {title} <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Busca tu dominio y gestiona registros y transferencias desde un solo lugar."
+        lead={lead}
       />
       <section className="wrap">
         <form className="domain-search glass" onSubmit={onSearch}>
@@ -65,11 +111,11 @@ export default function Domains() {
             ref={inputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Escribe tu dominio perfecto"
+            placeholder={searchPlaceholder}
             required
           />
           <button className="btn primary" type="submit">
-            Buscar dominio →
+            {searchButton}
           </button>
         </form>
         <div
@@ -95,31 +141,16 @@ export default function Domains() {
         </p>
         <section className="section">
           <SectionHead
-            kicker="Cómo funciona"
+            kicker={stepsKicker}
             title={
               <>
-                Tu dominio,{" "}
-                <span className="neon-text">en tres pasos.</span>
+                {stepsTitle}{" "}
+                <span className="neon-text">{stepsTitleAccent}</span>
               </>
             }
-            lead="La búsqueda y la verificación de disponibilidad se hacen en el portal de cliente, con tu registrador de dominios."
+            lead={stepsLead}
           />
-          <Steps
-            steps={[
-              {
-                title: "Busca tu dominio",
-                text: "Escribe el nombre que quieres en el buscador de arriba, con la extensión que prefieras (.com, .net, .org, .online, .info o .store).",
-              },
-              {
-                title: "Verifica la disponibilidad",
-                text: "La disponibilidad se comprueba en el portal de cliente (WHMCS). Si está libre, lo añades al carrito y completas el registro.",
-              },
-              {
-                title: "Gestiona todo en un lugar",
-                text: "Registro, renovación y transferencia se gestionan desde tu panel de cliente, junto a tus planes de hosting y VPS.",
-              },
-            ]}
-          />
+          <Steps steps={stepItems} />
         </section>
         <div className="cards">
           {TLDS.map((tld) => (
@@ -131,10 +162,7 @@ export default function Domains() {
               aria-label={`Usar la extensión ${tld}`}
             >
               <h3>{tld}</h3>
-              <p>
-                Registro, renovación y transferencia gestionados por tu
-                registrador de dominios.
-              </p>
+              <p>{tldCardText}</p>
             </button>
           ))}
         </div>

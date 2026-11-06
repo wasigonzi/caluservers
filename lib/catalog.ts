@@ -75,15 +75,26 @@ export interface SiteVisibility {
   services: boolean;
 }
 
-export type SafeFontId = "system" | "sora-montserrat" | "exo-sora" | "inter";
+export type SafeFontId =
+  | "system"
+  | "sora-montserrat"
+  | "exo-sora"
+  | "inter"
+  | "playfair-source"
+  | "dm-sans-ibm";
 export type RadiusToken = "sm" | "md" | "lg";
 export type ShadowToken = "soft" | "medium" | "strong";
+export type DensityToken = "compact" | "comfortable" | "relaxed";
+export type SurfaceToken = "solid" | "glass" | "mesh";
 
 export interface SiteAppearance {
   preset: AppearancePreset;
+  /** Pareja tipográfica heading/body segura (no CSS arbitrario). */
   font: SafeFontId;
   radius: RadiusToken;
   shadow: ShadowToken;
+  density: DensityToken;
+  surface: SurfaceToken;
 }
 
 export interface BrandingSettings {
@@ -243,6 +254,8 @@ export const SEED_CATALOG: Catalog = {
       category: "vps",
       name: "Starter",
       price: "$6.99",
+      featured: true,
+      badge: "Más vendido",
       description: "1 vCore · AMD Ryzen 9 9950X · 2GB DDR5 5600 MHz",
       features: ["1 vCore", "AMD Ryzen 9 9950X", "2GB DDR5 5600 MHz", "20 GB SSD NVMe GEN 5", "5TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-miami",
@@ -716,7 +729,7 @@ export const SEED_CATALOG: Catalog = {
       cta: true,
       services: true,
     },
-    appearance: { preset: "default", font: "sora-montserrat", radius: "lg", shadow: "medium" },
+    appearance: { preset: "default", font: "sora-montserrat", radius: "lg", shadow: "medium", density: "comfortable", surface: "glass" },
     branding: {
       siteName: "CaluServers",
       tagline: "Hosting • VPS • Dedicated Servers",
