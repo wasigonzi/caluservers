@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings-db";
 import { getCatalogPayload } from "@/lib/catalog-db";
+import { isBlobConfiguredEnv } from "@/lib/branding-upload";
 import ProSiteStudio from "@/components/admin/ProSiteStudio";
 
 export const dynamic = "force-dynamic";
@@ -12,18 +13,23 @@ export default async function SiteAdminPage() {
     getSiteSettings(),
     getCatalogPayload(),
   ]);
+  const blobConfigured = isBlobConfiguredEnv();
   return (
     <>
       <p className="accent">ESTUDIO DEL SITIO · PRO</p>
       <h1>Configuración avanzada</h1>
       <p className="muted">
-        Branding, apariencia, contenido, secciones, catálogo, SEO y navegación.
-        Publicación unificada. Requiere migraciones{" "}
-        <code>SiteSetting</code> y <code>CatalogConfig</code> aplicadas en tu
-        base de datos. WHMCS API sigue en «Conexión WHMCS».
+        Branding (URL o subida a Vercel Blob), apariencia, contenido, secciones,
+        catálogo, SEO y navegación. Publicación unificada. Requiere migraciones{" "}
+        <code>SiteSetting</code> / <code>CatalogConfig</code> y, para subidas,{" "}
+        <code>BLOB_READ_WRITE_TOKEN</code>. WHMCS API en «Conexión WHMCS».
       </p>
       <div className="glass">
-        <ProSiteStudio initialSettings={settings} initialCatalog={catalog} />
+        <ProSiteStudio
+          initialSettings={settings}
+          initialCatalog={catalog}
+          blobConfigured={blobConfigured}
+        />
       </div>
     </>
   );

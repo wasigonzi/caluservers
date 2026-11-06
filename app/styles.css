@@ -68,3 +68,8 @@
 @media(max-width:800px){
   .pro-studio .media-field,.pro-studio .color-grid,.pro-studio .plan-grid,.pro-studio .nav-row{grid-template-columns:1fr}
 }
+
+.pro-studio .upload-row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.pro-studio .upload-btn{cursor:pointer;display:inline-flex;align-items:center}
+.pro-studio .upload-btn.disabled{opacity:.5;cursor:not-allowed}
+.pro-studio .branding-asset{margin-bottom:16px}
