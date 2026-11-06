@@ -476,3 +476,29 @@ html[data-font="exo-sora"] body{font-family:'Sora',system-ui,sans-serif}
   .logo-desktop{display:none}
   .logo-mobile{display:block}
 }
+
+/* Sales-ready polish */
+.home-section:empty{display:none}
+.mobile-tab{
+  min-height:44px;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.mobile-tabbar{z-index:60}
+.plan-card .price-was{text-decoration:line-through;opacity:.65;margin-right:.4em}
+.domain-search{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:18px 0 12px;padding:18px}
+.domain-search input{flex:1;min-width:200px;padding:14px 16px;border-radius:14px;border:1px solid var(--calu-glass-border);background:rgba(0,0,0,.25);color:inherit;font:inherit}
+.tld-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 18px}
+.tld-chip{cursor:pointer;border:0}
+.tld-chip.selected{box-shadow:0 0 0 1px var(--calu-cyan)}
+.tld-card{text-align:left;cursor:pointer;width:100%;color:inherit;font:inherit}
+.notice{color:var(--muted);margin:8px 0 24px}
+.wide-cta{display:flex;justify-content:space-between;gap:24px;align-items:center;flex-wrap:wrap}
+@media(max-width:900px){
+  .domain-search{flex-direction:column;align-items:stretch}
+  .domain-search .btn{width:100%}
+  .wide-cta{flex-direction:column;align-items:flex-start}
+}
+/* Skip link a11y */
+.skip-link{position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden}
+.skip-link:focus{left:16px;top:16px;width:auto;height:auto;padding:10px 14px;background:#00e5ff;color:#001219;z-index:100;border-radius:10px}

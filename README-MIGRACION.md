@@ -50,3 +50,7 @@ Planes semilla en `lib/catalog.ts` (referencia pública). La gestión completa d
 - No se modifican pedidos ni se cobran desde esta app.
 - MFA y rate-limit distribuido recomendados antes de producción.
 - Aplicar migraciones y secrets solo en infra controlada.
+
+## Listo para vender
+
+Ver checklist operativo en `docs/SALES_READY.md` (env, migraciones, WHMCS, Blob). Esta app no cobra: el checkout es WHMCS.

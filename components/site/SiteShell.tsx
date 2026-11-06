@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode, type SVGProps } from "react";
 import Link from "next/link";
+import SafeLink from "@/components/site/SafeLink";
 import { usePathname } from "next/navigation";
 import { HERO_BG_DATA_URI } from "@/lib/brand";
 import type { Plan } from "@/lib/catalog";
@@ -105,15 +106,13 @@ function Nav({ settings }: { settings: SiteSettings }) {
           <a className="btn secondary" href={settings.whmcs}>
             {settings.chrome.clientAreaLabel}
           </a>
-          {settings.chrome.headerCtaHref === "whmcs" || resolveHref(settings.chrome.headerCtaHref, settings.whmcs).startsWith("http") ? (
-            <a className="btn primary" href={resolveHref(settings.chrome.headerCtaHref, settings.whmcs)}>
-              {settings.chrome.headerCtaLabel}
-            </a>
-          ) : (
-            <Link className="btn primary" href={resolveHref(settings.chrome.headerCtaHref, settings.whmcs)}>
-              {settings.chrome.headerCtaLabel}
-            </Link>
-          )}
+          <SafeLink
+            className="btn primary"
+            href={settings.chrome.headerCtaHref}
+            whmcs={settings.whmcs}
+          >
+            {settings.chrome.headerCtaLabel}
+          </SafeLink>
         </div>
       </div>
     </header>
@@ -236,6 +235,9 @@ export function SiteShell({
 
   return (
     <div className="site-shell has-mobile-tabbar">
+      <a className="skip-link" href="#contenido-principal">
+        Saltar al contenido
+      </a>
       <div
         className="aurora"
         aria-hidden="true"
@@ -243,7 +245,7 @@ export function SiteShell({
       />
       <TopBar settings={settings} />
       <Nav settings={settings} />
-      <main className="site-main" ref={mainRef}>
+      <main id="contenido-principal" className="site-main" ref={mainRef} tabIndex={-1}>
         {children}
       </main>
       <Footer settings={settings} />

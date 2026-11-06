@@ -1,6 +1,6 @@
 import { chromium } from "@playwright/test";
 
-const BASE = "http://127.0.0.1:3010";
+const BASE = process.env.SMOKE_BASE || "http://127.0.0.1:3010";
 const pages = [
   "/",
   "/web-hosting",
@@ -14,8 +14,10 @@ const pages = [
   "/aup",
   "/abuse",
   "/client",
+  "/robots.txt",
+  "/sitemap.xml",
   "/admin/login",
-  "/admin/site", // should redirect to login
+  "/admin/site",
 ];
 
 const viewports = [
@@ -32,37 +34,73 @@ for (const vp of viewports) {
     locale: "es-ES",
   });
   const page = await context.newPage();
+  const consoleErrors = [];
+  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+
   for (const path of pages) {
     const url = BASE + path;
     let status = "ok";
     let detail = "";
     try {
-      const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+      const resp = await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
       const code = resp?.status() ?? 0;
       const title = await page.title();
+      const lang = await page.locator("html").getAttribute("lang");
+      const finalUrl = page.url();
       const hasTabbar =
-        vp.width <= 900
+        vp.width <= 900 && !path.startsWith("/admin") && !path.endsWith(".txt") && !path.endsWith(".xml")
           ? (await page.locator(".mobile-tabbar").count()) > 0 &&
             (await page.locator(".mobile-tabbar").isVisible())
           : true;
-      const lang = await page.locator("html").getAttribute("lang");
-      // admin site redirects
-      const finalUrl = page.url();
       if (code >= 400) status = "fail";
-      detail = `status=${code} title=${JSON.stringify(title)} lang=${lang} final=${finalUrl.replace(BASE, "")} tabbarVisible=${vp.width <= 900 ? hasTabbar : "n/a"}`;
-      if (path.startsWith("/admin") && path !== "/admin/login") {
+      detail = `status=${code} title=${JSON.stringify(title)} lang=${lang} final=${finalUrl.replace(BASE, "")} tabbar=${vp.width <= 900 ? hasTabbar : "n/a"}`;
+      if (path.startsWith("/admin") && path !== "/admin/login" && !path.includes(".")) {
         if (!finalUrl.includes("/admin/login")) {
           status = "warn";
           detail += " (expected login redirect)";
         }
       }
-      if (!path.startsWith("/admin") && lang !== "es") {
+      if (
+        !path.startsWith("/admin") &&
+        !path.includes(".") &&
+        lang !== "es"
+      ) {
         status = "fail";
         detail += " BAD_LANG";
       }
-      if (vp.width <= 900 && !path.startsWith("/admin") && !hasTabbar) {
+      if (
+        vp.width <= 900 &&
+        !path.startsWith("/admin") &&
+        !path.includes(".") &&
+        !hasTabbar
+      ) {
         status = "fail";
         detail += " NO_TABBAR";
+      }
+      if (consoleErrors.length) {
+        status = "fail";
+        detail += ` PAGEERROR=${consoleErrors.slice(-1)[0]}`;
+        consoleErrors.length = 0;
+      }
+      // CTAs / purchase on product pages
+      if (path === "/web-hosting" || path === "/vps" || path === "/dedicated") {
+        const orders = page.locator('a.btn.primary[href*="client.caluservers.com"]');
+        const n = await orders.count();
+        detail += ` purchaseLinks=${n}`;
+        if (n < 1) {
+          status = "fail";
+          detail += " NO_PURCHASE_CTA";
+        }
+      }
+      if (path === "/") {
+        const heroBtn = page.locator(".hero-ctas a.btn, .hero-ctas .btn");
+        if ((await heroBtn.count()) < 1) {
+          status = "fail";
+          detail += " NO_HERO_CTA";
+        }
       }
     } catch (e) {
       status = "fail";

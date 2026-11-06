@@ -243,6 +243,8 @@ export const SEED_CATALOG: Catalog = {
       category: "vps",
       name: "Starter",
       price: "$6.99",
+      featured: true,
+      badge: "Más vendido",
       description: "1 vCore · AMD Ryzen 9 9950X · 2GB DDR5 5600 MHz",
       features: ["1 vCore", "AMD Ryzen 9 9950X", "2GB DDR5 5600 MHz", "20 GB SSD NVMe GEN 5", "5TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-miami",

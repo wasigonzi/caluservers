@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import SafeLink from "@/components/site/SafeLink";
 import SplineHero from "@/components/site/SplineHero";
 const iconHosting = "/icons/servicio-hosting.svg";
 const iconVps = "/icons/servicio-vps.svg";
@@ -10,7 +11,6 @@ const iconSeguridad = "/icons/servicio-seguridad.svg";
 const iconSoporte = "/icons/servicio-soporte.svg";
 import { isPriceToConfirm } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
-import { resolveHref } from "@/lib/safe-links";
 import { PlanCard } from "@/components/site/SiteShell";
 import type { HomeSectionId } from "@/lib/site-settings";
 import { AnimatedNumber } from "@/components/site/Interactive";
@@ -62,9 +62,15 @@ export default function Home() {
   const { catalog } = useCatalog();
   const { content, visibility, sections, whmcs } = catalog.settings;
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
-  const webMin = minPrice(catalog.webHosting.map((p) => p.price));
-  const vpsMin = minPrice(catalog.vps.map((p) => p.price));
-  const dedMin = minPrice(catalog.dedicated.map((p) => p.price));
+  const webMin = minPrice(
+    catalog.webHosting.filter((p) => p.active).map((p) => p.price),
+  );
+  const vpsMin = minPrice(
+    catalog.vps.filter((p) => p.active).map((p) => p.price),
+  );
+  const dedMin = minPrice(
+    catalog.dedicated.filter((p) => p.active).map((p) => p.price),
+  );
   const featured = [
     ...catalog.webHosting,
     ...catalog.vps,
@@ -85,18 +91,20 @@ export default function Home() {
             </h1>
             <p className="lead">{content.heroLead}</p>
             <div className="hero-ctas">
-              <Link
+              <SafeLink
                 className="btn primary"
-                href={resolveHref(content.heroCtaPrimaryHref, whmcs)}
+                href={content.heroCtaPrimaryHref}
+                whmcs={whmcs}
               >
                 {content.heroCtaPrimary}
-              </Link>
-              <Link
+              </SafeLink>
+              <SafeLink
                 className="btn secondary"
-                href={resolveHref(content.heroCtaSecondaryHref, whmcs)}
+                href={content.heroCtaSecondaryHref}
+                whmcs={whmcs}
               >
                 {content.heroCtaSecondary}
-              </Link>
+              </SafeLink>
             </div>
             <div className="stats">
               <div className="stat glass">
@@ -399,12 +407,13 @@ export default function Home() {
               <h2>{content.ctaTitle}</h2>
               <p className="muted">{content.ctaLead}</p>
             </div>
-            <Link
+            <SafeLink
               className="btn primary"
-              href={resolveHref(content.ctaButtonHref, whmcs)}
+              href={content.ctaButtonHref}
+              whmcs={whmcs}
             >
               {content.ctaButtonLabel}
-            </Link>
+            </SafeLink>
           </div>
         </div>
       </section>
@@ -416,15 +425,9 @@ export default function Home() {
     <>
       {sections.map((sec) => {
         if (!sec.enabled) return null;
-        if (sec.id === "trustStrip") {
-          // attach under hero if hero immediately precedes — still render block
-          return (
-            <div key="trust-wrap" className="trust-follow">
-              {blocks.trustStrip}
-            </div>
-          );
-        }
-        return blocks[sec.id] ?? null;
+        const node = blocks[sec.id];
+        if (!node) return null;
+        return <div key={sec.id} className={`home-section home-section--${sec.id}`}>{node}</div>;
       })}
     </>
   );
