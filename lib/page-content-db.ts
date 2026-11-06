@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { reportDbError } from "@/lib/db-errors";
 import {
   PAGE_DEFS,
   PAGE_PATHS,
@@ -14,7 +15,8 @@ export async function getPageContent(path: string): Promise<Record<string, strin
   try {
     const row = await db.pageContent.findUnique({ where: { path } });
     return mergePagePayload(path, row?.payload ?? null);
-  } catch {
+  } catch (error) {
+    reportDbError(error, process.env.DATABASE_URL);
     return defaultPayload(path);
   }
 }
@@ -29,8 +31,9 @@ export async function getAllPageContent(): Promise<PageContentMap> {
         out[row.path] = mergePagePayload(row.path, row.payload);
       }
     }
-  } catch {
-    // DB ausente / migración pendiente → defaults
+  } catch (error) {
+    reportDbError(error, process.env.DATABASE_URL);
+    // DB no usable: preserve documented public fallback.
   }
   return out;
 }
@@ -70,17 +73,14 @@ export async function pageContentDbReady(): Promise<{
   try {
     await db.pageContent.findMany({ take: 1 });
     return { ok: true, missingMigration: false, message: "PageContent listo" };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const missing =
-      /does not exist|P2021|PageContent/i.test(msg) ||
-      /Can't reach database/i.test(msg);
+  } catch (error) {
+    const { missingMigration } = reportDbError(error, process.env.DATABASE_URL);
     return {
       ok: false,
-      missingMigration: missing,
-      message: missing
-        ? "BD no accesible o falta migración PageContent. Los textos públicos usan defaults locales; el guardado NO está disponible (no es un éxito). Tras tener Postgres usable: npx prisma migrate deploy"
-        : `Error de BD (guardado no disponible): ${msg.slice(0, 180)}`,
+      missingMigration,
+      message: missingMigration
+        ? "Falta una tabla requerida del CMS. El guardado no está disponible; revisar migraciones."
+        : "BD no usable. El guardado no está disponible. Consultar los registros del servidor.",
     };
   }
 }
