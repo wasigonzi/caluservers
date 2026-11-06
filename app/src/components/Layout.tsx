@@ -69,7 +69,7 @@ export function Nav() {
           ))}
         </nav>
         <div className="nav-actions">
-          <a className="btn ghost" href={catalog.settings.whmcs}>
+          <a className="btn secondary" href={catalog.settings.whmcs}>
             Área de Cliente ↗
           </a>
           <Link className="btn primary" to="/domains">
@@ -145,7 +145,7 @@ export function Layout() {
       />
       <TopBar />
       <Nav />
-      <main ref={mainRef}>
+      <main className="site-main" ref={mainRef}>
         <Outlet />
       </main>
       <Footer />

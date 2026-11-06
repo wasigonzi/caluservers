@@ -78,16 +78,11 @@ export default function Home() {
               cPanel. Incluye SSL gratis, migración gratis desde cualquier
               proveedor y copias diarias.
             </p>
-            <div className="hero-pills">
-              <span className="pill">Desde 2013</span>
-              <span className="pill">4 ubicaciones en EE. UU.</span>
-              <span className="pill">Ryzen 9 9950X</span>
-            </div>
             <div className="hero-ctas">
               <Link className="btn primary" to="/web-hosting">
                 Ver Hosting →
               </Link>
-              <Link className="btn ghost" to="/vps">
+              <Link className="btn secondary" to="/vps">
                 Ver VPS
               </Link>
             </div>
@@ -114,11 +109,10 @@ export default function Home() {
           <TrustStrip
             items={[
               "Desde 2013",
-              "Soporte 24/7 por ticket en español e inglés",
               "4 ubicaciones en EE. UU.",
-              "NVMe Gen 5",
               "Ryzen 9 9950X",
               "Protección DDoS",
+              "Soporte en español e inglés",
             ]}
           />
         </div>
@@ -136,7 +130,7 @@ export default function Home() {
             }
             lead="Elige la plataforma adecuada para tu sitio web, aplicación o carga de trabajo empresarial."
           />
-          <div className="cards">
+          <div className="cards service-cards">
             <article className="card glass">
               <div className="icon-chip">
                 <img src={iconHosting} alt="" />
@@ -144,9 +138,13 @@ export default function Home() {
               <h3>Web Hosting</h3>
               <p>
                 Alojamiento rápido, seguro y sencillo para sitios personales,
-                empresas y marcas en crecimiento. Desde {webMin}/mes.
+                empresas y marcas en crecimiento.
               </p>
-              <Link className="btn ghost" to="/web-hosting">
+              <p className="card-price">
+                Desde <strong>{webMin}</strong>
+                <span>/mes</span>
+              </p>
+              <Link className="btn primary" to="/web-hosting">
                 Ver planes →
               </Link>
             </article>
@@ -157,9 +155,13 @@ export default function Home() {
               <h3>VPS Hosting</h3>
               <p>
                 Recursos dedicados, acceso root y configuraciones flexibles de
-                servidores virtuales. Desde {vpsMin}/mes.
+                servidores virtuales.
               </p>
-              <Link className="btn ghost" to="/vps">
+              <p className="card-price">
+                Desde <strong>{vpsMin}</strong>
+                <span>/mes</span>
+              </p>
+              <Link className="btn secondary" to="/vps">
                 Ver planes →
               </Link>
             </article>
@@ -170,9 +172,13 @@ export default function Home() {
               <h3>Dedicated Servers</h3>
               <p>
                 Potente rendimiento en hardware dedicado para aplicaciones y
-                cargas de trabajo exigentes. Desde {dedMin}/mes.
+                cargas de trabajo exigentes.
               </p>
-              <Link className="btn ghost" to="/dedicated">
+              <p className="card-price">
+                Desde <strong>{dedMin}</strong>
+                <span>/mes</span>
+              </p>
+              <Link className="btn secondary" to="/dedicated">
                 Ver planes →
               </Link>
             </article>

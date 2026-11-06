@@ -10,11 +10,12 @@ function prefersReducedMotion(): boolean {
   );
 }
 
+const SECTION_SEL = "section, .hero, .page-hero";
+
 /**
- * Observa las secciones dentro de `containerRef` y les aplica reveal on
- * scroll: añade la clase `reveal` y, cuando entran en el viewport, la clase
- * `is-visible`. Un MutationObserver cubre las secciones que aparecen al
- * cambiar de ruta o de pestaña. Sin IntersectionObserver, todo queda visible.
+ * Reveal progresivo y tolerante: el contenido permanece legible por defecto.
+ * La animación solo se aplica cuando hay motion y el observer funciona; un
+ * fallback fuerza visibilidad para evitar secciones atrapadas en opacity 0.
  */
 export function useRevealOnScroll(
   containerRef: RefObject<HTMLElement | null>,
@@ -22,39 +23,62 @@ export function useRevealOnScroll(
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const markVisible = (el: Element) => {
+      el.classList.add("is-visible");
+      el.classList.remove("reveal-pending");
+    };
+
+    const showAll = () => {
+      container.querySelectorAll(SECTION_SEL).forEach(markVisible);
+    };
+
     if (
       typeof IntersectionObserver === "undefined" ||
       prefersReducedMotion()
     ) {
-      container
-        .querySelectorAll("section, .hero, .page-hero")
-        .forEach((el) => el.classList.add("is-visible"));
+      showAll();
       return;
     }
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
+          if (entry.isIntersecting || entry.intersectionRatio > 0) {
+            markVisible(entry.target);
             io.unobserve(entry.target);
           }
         }
       },
-      { threshold: 0.05, rootMargin: "0px 0px -40px 0px" },
+      // Margen generoso: revela un poco antes de entrar y no exige casi todo el alto.
+      { threshold: [0, 0.01, 0.08], rootMargin: "120px 0px 120px 0px" },
     );
+
     const watch = (root: Element) => {
-      root
-        .querySelectorAll("section, .hero, .page-hero")
-        .forEach((el) => {
-          if (el.classList.contains("reveal")) return;
-          el.classList.add("reveal");
-          io.observe(el);
-        });
+      root.querySelectorAll(SECTION_SEL).forEach((el) => {
+        if (el.classList.contains("is-visible")) return;
+        if (!el.classList.contains("reveal")) {
+          el.classList.add("reveal", "reveal-pending");
+        }
+        io.observe(el);
+        // Si ya está en viewport (hero / primeras secciones), mostrar ya.
+        const rect = el.getBoundingClientRect();
+        const vh = window.innerHeight || 0;
+        if (rect.top < vh + 120 && rect.bottom > -40) {
+          markVisible(el);
+          io.unobserve(el);
+        }
+      });
     };
+
     watch(container);
+    // Seguridad: nada debe quedar invisible si el observer no dispara.
+    const safety = window.setTimeout(showAll, 900);
+
     const mo = new MutationObserver(() => watch(container));
     mo.observe(container, { childList: true, subtree: true });
     return () => {
+      window.clearTimeout(safety);
       io.disconnect();
       mo.disconnect();
     };

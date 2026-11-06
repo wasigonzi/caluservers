@@ -10,7 +10,7 @@
   --calu-glass-strong:rgba(255,255,255,.1);
   --calu-glass-border:rgba(255,255,255,.14);
   --calu-glass-border-cyan:rgba(0,229,255,.28);
-  --bg:#070E15; --muted:#9eb4c6; --ok:#45e3a1;
+  --bg:#070E15; --muted:#b6c9d8; --ok:#45e3a1;
   --radius-sm:14px; --radius-md:20px; --radius-lg:28px; --radius-xl:32px;
   --space-section:72px; --space-section-sm:48px;
   --shadow-glass:0 20px 50px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.16);
@@ -46,18 +46,19 @@ img{max-width:100%;height:auto}
   padding:14px 24px;background:linear-gradient(105deg,#00E5FF 0%,#00B8D9 55%,#0099c9 100%);cursor:pointer;
   text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;
   box-shadow:0 12px 32px rgba(0,229,255,.26), inset 0 1px 0 rgba(255,255,255,.35);transition:transform .22s var(--ease),box-shadow .22s var(--ease),filter .22s var(--ease);letter-spacing:.01em}
-.btn.ghost{background:rgba(255,255,255,.06);color:var(--calu-white);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.btn.primary{/* alias del CTA principal con el estilo por defecto del .btn */}
+.btn.ghost,.btn.secondary{background:rgba(255,255,255,.08);color:#e8f4fb;border:1px solid rgba(200,230,245,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
 .btn:hover{filter:brightness(1.06);transform:translateY(-2px);box-shadow:0 16px 40px rgba(0,229,255,.36), inset 0 1px 0 rgba(255,255,255,.4)}
-.btn.ghost:hover{background:rgba(255,255,255,.1);border-color:rgba(0,229,255,.28);box-shadow:0 12px 28px rgba(0,0,0,.28)}
+.btn.ghost:hover,.btn.secondary:hover{background:rgba(255,255,255,.14);border-color:rgba(0,229,255,.4);color:#fff;box-shadow:0 12px 28px rgba(0,0,0,.28);filter:none}
 .btn:focus-visible,.links a:focus-visible,.menu:focus-visible{outline:2px solid var(--calu-cyan);outline-offset:3px}
 .neon-text{background:linear-gradient(100deg,#00F0EE,#00B8D9 50%,#4da3ff);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .muted{color:var(--muted)} .ok{color:var(--ok)}
 .kicker{display:inline-block;color:var(--calu-cyan);letter-spacing:.18em;font:600 11px 'Sora',sans-serif;text-transform:uppercase;margin-bottom:10px}
-.lead{font-size:17px;line-height:1.75;color:var(--muted);max-width:36em}
+.lead{font-size:17px;line-height:1.75;color:#c5d7e5;max-width:36em}
 .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;
-  font:600 12px 'Sora',sans-serif;letter-spacing:.04em;color:#dffaff;
-  background:rgba(0,229,255,.08);border:1px solid var(--calu-glass-border-cyan)}
+  font:600 12px 'Sora',sans-serif;letter-spacing:.04em;color:#eaf9ff;
+  background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.42)}
 .icon-chip{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;flex:none;margin-bottom:18px;
   background:linear-gradient(145deg,rgba(0,229,255,.14),rgba(0,123,255,.06));border:1px solid rgba(255,255,255,.12);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 8px 20px rgba(0,0,0,.18)}
@@ -68,7 +69,8 @@ img{max-width:100%;height:auto}
 /* topbar + nav */
 .topbar{background:rgba(5,9,20,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;padding:10px 0;letter-spacing:.02em;color:#b7c9d8}
 .topbar-in{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
-.nav{position:sticky;top:14px;z-index:50;margin:14px auto;max-width:1180px;border-radius:999px;padding:0 8px}
+.nav{position:sticky;top:12px;z-index:50;margin:12px auto 0;max-width:1180px;border-radius:999px;padding:0 8px;width:calc(100% - 28px)}
+.site-main{position:relative;z-index:1;isolation:isolate}
 .nav-in{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 14px 8px 18px}
 .brand img{height:46px;width:auto;display:block}
 .links{display:flex;gap:2px;align-items:center}
@@ -78,7 +80,7 @@ img{max-width:100%;height:auto}
 .nav-actions .btn{padding:10px 16px;border-radius:999px;font-size:13px}
 .menu{display:none;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:12px;padding:8px 12px;font-size:18px;cursor:pointer}
 /* hero */
-.hero{padding:56px 0 48px}
+.hero{padding:40px 0 48px}
 .hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:48px;align-items:center}
 .hero h1{font-size:clamp(38px,5.2vw,68px);letter-spacing:-.035em;margin:14px 0 18px;max-width:12ch}
 .eyebrow{display:inline-flex;align-items:center;color:var(--calu-cyan);letter-spacing:.14em;font:600 11px 'Sora',sans-serif;text-transform:uppercase}
@@ -87,8 +89,8 @@ img{max-width:100%;height:auto}
 .hero-pills{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:520px}
 .stat{padding:18px 16px;border-radius:var(--radius-md);text-align:left}
-.stat strong{display:block;font:800 24px/1.1 'Exo 2',sans-serif;letter-spacing:-.02em}
-.stat span{font-size:12px;color:var(--muted);margin-top:4px;display:block}
+.stat strong{display:block;font:800 24px/1.1 'Exo 2',sans-serif;letter-spacing:-.02em;color:#fff}
+.stat span{font-size:12px;color:#c2d4e2;margin-top:4px;display:block}
 .show{padding:40px;display:grid;place-items:center;min-height:230px}
 .show img{width:100%;max-width:520px}
 /* Robot 3D del hero (Spline real): columna derecha en escritorio, debajo del
@@ -115,7 +117,11 @@ img{max-width:100%;height:auto}
 .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,229,255,.35),transparent);opacity:.7}
 .card-icon{font-size:26px;margin-bottom:12px}
 .card h3{font-size:22px;margin:0 0 10px}
-.card p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 20px;flex:1}
+.card p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:0 0 16px;flex:1}
+.card-price{flex:0 0 auto;margin:0 0 18px !important;font:600 13px 'Sora',sans-serif;color:#cfe3f0;letter-spacing:.02em}
+.card-price strong{display:inline;font:800 28px/1 'Exo 2',sans-serif;color:#fff;letter-spacing:-.02em;margin:0 4px}
+.card-price span{color:#9eb4c6;font:600 13px 'Sora',sans-serif}
+.service-cards .card .btn{align-self:stretch;width:100%;margin-top:auto}
 .card .btn{align-self:flex-start;margin-top:auto}
 .wide-cta{padding:36px 40px;display:flex;justify-content:space-between;align-items:center;gap:28px;flex-wrap:wrap;position:relative;overflow:hidden}
 .wide-cta::after{content:"";position:absolute;right:-40px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,255,.18),transparent 70%);pointer-events:none}
@@ -198,18 +204,19 @@ img{max-width:100%;height:auto}
 .content h2{margin-top:26px;font-size:22px}
 .content p{color:var(--muted)}
 /* footer */
-.footer{border-top:1px solid rgba(255,255,255,.07);margin-top:72px;padding:56px 0 32px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.22))}
-.footer-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:36px}
-.footer img{height:72px;width:auto;margin-bottom:12px}
-.footer h4{font:600 11px 'Sora',sans-serif;letter-spacing:.16em;color:var(--calu-cyan);margin:0 0 16px;text-transform:uppercase}
-.footer a{display:block;color:var(--muted);text-decoration:none;padding:5px 0;font-size:14px;transition:color .2s var(--ease)}
+.footer{border-top:1px solid rgba(255,255,255,.08);margin-top:72px;padding:64px 0 36px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.28))}
+.footer-grid{display:grid;grid-template-columns:1.7fr 1fr 1fr 1fr;gap:40px}
+.footer-brand{max-width:280px}
+.footer img{height:68px;width:auto;margin-bottom:14px}
+.footer h4{font:700 11px 'Sora',sans-serif;letter-spacing:.18em;color:#7eecff;margin:4px 0 14px;text-transform:uppercase}
+.footer a{display:block;color:#b9cddc;text-decoration:none;padding:6px 0;font-size:14px;transition:color .2s var(--ease)}
 .footer a:hover{color:#fff}
-.footer p{color:var(--muted);font-size:14px;line-height:1.7;max-width:28ch;margin:0}
-.copyright{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;border-top:1px solid rgba(255,255,255,.06);margin-top:40px;padding-top:22px;color:var(--muted);font-size:12.5px}
+.footer p{color:#c2d4e2;font-size:14px;line-height:1.7;max-width:30ch;margin:0}
+.copyright{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;border-top:1px solid rgba(255,255,255,.08);margin-top:44px;padding-top:22px;color:#9eb4c6;font-size:12.5px}
 
 /* --- Nuevas secciones v2 (frosted glass) --- */
 .trust-strip{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:16px 18px;margin:28px 0 0}
-.trust-strip .pill{font-size:12px;padding:8px 14px}
+.trust-strip .pill{font-size:12px;padding:8px 14px;color:#eefbff;background:rgba(0,229,255,.12);border-color:rgba(0,229,255,.38)}
 .steps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .step-card{padding:28px 26px;position:relative;display:flex;flex-direction:column}
 .step-num{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:14px;
@@ -281,7 +288,7 @@ img{max-width:100%;height:auto}
   .links a{border-radius:12px}
   .links.open{display:flex}
   .menu{display:block}
-  .nav-actions .btn.ghost{display:none}
+  .nav-actions .btn.ghost,.nav-actions .btn.secondary{display:none}
   .domain-search{flex-direction:column}
   .use-case-grid,.story-grid{grid-template-columns:1fr}
   .wide-cta{padding:28px 24px}
@@ -317,8 +324,12 @@ img{max-width:100%;height:auto}
 .checkline input{width:auto}
 .source-note{font-size:13px;color:var(--muted)}
 
-/* --- Interactividad: reveal on scroll, contadores, hover lift --- */
-.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+/* --- Interactividad: reveal on scroll (tolerante), contadores, hover lift --- */
+/* Visible por defecto: solo .reveal-pending oculta suavemente mientras anima. */
+.reveal{opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+@media (prefers-reduced-motion:no-preference){
+  .reveal.reveal-pending:not(.is-visible){opacity:.28;transform:translateY(12px)}
+}
 .reveal.is-visible{opacity:1;transform:none}
 .card,.plan-card,.detail-card,.included-card,.loc-show-card,.step-card,
 .use-case-card,.story-card,.tech-item,.loc-card{
