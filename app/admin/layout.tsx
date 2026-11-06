@@ -15,7 +15,7 @@ export default async function AdminLayout({
     ["Facturas", "/admin/invoices"],
     ["Productos", "/admin/products"],
     ["Tickets", "/admin/tickets"],
-    ["Sitio (CMS)", "/admin/site"],
+    ["Sitio PRO", "/admin/site"],
     ["Conexión WHMCS", "/admin/settings"],
   ];
   return (

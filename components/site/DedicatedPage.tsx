@@ -32,6 +32,7 @@ const DEDICATED_FAQ = [
 
 export default function Dedicated() {
     const { catalog } = useCatalog();
+  const plans = catalog.dedicated.filter((p) => p.active);
   return (
     <>
       <PageHero
@@ -45,7 +46,7 @@ export default function Dedicated() {
       />
       <section className="wrap">
         <div className="plan-grid five">
-          {catalog.dedicated.map((plan, i) => (
+          {plans.map((plan, i) => (
             <PlanCard
               key={plan.id}
               plan={plan}

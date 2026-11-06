@@ -7,7 +7,8 @@ import { HERO_BG_DATA_URI } from "@/lib/brand";
 import type { Plan } from "@/lib/catalog";
 import { isPriceToConfirm } from "@/lib/catalog";
 import type { SiteSettings } from "@/lib/site-settings";
-import { applySiteTheme, socialEntries } from "@/lib/site-settings";
+import { applySiteTheme, logoSrc, socialEntries } from "@/lib/site-settings";
+import { resolveHref } from "@/lib/safe-links";
 import { useRevealOnScroll } from "@/components/site/Interactive";
 
 const NAV_LINKS: { href: string; label: string }[] = [
@@ -57,25 +58,13 @@ function IconClient(props: TabIconProps) {
   );
 }
 
-const MOBILE_TABS: {
-  key: string;
-  label: string;
-  href?: string;
-  external?: boolean;
-  Icon: (props: TabIconProps) => ReactNode;
-}[] = [
-  { key: "home", label: "Inicio", href: "/", Icon: IconHome },
-  { key: "hosting", label: "Hosting", href: "/web-hosting", Icon: IconHosting },
-  { key: "vps", label: "VPS", href: "/vps", Icon: IconVps },
-  { key: "domains", label: "Dominios", href: "/domains", Icon: IconDomains },
-  { key: "client", label: "Cliente", external: true, Icon: IconClient },
-];
 
 function TopBar({ settings }: { settings: SiteSettings }) {
+  if (!settings.chrome.showNetworkStatus) return null;
   return (
     <div className="topbar">
       <div className="wrap topbar-in">
-        <span>⚡ Infraestructura de alojamiento premium</span>
+        <span>⚡ {settings.branding.tagline || "Infraestructura de alojamiento premium"}</span>
         <span>
           Estado de la red: <b className="ok">{settings.networkStatus}</b>
         </span>
@@ -89,9 +78,11 @@ function Nav({ settings }: { settings: SiteSettings }) {
   return (
     <header className="nav glass">
       <div className="nav-in">
-        <Link className="brand" href="/" aria-label="CaluServers - Inicio">
+        <Link className="brand" href="/" aria-label={settings.branding.siteName + " - Inicio"}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/logo-principal.svg" alt="CALUSERVERS" />
+          <img className="logo-desktop" src={logoSrc(settings.branding)} alt={settings.branding.siteName} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="logo-mobile" src={logoSrc(settings.branding, true)} alt={settings.branding.siteName} />
         </Link>
         <details className="mobile-menu">
           <summary className="menu" aria-label="Abrir menú">☰</summary>
@@ -112,11 +103,17 @@ function Nav({ settings }: { settings: SiteSettings }) {
         </nav>
         <div className="nav-actions">
           <a className="btn secondary" href={settings.whmcs}>
-            Área de Cliente ↗
+            {settings.chrome.clientAreaLabel}
           </a>
-          <Link className="btn primary" href="/domains">
-            Comenzar
-          </Link>
+          {settings.chrome.headerCtaHref === "whmcs" || resolveHref(settings.chrome.headerCtaHref, settings.whmcs).startsWith("http") ? (
+            <a className="btn primary" href={resolveHref(settings.chrome.headerCtaHref, settings.whmcs)}>
+              {settings.chrome.headerCtaLabel}
+            </a>
+          ) : (
+            <Link className="btn primary" href={resolveHref(settings.chrome.headerCtaHref, settings.whmcs)}>
+              {settings.chrome.headerCtaLabel}
+            </Link>
+          )}
         </div>
       </div>
     </header>
@@ -125,22 +122,31 @@ function Nav({ settings }: { settings: SiteSettings }) {
 
 function MobileTabBar({ settings }: { settings: SiteSettings }) {
   const pathname = usePathname();
-  const whmcs = settings.whmcs;
+  const iconByKey: Record<string, (props: TabIconProps) => ReactNode> = {
+    home: IconHome,
+    hosting: IconHosting,
+    vps: IconVps,
+    domains: IconDomains,
+    client: IconClient,
+  };
+  const items = settings.mobileNav.filter((i) => i.enabled);
   return (
     <nav className="mobile-tabbar" aria-label="Navegación móvil">
-      {MOBILE_TABS.map((tab) => {
-        const Icon = tab.Icon;
-        if (tab.external) {
+      {items.map((tab) => {
+        const Icon = iconByKey[tab.key] || IconHome;
+        const href = resolveHref(tab.href, settings.whmcs);
+        const external = tab.href === "whmcs" || href.startsWith("http");
+        if (external) {
           return (
-            <a key={tab.key} className="mobile-tab" href={whmcs} target="_blank" rel="noreferrer">
+            <a key={tab.key} className="mobile-tab" href={href} target="_blank" rel="noreferrer">
               <span className="mobile-tab-icon"><Icon /></span>
               <span className="mobile-tab-label">{tab.label}</span>
             </a>
           );
         }
-        const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href!);
+        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
-          <Link key={tab.key} href={tab.href!} className={`mobile-tab${active ? " active" : ""}`}>
+          <Link key={tab.key} href={href} className={`mobile-tab${active ? " active" : ""}`}>
             <span className="mobile-tab-icon"><Icon /></span>
             <span className="mobile-tab-label">{tab.label}</span>
             {active ? <span className="sr-only">(página actual)</span> : null}
@@ -159,7 +165,7 @@ function Footer({ settings }: { settings: SiteSettings }) {
         <div className="footer-grid">
           <div className="footer-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/logo-principal.svg" alt="CALUSERVERS" />
+            <img src={logoSrc(settings.branding)} alt={settings.branding.siteName} />
             <p>{settings.content.footerBlurb}</p>
             {settings.contact.email ? (
               <p><a href={`mailto:${settings.contact.email}`}>{settings.contact.email}</a></p>
@@ -279,11 +285,12 @@ export function PlanCard({
 }) {
   const toConfirm = isPriceToConfirm(plan.price);
   return (
-    <article className={`plan-card glass${featured ? " featured" : ""}`}>
-      <span className="tag">{tag ?? "CALUSERVERS"}</span>
+    <article className={`plan-card glass${featured || plan.featured ? " featured" : ""}`}>
+      <span className="tag">{tag ?? plan.badge ?? "CALUSERVERS"}</span>
       <h3>{plan.name}</h3>
       {plan.description ? <p className="muted">{plan.description}</p> : null}
       <div className="price-line">
+        {plan.priceWas ? <s className="price-was">{plan.priceWas}</s> : null}
         {toConfirm ? <span className="price-consultar">Consultar</span> : plan.price}
         <span> / mes</span>
         {toConfirm ? <em className="price-note">Precio a confirmar en el portal</em> : null}

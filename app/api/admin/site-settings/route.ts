@@ -5,12 +5,21 @@ import { getSiteSettings, saveSiteSettings } from "@/lib/site-settings-db";
 import {
   DEFAULT_SITE_SETTINGS,
   parseSiteSettings,
+  settingsToRows,
   validateSiteSettings,
   type SiteSettings,
 } from "@/lib/site-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function coerceSettings(body: unknown): SiteSettings {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return structuredClone(DEFAULT_SITE_SETTINGS);
+  }
+  const b = body as SiteSettings;
+  return parseSiteSettings(settingsToRows(b), DEFAULT_SITE_SETTINGS);
+}
 
 export async function GET() {
   try {
@@ -36,23 +45,13 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    if (body?.action === "restore") {
+      const saved = await saveSiteSettings(
+        structuredClone(DEFAULT_SITE_SETTINGS),
+      );
+      return NextResponse.json({ ok: true, settings: saved });
     }
-    // Merge over defaults via the same row parser used publicly.
-    const candidate = parseSiteSettings(
-      [
-        { key: "whmcs", value: (body as SiteSettings).whmcs },
-        { key: "theme", value: (body as SiteSettings).theme },
-        { key: "network_status", value: (body as SiteSettings).networkStatus },
-        { key: "contact", value: (body as SiteSettings).contact },
-        { key: "social", value: (body as SiteSettings).social },
-        { key: "content", value: (body as SiteSettings).content },
-        { key: "visibility", value: (body as SiteSettings).visibility },
-        { key: "appearance", value: (body as SiteSettings).appearance },
-      ],
-      DEFAULT_SITE_SETTINGS,
-    );
+    const candidate = coerceSettings(body?.settings ?? body);
     const err = validateSiteSettings(candidate);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
     const saved = await saveSiteSettings(candidate);

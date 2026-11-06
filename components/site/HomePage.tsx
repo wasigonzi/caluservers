@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import SplineHero from "@/components/site/SplineHero";
 const iconHosting = "/icons/servicio-hosting.svg";
@@ -9,6 +10,9 @@ const iconSeguridad = "/icons/servicio-seguridad.svg";
 const iconSoporte = "/icons/servicio-soporte.svg";
 import { isPriceToConfirm } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
+import { resolveHref } from "@/lib/safe-links";
+import { PlanCard } from "@/components/site/SiteShell";
+import type { HomeSectionId } from "@/lib/site-settings";
 import { AnimatedNumber } from "@/components/site/Interactive";
 import {
   CompareTable,
@@ -55,16 +59,21 @@ const HOME_FAQ = [
 ];
 
 export default function Home() {
-    const { catalog } = useCatalog();
-  const { content, visibility } = catalog.settings;
+  const { catalog } = useCatalog();
+  const { content, visibility, sections, whmcs } = catalog.settings;
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
   const webMin = minPrice(catalog.webHosting.map((p) => p.price));
   const vpsMin = minPrice(catalog.vps.map((p) => p.price));
   const dedMin = minPrice(catalog.dedicated.map((p) => p.price));
+  const featured = [
+    ...catalog.webHosting,
+    ...catalog.vps,
+    ...catalog.dedicated,
+  ].filter((p) => p.active && p.featured);
 
-  return (
-    <>
-      <section className="hero">
+  const blocks: Record<HomeSectionId, ReactNode> = {
+    hero: (
+      <section className="hero" key="hero">
         <div className="wrap hero-grid">
           <div>
             <span className="eyebrow">
@@ -76,10 +85,16 @@ export default function Home() {
             </h1>
             <p className="lead">{content.heroLead}</p>
             <div className="hero-ctas">
-              <Link className="btn primary" href="/web-hosting">
+              <Link
+                className="btn primary"
+                href={resolveHref(content.heroCtaPrimaryHref, whmcs)}
+              >
                 {content.heroCtaPrimary}
               </Link>
-              <Link className="btn secondary" href="/vps">
+              <Link
+                className="btn secondary"
+                href={resolveHref(content.heroCtaSecondaryHref, whmcs)}
+              >
                 {content.heroCtaSecondary}
               </Link>
             </div>
@@ -102,32 +117,28 @@ export default function Home() {
           </div>
           <SplineHero />
         </div>
-        {visibility.trustStrip ? (
-          <div className="wrap">
-            <TrustStrip
-              items={[
-                "Desde 2013",
-                "4 ubicaciones en EE. UU.",
-                "Ryzen 9 9950X",
-                "Protección DDoS",
-                "Soporte en español e inglés",
-              ]}
-            />
-          </div>
-        ) : null}
       </section>
-
-      <section className="section">
+    ),
+    trustStrip: visibility.trustStrip ? (
+      <div className="wrap" key="trust">
+        <TrustStrip
+          items={[
+            "Desde 2013",
+            "4 ubicaciones en EE. UU.",
+            "Ryzen 9 9950X",
+            "Protección DDoS",
+            "Soporte en español e inglés",
+          ]}
+        />
+      </div>
+    ) : null,
+    services: visibility.services ? (
+      <section className="section" key="services">
         <div className="wrap">
           <SectionHead
-            kicker="Nuestros servicios"
-            title={
-              <>
-                Infraestructura que{" "}
-                <span className="neon-text">te impulsa hacia adelante.</span>
-              </>
-            }
-            lead="Elige la plataforma adecuada para tu sitio web, aplicación o carga de trabajo empresarial."
+            kicker={content.servicesKicker}
+            title={<>{content.servicesTitle}</>}
+            lead={content.servicesLead}
           />
           <div className="cards service-cards">
             <article className="card glass">
@@ -184,9 +195,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {visibility.steps ? (
-      <section className="section">
+    ) : null,
+    steps: visibility.steps ? (
+      <section className="section" key="steps">
         <div className="wrap">
           <SectionHead
             kicker="Cómo funciona"
@@ -216,10 +227,9 @@ export default function Home() {
           />
         </div>
       </section>
-      ) : null}
-
-      {visibility.compare ? (
-      <section className="section">
+    ) : null,
+    compare: visibility.compare ? (
+      <section className="section" key="compare">
         <div className="wrap">
           <SectionHead
             kicker="Comparativa"
@@ -237,38 +247,20 @@ export default function Home() {
               {
                 label: "Desde",
                 cells: [
-                  <span className="best" key="w">{webMin}/mes</span>,
-                  <span className="best" key="v">{vpsMin}/mes</span>,
-                  <span className="best" key="d">{dedMin}/mes</span>,
-                ],
-              },
-              {
-                label: "Procesador",
-                cells: [
-                  "Compartido",
-                  "AMD Ryzen 9 9950X · 1–16 vCores",
-                  "Intel Xeon · AMD Ryzen · AMD EPYC · 8–24 cores",
-                ],
-              },
-              {
-                label: "Memoria",
-                cells: ["—", "2–64 GB DDR5", "32–256 GB RAM"],
-              },
-              {
-                label: "Almacenamiento",
-                cells: [
-                  "20–100 GB NVMe SSD",
-                  "20–960 GB SSD NVMe Gen 5",
-                  "2× 1 TB SSD – 4× 2 TB NVMe",
+                  <span className="best" key="w">
+                    {webMin}/mes
+                  </span>,
+                  <span className="best" key="v">
+                    {vpsMin}/mes
+                  </span>,
+                  <span className="best" key="d">
+                    {dedMin}/mes
+                  </span>,
                 ],
               },
               {
                 label: "Acceso root",
-                cells: [
-                  "No · Panel cPanel",
-                  "Sí · Root total",
-                  "Sí · Hardware propio",
-                ],
+                cells: ["No · Panel cPanel", "Sí · Root total", "Sí · Hardware propio"],
               },
               {
                 label: "Ideal para",
@@ -280,16 +272,32 @@ export default function Home() {
               },
             ]}
           />
-          <p className="fineprint" style={{ textAlign: "center" }}>
-            Rangos tomados de los planes publicados: VPS de 1 vCore/2 GB a 16
-            vCores/64 GB; dedicados de 8 cores/32 GB a 24 cores/256 GB.
-          </p>
         </div>
       </section>
-      ) : null}
-
-      {visibility.locations ? (
-      <section className="section">
+    ) : null,
+    featuredPlans: visibility.featuredPlans ? (
+      <section className="section" key="featured">
+        <div className="wrap">
+          <SectionHead
+            kicker={content.featuredKicker}
+            title={<>{content.featuredTitle}</>}
+            lead={content.featuredLead}
+          />
+          <div className="cards">
+            {featured.length ? (
+              featured.map((plan) => <PlanCard key={plan.id} plan={plan} featured />)
+            ) : (
+              <p className="muted">
+                Marca planes como «Destacado» en el panel de catálogo para
+                mostrarlos aquí.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+    ) : null,
+    locations: visibility.locations ? (
+      <section className="section" key="locations">
         <div className="wrap">
           <SectionHead
             kicker="Ubicaciones"
@@ -303,30 +311,24 @@ export default function Home() {
           />
           <div className="loc-show-grid">
             {enabledLocations.map((loc) => {
-              const count = catalog.vps.filter(
-                (p) => p.locationId === loc.id,
-              ).length;
+              const count = catalog.vps.filter((p) => p.locationId === loc.id).length;
               return (
                 <article key={loc.id} className="loc-show-card glass">
                   <span className="loc-flag">{loc.flag}</span>
                   <h3>{loc.city}</h3>
                   <p>
                     {loc.name} · {count} plan{count === 1 ? "" : "es"} VPS
-                    disponible{count === 1 ? "" : "s"}
                   </p>
-                  {loc.badge ? (
-                    <span className="pill">{loc.badge}</span>
-                  ) : null}
+                  {loc.badge ? <span className="pill">{loc.badge}</span> : null}
                 </article>
               );
             })}
           </div>
         </div>
       </section>
-      ) : null}
-
-      {visibility.whyUs ? (
-      <section className="section">
+    ) : null,
+    whyUs: visibility.whyUs ? (
+      <section className="section" key="whyUs">
         <div className="wrap">
           <SectionHead
             kicker="¿Por qué CaluServers?"
@@ -372,47 +374,58 @@ export default function Home() {
           </div>
         </div>
       </section>
-      ) : null}
-
-      {visibility.faq ? (
-      <section className="section">
+    ) : null,
+    faq: visibility.faq ? (
+      <section className="section" key="faq">
         <div className="wrap">
           <SectionHead
             kicker="Preguntas frecuentes"
             title={
               <>
-                Dudas comunes,{" "}
-                <span className="neon-text">respuestas claras.</span>
+                Dudas comunes, <span className="neon-text">respuestas claras.</span>
               </>
             }
           />
           <Faq items={HOME_FAQ} />
         </div>
       </section>
-      ) : null}
-
-      <section className="section">
+    ) : null,
+    cta: visibility.cta ? (
+      <section className="section" key="cta">
         <div className="wrap">
           <div className="glass wide-cta">
             <div>
-              <span className="kicker">¿Estás listo?</span>
-              <h2>Tu próximo proyecto comienza aquí.</h2>
-              <p className="muted">
-                Encuentra un plan de alojamiento que se ajuste a tus objetivos.
-              </p>
+              <span className="kicker">{content.ctaKicker}</span>
+              <h2>{content.ctaTitle}</h2>
+              <p className="muted">{content.ctaLead}</p>
             </div>
-            <Link className="btn primary" href="/web-hosting">
-              Comenzar →
+            <Link
+              className="btn primary"
+              href={resolveHref(content.ctaButtonHref, whmcs)}
+            >
+              {content.ctaButtonLabel}
             </Link>
           </div>
-          <p className="fineprint">
-            *El tiempo de actividad es solo un objetivo, no una garantía
-            contractual. Publica un SLA (acuerdo de nivel de servicio)
-            únicamente después de haber confirmado tus compromisos de
-            infraestructura.
-          </p>
         </div>
       </section>
+    ) : null,
+  };
+
+  // trustStrip lives visually under hero historically; if ordered separately, render as section
+  return (
+    <>
+      {sections.map((sec) => {
+        if (!sec.enabled) return null;
+        if (sec.id === "trustStrip") {
+          // attach under hero if hero immediately precedes — still render block
+          return (
+            <div key="trust-wrap" className="trust-follow">
+              {blocks.trustStrip}
+            </div>
+          );
+        }
+        return blocks[sec.id] ?? null;
+      })}
     </>
   );
 }

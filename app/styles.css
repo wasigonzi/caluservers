@@ -38,3 +38,33 @@
   .admin .main{padding:18px}
   .admin .metrics,.admin .preset-grid{grid-template-columns:1fr}
 }
+
+/* PRO studio */
+.pro-studio .pro-toolbar{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-bottom:12px}
+.pro-studio .pro-search input{min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid #ffffff35;background:#07131d;color:#fff}
+.pro-studio .pro-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pro-studio .pill{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:12px}
+.pro-studio .pill.warn{background:#ffb02033;color:#ffd38a}
+.pro-studio .pill.ok{background:#45e3a133;color:#9dffd0}
+.pro-studio .media-field{display:grid;grid-template-columns:1fr 120px;gap:12px;align-items:end}
+.pro-studio .media-preview{min-height:72px;border:1px dashed #ffffff33;border-radius:12px;display:grid;place-items:center;overflow:hidden;background:#07131d}
+.pro-studio .media-preview img{max-width:100%;max-height:70px;object-fit:contain}
+.pro-studio .logo-fallback{display:flex;gap:16px;padding:12px;margin-top:12px}
+.pro-studio .color-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pro-studio .section-list{list-style:none;padding:0;margin:0}
+.pro-studio .section-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #ffffff18}
+.pro-studio .row-actions{display:flex;gap:6px}
+.pro-studio .plan-editor{margin:14px 0}
+.pro-studio .plan-editor header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px}
+.pro-studio .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pro-studio .plan-grid .wide{grid-column:1/-1}
+.pro-studio .nav-row{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;margin:8px 0;align-items:center}
+.pro-studio .preview-frame{border-radius:18px;padding:22px;margin-top:12px;border:1px solid #ffffff22}
+.pro-studio .preview-frame.mobile{max-width:390px}
+.pro-studio .preview-frame img{height:40px;width:auto;margin-bottom:12px}
+.pro-studio .sticky-actions{position:sticky;bottom:12px;background:#09101cee;padding:12px;border-radius:14px;border:1px solid #ffffff22;backdrop-filter:blur(10px)}
+.pro-studio .tabs.compact{margin:10px 0}
+.pro-studio select{display:block;width:100%;margin-top:7px;padding:13px;border-radius:11px;border:1px solid #ffffff35;background:#07131d;color:white;font:inherit}
+@media(max-width:800px){
+  .pro-studio .media-field,.pro-studio .color-grid,.pro-studio .plan-grid,.pro-studio .nav-row{grid-template-columns:1fr}
+}

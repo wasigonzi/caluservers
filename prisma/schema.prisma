@@ -30,3 +30,12 @@ model SiteSetting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+/// Catálogo público editable (planes/ubicaciones). JSON validado en servidor.
+/// Aplicar con prisma migrate deploy. Independiente de SiteSetting.
+model CatalogConfig {
+  id        String   @id @default("default")
+  payload   Json
+  updatedAt DateTime @updatedAt
+}
+
