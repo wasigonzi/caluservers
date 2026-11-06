@@ -74,7 +74,9 @@ img{max-width:100%;height:auto}
 .nav{position:sticky;top:12px;z-index:50;margin:12px auto 0;max-width:1180px;border-radius:999px;padding:0 8px;width:calc(100% - 28px)}
 .site-main{position:relative;z-index:1;isolation:isolate}
 .nav-in{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 14px 8px 18px}
-.brand img{height:46px;width:auto;display:block}
+.brand img{height:46px;width:auto}
+.brand .logo-desktop{display:block}
+.brand .logo-mobile{display:none}
 .links{display:flex;gap:2px;align-items:center}
 .links a{color:#c5d8e6;text-decoration:none;font:500 13px 'Sora',sans-serif;padding:9px 13px;border-radius:999px;transition:background .2s var(--ease),color .2s var(--ease)}
 .links a:hover,.links a.active{color:#fff;background:rgba(0,229,255,.12)}
@@ -278,6 +280,8 @@ img{max-width:100%;height:auto}
   .nav{top:8px;margin:8px 12px;border-radius:18px;max-width:none;padding:0}
   .nav-in{padding:6px 10px}
   .brand img{height:36px}
+  .brand .logo-desktop{display:none!important}
+  .brand .logo-mobile{display:block!important}
   .hero{padding:28px 0 28px}
   .hero h1{max-width:none;font-size:clamp(34px,9vw,46px)}
   .hero-grid,.vps-slide{grid-template-columns:1fr}
@@ -466,15 +470,15 @@ img{max-width:100%;height:auto}
   .desktop-links{display:none!important}
 }
 
-.logo-mobile{display:none}
-.logo-desktop{display:block}
 .price-was{opacity:.65;margin-right:8px;font-size:.85em}
 html[data-font="system"] body{font-family:system-ui,Segoe UI,Roboto,sans-serif}
 html[data-font="inter"] body{font-family:'Inter',system-ui,sans-serif}
 html[data-font="exo-sora"] body{font-family:'Sora',system-ui,sans-serif}
+
+/* Un solo logo visible: desktop por defecto; móvil/tablet ≤900px */
 @media(max-width:900px){
-  .logo-desktop{display:none}
-  .logo-mobile{display:block}
+  .brand .logo-desktop{display:none!important}
+  .brand .logo-mobile{display:block!important}
 }
 
 /* Sales-ready polish */

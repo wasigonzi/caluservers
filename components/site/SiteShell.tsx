@@ -81,9 +81,19 @@ function Nav({ settings }: { settings: SiteSettings }) {
       <div className="nav-in">
         <Link className="brand" href="/" aria-label={settings.branding.siteName + " - Inicio"}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-desktop" src={logoSrc(settings.branding)} alt={settings.branding.siteName} />
+          <img
+            className="logo-desktop"
+            src={logoSrc(settings.branding)}
+            alt=""
+            aria-hidden="true"
+          />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-mobile" src={logoSrc(settings.branding, true)} alt={settings.branding.siteName} />
+          <img
+            className="logo-mobile"
+            src={logoSrc(settings.branding, true)}
+            alt=""
+            aria-hidden="true"
+          />
         </Link>
         <details className="mobile-menu">
           <summary className="menu" aria-label="Abrir menú">☰</summary>
