@@ -21,3 +21,12 @@ model AdminAudit {
   details   String?  @db.Text
   createdAt DateTime @default(now())
 }
+
+/// Ajustes públicos del sitio (contacto, redes, contenido, visibilidad, apariencia).
+/// Claves esperadas: whmcs, theme, network_status, contact, social, content, visibility, appearance.
+/// Aplicar con: npx prisma migrate deploy (o db push en desarrollo). No ejecutar en remoto desde CI de este PR.
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
