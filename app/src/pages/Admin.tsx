@@ -4,6 +4,7 @@ import type { Plan, SiteSettings, VpsLocation } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { isSupabaseConfigured } from "../lib/supabase";
 import {
+  changePassword,
   deletePlanAdmin,
   ensureFirstAdmin,
   fetchLocationsAdmin,
@@ -63,6 +64,28 @@ export default function Admin() {
   const [editing, setEditing] = useState<Plan | null>(null);
   const [featuresText, setFeaturesText] = useState("");
   const [status, setStatus] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [newPass2, setNewPass2] = useState("");
+
+  async function onChangePassword(e: FormEvent) {
+    e.preventDefault();
+    if (newPass.length < 8) {
+      setStatus("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (newPass !== newPass2) {
+      setStatus("Las contraseñas no coinciden.");
+      return;
+    }
+    const res = await changePassword(newPass);
+    setStatus(
+      res.ok ? "Contraseña actualizada." : (res.error ?? "No se pudo actualizar la contraseña."),
+    );
+    if (res.ok) {
+      setNewPass("");
+      setNewPass2("");
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -458,6 +481,43 @@ export default function Admin() {
           </button>
         </div>
         {status ? <p className="notice glass">{status}</p> : null}
+
+        <details className="glass admin-card" style={{ marginBottom: 16 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 700 }}>
+            Cambiar contraseña
+          </summary>
+          <form
+            className="admin-form"
+            onSubmit={onChangePassword}
+            style={{ marginTop: 12 }}
+          >
+            <div className="field">
+              <label htmlFor="np-pass">Nueva contraseña</label>
+              <input
+                id="np-pass"
+                type="password"
+                value={newPass}
+                onChange={(e) => setNewPass(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="np-pass2">Repite la nueva contraseña</label>
+              <input
+                id="np-pass2"
+                type="password"
+                value={newPass2}
+                onChange={(e) => setNewPass2(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+            <button className="btn primary" type="submit">
+              Guardar contraseña
+            </button>
+          </form>
+        </details>
 
         {tab === "planes" && (
           <div className="admin-card glass">

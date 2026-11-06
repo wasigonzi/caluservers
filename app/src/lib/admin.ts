@@ -72,7 +72,14 @@ export async function signUpAdmin(
   if (err || !supabase) {
     return { ok: false, needsConfirmation: false, error: err ?? NOT_CONFIGURED };
   }
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo:
+        "https://caluservers-wasigonzi-2937s-projects.vercel.app/admin",
+    },
+  });
   if (error) {
     return { ok: false, needsConfirmation: false, error: error.message };
   }
@@ -94,6 +101,16 @@ export async function signUpAdmin(
     message:
       "Cuenta creada. Revisa tu correo para confirmar la cuenta y luego inicia sesión.",
   };
+}
+
+export async function changePassword(
+  newPassword: string,
+): Promise<AdminResult<void>> {
+  const err = guard();
+  if (err || !supabase) return { ok: false, error: err ?? NOT_CONFIGURED };
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function isAdmin(userId: string): Promise<boolean> {
