@@ -1,0 +1,1 @@
+import {NextRequest,NextResponse} from "next/server";import {sessionCookie} from "@/lib/auth";import {trustedWrite} from "@/lib/request";export async function POST(req:NextRequest){if(!trustedWrite(req))return NextResponse.json({error:"Forbidden"},{status:403});const res=NextResponse.redirect(new URL("/admin/login",req.url),303);res.cookies.delete(sessionCookie);return res}
