@@ -39,3 +39,12 @@ model CatalogConfig {
   updatedAt DateTime @updatedAt
 }
 
+/// Textos públicos editables por ruta (CMS estructurado).
+/// payload = Record<fieldId, string>. Defaults en lib/page-content.ts.
+/// Aplicar: npx prisma migrate deploy
+model PageContent {
+  path      String   @id
+  payload   Json
+  updatedAt DateTime @updatedAt
+}
+

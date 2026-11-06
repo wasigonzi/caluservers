@@ -2,12 +2,14 @@ import type {
   AppearancePreset,
   BrandingSettings,
   ChromeSettings,
+  DensityToken,
   HomeSection,
   HomeSectionId,
   MobileNavItem,
   SafeFontId,
   SeoSettings,
   SiteSettings,
+  SurfaceToken,
   ThemeSettings,
 } from "./catalog";
 import { SEED_CATALOG } from "./catalog";
@@ -22,12 +24,14 @@ export type {
   AppearancePreset,
   BrandingSettings,
   ChromeSettings,
+  DensityToken,
   HomeSection,
   HomeSectionId,
   MobileNavItem,
   SafeFontId,
   SeoSettings,
   SiteSettings,
+  SurfaceToken,
   ThemeSettings,
 };
 
@@ -67,22 +71,45 @@ export const APPEARANCE_PRESETS: Record<
   },
 };
 
-export const SAFE_FONTS: Record<SafeFontId, { label: string; css: string }> = {
+export const SAFE_FONTS: Record<
+  SafeFontId,
+  { label: string; css: string; heading: string; body: string }
+> = {
   system: {
     label: "System UI",
     css: "system-ui,Segoe UI,Roboto,sans-serif",
+    heading: "system-ui,Segoe UI,Roboto,sans-serif",
+    body: "system-ui,Segoe UI,Roboto,sans-serif",
   },
   "sora-montserrat": {
-    label: "Sora + Montserrat",
+    label: "Sora (títulos) + Montserrat (cuerpo)",
     css: "'Montserrat',system-ui,sans-serif",
+    heading: "'Sora',system-ui,sans-serif",
+    body: "'Montserrat',system-ui,sans-serif",
   },
   "exo-sora": {
-    label: "Exo 2 + Sora",
+    label: "Exo 2 (títulos) + Sora (cuerpo)",
     css: "'Sora',system-ui,sans-serif",
+    heading: "'Exo 2',system-ui,sans-serif",
+    body: "'Sora',system-ui,sans-serif",
   },
   inter: {
-    label: "Inter",
+    label: "Inter (títulos y cuerpo)",
     css: "'Inter',system-ui,sans-serif",
+    heading: "'Inter',system-ui,sans-serif",
+    body: "'Inter',system-ui,sans-serif",
+  },
+  "playfair-source": {
+    label: "Playfair Display + Source Sans 3",
+    css: "'Source Sans 3',system-ui,sans-serif",
+    heading: "'Playfair Display',Georgia,serif",
+    body: "'Source Sans 3',system-ui,sans-serif",
+  },
+  "dm-sans-ibm": {
+    label: "DM Sans + IBM Plex Sans",
+    css: "'IBM Plex Sans',system-ui,sans-serif",
+    heading: "'DM Sans',system-ui,sans-serif",
+    body: "'IBM Plex Sans',system-ui,sans-serif",
   },
 };
 
@@ -257,7 +284,9 @@ export function parseSiteSettings(
         font === "system" ||
         font === "sora-montserrat" ||
         font === "exo-sora" ||
-        font === "inter"
+        font === "inter" ||
+        font === "playfair-source" ||
+        font === "dm-sans-ibm"
       ) {
         settings.appearance.font = font;
       }
@@ -268,6 +297,22 @@ export function parseSiteSettings(
       const shadow = obj?.shadow;
       if (shadow === "soft" || shadow === "medium" || shadow === "strong") {
         settings.appearance.shadow = shadow;
+      }
+      const density = obj?.density;
+      if (
+        density === "compact" ||
+        density === "comfortable" ||
+        density === "relaxed"
+      ) {
+        settings.appearance.density = density;
+      } else if (!settings.appearance.density) {
+        settings.appearance.density = "comfortable";
+      }
+      const surface = obj?.surface;
+      if (surface === "solid" || surface === "glass" || surface === "mesh") {
+        settings.appearance.surface = surface;
+      } else if (!settings.appearance.surface) {
+        settings.appearance.surface = "glass";
       }
     } else if (row.key === "branding") {
       const obj = asObject(row.value);
@@ -387,6 +432,10 @@ export function settingsToRows(
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateSiteSettings(settings: SiteSettings): string | null {
+  if (!contrastOk(settings.theme.background, settings.theme.text)) {
+    return "Contraste insuficiente entre fondo y texto (mín. 4.5:1).";
+  }
+
   if (!isHttpsUrl(settings.whmcs, { allowEmpty: false })) {
     return "La URL de WHMCS debe ser https válida.";
   }
@@ -485,26 +534,53 @@ export function validateSiteSettings(settings: SiteSettings): string | null {
   return null;
 }
 
+export function contrastOk(bg: string, fg: string): boolean {
+  const hex = (h: string) => {
+    const x = h.replace("#", "").trim();
+    if (!/^[0-9a-fA-F]{6}$/.test(x)) return null;
+    const n = (i: number) => parseInt(x.slice(i, i + 2), 16) / 255;
+    const lin = (c: number) =>
+      c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    const [r, g, b] = [n(0), n(2), n(4)].map(lin);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const L1 = hex(bg);
+  const L2 = hex(fg);
+  if (L1 == null || L2 == null) return true;
+  const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+  return ratio >= 4.5;
+}
+
 export function applySiteTheme(settings: SiteSettings): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const { theme, appearance } = settings;
+  const font = SAFE_FONTS[appearance.font] ?? SAFE_FONTS["sora-montserrat"];
   root.dataset.appearance = appearance.preset;
   root.dataset.font = appearance.font;
   root.dataset.radius = appearance.radius;
   root.dataset.shadow = appearance.shadow;
+  root.dataset.density = appearance.density || "comfortable";
+  root.dataset.surface = appearance.surface || "glass";
   root.style.setProperty("--calu-cyan", theme.primary);
   root.style.setProperty("--calu-turquoise", theme.secondary);
   root.style.setProperty("--calu-luminous", theme.primary);
   root.style.setProperty("--bg", theme.background);
   root.style.setProperty("--calu-white", theme.text);
   root.style.setProperty("--calu-btn-gradient", theme.gradient);
-  root.style.setProperty(
-    "--calu-font",
-    SAFE_FONTS[appearance.font]?.css ?? SAFE_FONTS["sora-montserrat"].css,
-  );
+  root.style.setProperty("--calu-font", font.body);
+  root.style.setProperty("--calu-font-heading", font.heading);
   const radiusMap = { sm: "12px", md: "20px", lg: "28px" };
   root.style.setProperty("--radius-lg", radiusMap[appearance.radius]);
+  const densityMap = {
+    compact: "0.92",
+    comfortable: "1",
+    relaxed: "1.08",
+  } as const;
+  root.style.setProperty(
+    "--calu-density",
+    densityMap[appearance.density || "comfortable"],
+  );
 }
 
 export function socialEntries(

@@ -75,15 +75,26 @@ export interface SiteVisibility {
   services: boolean;
 }
 
-export type SafeFontId = "system" | "sora-montserrat" | "exo-sora" | "inter";
+export type SafeFontId =
+  | "system"
+  | "sora-montserrat"
+  | "exo-sora"
+  | "inter"
+  | "playfair-source"
+  | "dm-sans-ibm";
 export type RadiusToken = "sm" | "md" | "lg";
 export type ShadowToken = "soft" | "medium" | "strong";
+export type DensityToken = "compact" | "comfortable" | "relaxed";
+export type SurfaceToken = "solid" | "glass" | "mesh";
 
 export interface SiteAppearance {
   preset: AppearancePreset;
+  /** Pareja tipográfica heading/body segura (no CSS arbitrario). */
   font: SafeFontId;
   radius: RadiusToken;
   shadow: ShadowToken;
+  density: DensityToken;
+  surface: SurfaceToken;
 }
 
 export interface BrandingSettings {
@@ -718,7 +729,7 @@ export const SEED_CATALOG: Catalog = {
       cta: true,
       services: true,
     },
-    appearance: { preset: "default", font: "sora-montserrat", radius: "lg", shadow: "medium" },
+    appearance: { preset: "default", font: "sora-montserrat", radius: "lg", shadow: "medium", density: "comfortable", surface: "glass" },
     branding: {
       siteName: "CaluServers",
       tagline: "Hosting • VPS • Dedicated Servers",

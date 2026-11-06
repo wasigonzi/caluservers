@@ -18,11 +18,14 @@ const pages = [
   "/sitemap.xml",
   "/admin/login",
   "/admin/site",
+  "/admin/pages",
 ];
 
 const viewports = [
+  { name: "mobile-360", width: 360, height: 800 },
   { name: "mobile-390", width: 390, height: 844 },
-  { name: "tablet-900", width: 900, height: 900 },
+  { name: "tablet-768", width: 768, height: 1024 },
+  { name: "laptop-1024", width: 1024, height: 768 },
   { name: "desktop-1440", width: 1440, height: 900 },
 ];
 
@@ -87,6 +90,23 @@ for (const vp of viewports) {
         detail += ` PAGEERROR=${consoleErrors.slice(-1)[0]}`;
         consoleErrors.length = 0;
       }
+
+      // No horizontal overflow on public HTML pages
+      if (!path.startsWith("/admin") && !path.includes(".")) {
+        const overflow = await page.evaluate(() => {
+          const doc = document.documentElement;
+          return doc.scrollWidth > doc.clientWidth + 1;
+        });
+        detail += ` overflowX=${overflow}`;
+        if (overflow) {
+          status = "fail";
+          detail += " H_OVERFLOW";
+        }
+      }
+      if (path === "/admin/pages" || path === "/api/admin/page-content") {
+        // handled via page nav; login redirect expected for /admin/pages
+      }
+
       // CTAs / purchase on product pages
       if (path === "/web-hosting" || path === "/vps" || path === "/dedicated") {
         const orders = page.locator('a.btn.primary[href*="client.caluservers.com"]');

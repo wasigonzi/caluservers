@@ -1,4 +1,5 @@
 "use client";
+import { useCopy } from "@/lib/page-content-context";
 import { INCLUDED_BENEFITS, TECH_SPECS } from "@/lib/catalog";
 const iconHosting = "/icons/servicio-hosting.svg";
 const iconRed = "/icons/servicio-red.svg";
@@ -37,19 +38,26 @@ const WEB_FAQ = [
 ];
 
 export default function WebHosting() {
-    const { catalog } = useCatalog();
+    
+  const kicker = useCopy("kicker", "Web Hosting");
+  const title = useCopy("title", "Hosting web rápido con cPanel");
+  const titleAccent = useCopy("titleAccent", "y SSL gratis");
+  const lead = useCopy("lead", "Alojamiento sencillo, seguro y rápido para cada etapa de tu trayectoria en línea.");
+  const faqKicker = useCopy("faqKicker", "Preguntas frecuentes");
+  const faqTitle = useCopy("faqTitle", "Hosting sin sorpresas");
+const { catalog } = useCatalog();
   const plans = catalog.webHosting.filter((p) => p.active);
   return (
     <>
       <PageHero
-        kicker="Web Hosting"
+        kicker={kicker}
         title={
           <>
-            Alojamiento que{" "}
-            <span className="neon-text">te mantiene en marcha.</span>
+            {title}{" "}
+            <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Alojamiento sencillo, seguro y rápido para cada etapa de tu trayectoria en línea."
+        lead={lead}
       />
       <section className="wrap">
         <div className="plan-grid">
@@ -170,13 +178,8 @@ export default function WebHosting() {
         </section>
         <section className="section">
           <SectionHead
-            kicker="Preguntas frecuentes"
-            title={
-              <>
-                Hosting compartido,{" "}
-                <span className="neon-text">sin sorpresas.</span>
-              </>
-            }
+            kicker={faqKicker}
+            title={<>{faqTitle}</>}
           />
           <Faq items={WEB_FAQ} />
         </section>

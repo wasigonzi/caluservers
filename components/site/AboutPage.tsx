@@ -1,42 +1,81 @@
 "use client";
 import { PageHero } from "@/components/site/SiteShell";
 import { SectionHead } from "@/components/site/Sections";
+import { useCopy } from "@/lib/page-content-context";
 
 export default function About() {
-    return (
+  const kicker = useCopy("kicker", "Sobre CaluServers");
+  const title = useCopy("title", "Negocios de hosting que");
+  const titleAccent = useCopy("titleAccent", "confían desde 2013.");
+  const lead = useCopy(
+    "lead",
+    "Nuestro comienzo bajo otro nombre, HostZafiro, mantiene sitios web, tiendas y aplicaciones en línea con hosting SSD puro, infraestructura de nivel empresarial y soporte 24/7 por ticket que sí responde.",
+  );
+  const missionTitle = useCopy("missionTitle", "Nuestra misión");
+  const missionText = useCopy(
+    "missionText",
+    "Hacer que la infraestructura de servidores y de alojamiento sea accesible, transparente y escalable.",
+  );
+  const focusTitle = useCopy("focusTitle", "Nuestro enfoque");
+  const focusText = useCopy(
+    "focusText",
+    "Planes claros, apoyo práctico y opciones de infraestructura que se ajustan a las necesidades del cliente.",
+  );
+  const promiseTitle = useCopy("promiseTitle", "Nuestra promesa");
+  const promiseText = useCopy(
+    "promiseText",
+    "Detalles honestos sobre el producto y una comunicación de servicio confiable.",
+  );
+  const storyKicker = useCopy("storyKicker", "Nuestra historia");
+  const storyTitle = useCopy("storyTitle", "Desde 2013,");
+  const storyTitleAccent = useCopy("storyTitleAccent", "bajo otro nombre.");
+  const storyLead = useCopy(
+    "storyLead",
+    "CaluServers nació como HostZafiro. El nombre cambió; la idea sigue siendo la misma: hosting honesto, infraestructura seria y soporte que responde.",
+  );
+  const year1 = useCopy("year1", "2013");
+  const year1Title = useCopy("year1Title", "El comienzo: HostZafiro");
+  const year1Text = useCopy(
+    "year1Text",
+    "Nuestro comienzo bajo otro nombre, HostZafiro, mantiene sitios web, tiendas y aplicaciones en línea con hosting SSD puro e infraestructura de nivel empresarial.",
+  );
+  const year2 = useCopy("year2", "Hoy");
+  const year2Title = useCopy("year2Title", "CaluServers");
+  const year2Text = useCopy(
+    "year2Text",
+    "Web Hosting con cPanel y LiteSpeed, VPS con Ryzen 9 9950X y NVMe Gen 5 en cuatro ubicaciones de EE. UU., servidores dedicados y registro de dominios, todo bajo una misma marca.",
+  );
+  const year3 = useCopy("year3", "24/7");
+  const year3Title = useCopy("year3Title", "Soporte que sí responde");
+  const year3Text = useCopy(
+    "year3Text",
+    "Soporte por ticket en inglés y español, todos los días del año, con monitoreo proactivo del host y cobertura de soporte.",
+  );
+  return (
     <>
       <PageHero
-        kicker="Sobre CaluServers"
+        kicker={kicker}
         title={
           <>
-            Negocios de hosting que{" "}
-            <span className="neon-text">confían desde 2013.</span>
+            {title}{" "}
+            <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Nuestro comienzo bajo otro nombre, HostZafiro, mantiene sitios web, tiendas y aplicaciones en línea con hosting SSD puro, infraestructura de nivel empresarial y soporte 24/7 por ticket que sí responde."
+        lead={lead}
       />
       <section className="wrap">
         <div className="cards">
           <div className="card glass">
-            <h3>Nuestra misión</h3>
-            <p>
-              Hacer que la infraestructura de servidores y de alojamiento sea
-              accesible, transparente y escalable.
-            </p>
+            <h3>{missionTitle}</h3>
+            <p>{missionText}</p>
           </div>
           <div className="card glass">
-            <h3>Nuestro enfoque</h3>
-            <p>
-              Planes claros, apoyo práctico y opciones de infraestructura que
-              se ajustan a las necesidades del cliente.
-            </p>
+            <h3>{focusTitle}</h3>
+            <p>{focusText}</p>
           </div>
           <div className="card glass">
-            <h3>Nuestra promesa</h3>
-            <p>
-              Detalles honestos sobre el producto y una comunicación de
-              servicio confiable.
-            </p>
+            <h3>{promiseTitle}</h3>
+            <p>{promiseText}</p>
           </div>
         </div>
       </section>
@@ -44,42 +83,30 @@ export default function About() {
       <section className="section">
         <div className="wrap">
           <SectionHead
-            kicker="Nuestra historia"
+            kicker={storyKicker}
             title={
               <>
-                Desde 2013,{" "}
-                <span className="neon-text">bajo otro nombre.</span>
+                {storyTitle}{" "}
+                <span className="neon-text">{storyTitleAccent}</span>
               </>
             }
-            lead="CaluServers nació como HostZafiro. El nombre cambió; la idea sigue siendo la misma: hosting honesto, infraestructura seria y soporte que responde."
+            lead={storyLead}
           />
           <div className="story-grid">
             <article className="story-card glass">
-              <span className="year">2013</span>
-              <h3>El comienzo: HostZafiro</h3>
-              <p>
-                Nuestro comienzo bajo otro nombre, HostZafiro, mantiene sitios
-                web, tiendas y aplicaciones en línea con hosting SSD puro e
-                infraestructura de nivel empresarial.
-              </p>
+              <span className="year">{year1}</span>
+              <h3>{year1Title}</h3>
+              <p>{year1Text}</p>
             </article>
             <article className="story-card glass">
-              <span className="year">Hoy</span>
-              <h3>CaluServers</h3>
-              <p>
-                Web Hosting con cPanel y LiteSpeed, VPS con Ryzen 9 9950X y
-                NVMe Gen 5 en cuatro ubicaciones de EE. UU., servidores
-                dedicados y registro de dominios, todo bajo una misma marca.
-              </p>
+              <span className="year">{year2}</span>
+              <h3>{year2Title}</h3>
+              <p>{year2Text}</p>
             </article>
             <article className="story-card glass">
-              <span className="year">24/7</span>
-              <h3>Soporte que sí responde</h3>
-              <p>
-                Soporte por ticket en inglés y español, todos los días del
-                año, con monitoreo proactivo del host y cobertura de soporte
-                24/7/365 en cada cuenta.
-              </p>
+              <span className="year">{year3}</span>
+              <h3>{year3Title}</h3>
+              <p>{year3Text}</p>
             </article>
           </div>
         </div>
