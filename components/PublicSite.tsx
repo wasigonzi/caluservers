@@ -1,0 +1,1 @@
+"use client";import dynamic from "next/dynamic";const LegacySite=dynamic(()=>import("@/legacy/App"),{ssr:false,loading:()=> <div className="wrap" style={{padding:"120px 20px",color:"#00e5ff"}}>Cargando CaluServers…</div>});export default function PublicSite(){return <div className="calu-site"><LegacySite/></div>}

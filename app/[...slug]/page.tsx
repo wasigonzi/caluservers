@@ -1,0 +1,1 @@
+import PublicSite from "@/components/PublicSite";export default function SiteRoute(){return <PublicSite/>}
