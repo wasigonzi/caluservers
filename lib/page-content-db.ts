@@ -79,8 +79,8 @@ export async function pageContentDbReady(): Promise<{
       ok: false,
       missingMigration: missing,
       message: missing
-        ? "Falta migración PageContent o no hay conexión a la base de datos. La UI usará defaults hasta aplicar: npx prisma migrate deploy"
-        : msg.slice(0, 200),
+        ? "BD no accesible o falta migración PageContent. Los textos públicos usan defaults locales; el guardado NO está disponible (no es un éxito). Tras tener Postgres usable: npx prisma migrate deploy"
+        : `Error de BD (guardado no disponible): ${msg.slice(0, 180)}`,
     };
   }
 }

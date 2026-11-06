@@ -150,15 +150,16 @@ export default function PageContentStudio({
         <div className="pro-actions">
           {dirty ? <span className="pill warn">Cambios sin guardar</span> : null}
           <span className={`pill ${db.ok ? "ok" : "warn"}`}>
-            {db.ok ? "DB lista" : "DB / migración pendiente"}
+            {db.ok ? "DB lista" : "BD no usable — sin guardado"}
           </span>
         </div>
       </div>
 
       {!db.ok ? (
         <p className="error" role="status">
-          {db.message} No se afirmará guardado hasta que la migración{" "}
-          <code>PageContent</code> esté aplicada y la conexión responda.
+          {db.message} Los cambios en pantalla NO se persisten. Requiere Postgres
+          alcanzable + <code>npx prisma migrate deploy</code> (PageContent). La
+          configuración Supabase/Vercel actual no es funcional hasta corregir URL/credenciales.
         </p>
       ) : null}
 

@@ -88,9 +88,17 @@ export async function POST(req: NextRequest) {
     const saved = await savePageContent(path, payload);
     return NextResponse.json({ ok: true, path, payload: saved });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error";
+    const dbFail =
+      /P1001|P1017|P2021|Can't reach database|ECONNREFUSED|timeout/i.test(msg);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error" },
-      { status: 400 },
+      {
+        ok: false,
+        error: dbFail
+          ? `BD no disponible — guardado rechazado (no es éxito): ${msg.slice(0, 160)}`
+          : msg,
+      },
+      { status: dbFail ? 503 : 400 },
     );
   }
 }

@@ -29,3 +29,18 @@ Sin migración o sin DB: la web usa defaults; el editor muestra aviso y **no afi
 - Texto plano, sin HTML arbitrario.
 - Enlaces: https o rutas internas validadas (`isSafeHref`).
 - No modifica WHMCS ni procesa pagos.
+
+
+## Base de datos / Supabase
+
+- Prisma necesita Postgres alcanzable. La URL directa `db.<ref>.supabase.co:5432` es IPv6; en redes IPv4-only usar **Session pooler** (`postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432?sslmode=require`) según docs de Supabase.
+- Si `DATABASE_URL` o la publishable key de Vercel fallan (P1001 / Invalid API key), el CMS **no guarda**: solo sirve defaults. No tratar eso como éxito.
+- No crear proyecto nuevo sin confirmación del usuario. No tocar proyectos ajenos.
+
+
+## TEMP `/api/admin/db-setup` (eliminar tras BD sana)
+
+- **GET** (sesión admin): `current_database` / `current_user` / tablas / forma de `DATABASE_URL` (host/user, sin password) / tablas esperadas.
+- **POST** (admin + `Origin` = Host): `{"action":"apply"}` crea `SiteSetting`/`CatalogConfig`/`PageContent` (IF NOT EXISTS, sin DROP); `probe_write` hace insert/delete transaccional; `diagnose` igual que GET.
+- No acepta SQL arbitrario. Respuestas 503 si BD no alcanza — no simula éxito.
+- Quitar la ruta cuando Supabase/Vercel responda bien.

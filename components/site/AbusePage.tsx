@@ -4,41 +4,62 @@ import type { FormEvent } from "react";
 import { ABUSE_CATEGORIES } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
 import { PageHero, openWhmcsTicket } from "@/components/site/SiteShell";
+import { useCopy } from "@/lib/page-content-context";
 
 export default function Abuse() {
-    const { catalog } = useCatalog();
+  const { catalog } = useCatalog();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [target, setTarget] = useState("");
   const [category, setCategory] = useState(ABUSE_CATEGORIES[0]);
   const [description, setDescription] = useState("");
+  const kicker = useCopy("kicker", "Trust & Safety");
+  const title = useCopy("title", "Reportar");
+  const titleAccent = useCopy("titleAccent", "abuso.");
+  const lead = useCopy(
+    "lead",
+    "Reporta spam, phishing, malware, infracción de copyright o abuso de red.",
+  );
+  const submitLabel = useCopy("submitLabel", "Enviar reporte");
+  const formNote = useCopy(
+    "formNote",
+    "Los reportes se canalizan a nuestro buzón de abuso monitoreado.",
+  );
+  const labelName = useCopy("labelName", "Tu nombre");
+  const labelEmail = useCopy("labelEmail", "Email");
+  const labelTarget = useCopy("labelTarget", "Dominio o IP involucrada");
+  const labelCategory = useCopy("labelCategory", "Categoría de abuso");
+  const labelDescription = useCopy(
+    "labelDescription",
+    "Descripción detallada y enlaces de evidencia",
+  );
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     openWhmcsTicket(catalog.settings.whmcs, [
-      { label: "Nombre", value: name },
-      { label: "Email", value: email },
-      { label: "Dominio o IP involucrada", value: target },
-      { label: "Categoría de abuso", value: category },
-      { label: "Descripción y evidencia", value: description },
+      { label: labelName, value: name },
+      { label: labelEmail, value: email },
+      { label: labelTarget, value: target },
+      { label: labelCategory, value: category },
+      { label: labelDescription, value: description },
     ]);
   }
 
   return (
     <>
       <PageHero
-        kicker="Trust & Safety"
+        kicker={kicker}
         title={
           <>
-            Reportar <span className="neon-text">abuso.</span>
+            {title} <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Reporta spam, phishing, malware, infracción de copyright o abuso de red."
+        lead={lead}
       />
       <section className="wrap">
         <form className="formbox glass" onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="a-name">Tu nombre</label>
+            <label htmlFor="a-name">{labelName}</label>
             <input
               id="a-name"
               value={name}
@@ -47,7 +68,7 @@ export default function Abuse() {
             />
           </div>
           <div className="field">
-            <label htmlFor="a-email">Email</label>
+            <label htmlFor="a-email">{labelEmail}</label>
             <input
               id="a-email"
               type="email"
@@ -57,7 +78,7 @@ export default function Abuse() {
             />
           </div>
           <div className="field">
-            <label htmlFor="a-target">Dominio o IP involucrada</label>
+            <label htmlFor="a-target">{labelTarget}</label>
             <input
               id="a-target"
               value={target}
@@ -66,7 +87,7 @@ export default function Abuse() {
             />
           </div>
           <div className="field">
-            <label htmlFor="a-cat">Categoría de abuso</label>
+            <label htmlFor="a-cat">{labelCategory}</label>
             <select
               id="a-cat"
               value={category}
@@ -78,9 +99,7 @@ export default function Abuse() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="a-desc">
-              Descripción detallada y enlaces de evidencia
-            </label>
+            <label htmlFor="a-desc">{labelDescription}</label>
             <textarea
               id="a-desc"
               value={description}
@@ -89,11 +108,9 @@ export default function Abuse() {
             />
           </div>
           <button className="btn primary" type="submit">
-            Enviar reporte
+            {submitLabel}
           </button>
-          <p className="muted">
-            Los reportes se canalizan a nuestro buzón de abuso monitoreado.
-          </p>
+          <p className="muted">{formNote}</p>
         </form>
       </section>
     </>

@@ -15,6 +15,8 @@ import {
   Faq,
   SectionHead,
 } from "@/components/site/Sections";
+import { useCopy, usePageCopy } from "@/lib/page-content-context";
+import { pc } from "@/lib/page-content";
 
 const VPS_TIERS = [
   "Starter",
@@ -27,35 +29,83 @@ const VPS_TIERS = [
   "Phantom",
 ];
 
-const VPS_FAQ = [
-  {
-    q: "¿Tengo acceso root en mi VPS?",
-    a: "Sí. Todos los VPS incluyen acceso root / administrador total para instalar, configurar y administrar tu entorno como quieras.",
-  },
-  {
-    q: "¿Qué sistema operativo puedo instalar?",
-    a: "Hay distribuciones Linux disponibles y puedes reinstalar el servidor desde el panel cuando lo necesites. Elige el sistema que mejor se ajuste a tu proyecto.",
-  },
-  {
-    q: "¿Por qué el precio varía según la ubicación?",
-    a: "Cada ubicación tiene sus propios planes y precios. Dallas tiene la gama completa (de Starter a Phantom); Los Angeles, New York y Miami tienen una selección de planes con precios propios.",
-  },
-  {
-    q: "¿Qué significa «Consultar» en el VPS Normal de New York?",
-    a: "El precio de ese plan no está publicado en el catálogo en este momento. El precio a confirmar se muestra en el portal de cliente al hacer el pedido.",
-  },
-  {
-    q: "¿La red es realmente de 20 Gbps?",
-    a: "La capacidad de red llega hasta 20 Gbps donde la ubicación y el plan lo permitan. La velocidad máxima depende del plan, la ubicación y la disponibilidad real de infraestructura.",
-  },
-  {
-    q: "¿La IP está incluida en el precio?",
-    a: "Sí. Los planes incluyen IPv4, y en la mayoría de ubicaciones también IPv6, incluidos en el precio publicado.",
-  },
-];
-
 export default function Vps() {
-    const { catalog } = useCatalog();
+  const { catalog } = useCatalog();
+
+  const kicker = useCopy("kicker", "VPS Hosting");
+  const title = useCopy("title", "Tu servidor.");
+  const titleAccent = useCopy("titleAccent", "Tus reglas.");
+  const lead = useCopy(
+    "lead",
+    "Despliega infraestructura de nueva generación en segundos. Cómputo Ryzen de alta frecuencia, recursos dedicados y uplinks de hasta 20 Gbps en ubicaciones de Europa y EE. UU.",
+  );
+  const locTitle = useCopy("locTitle", "Servidores virtuales");
+  const locTitleAccent = useCopy("locTitleAccent", "dedicados");
+  const locLead = useCopy(
+    "locLead",
+    "Selecciona una ubicación cercana a tus usuarios para minimizar la latencia.",
+  );
+  const locHeading = useCopy("locHeading", "Ubicaciones del datacenter");
+  const locHint = useCopy(
+    "locHint",
+    "Los tiempos de ping dependen de tu conexión.",
+  );
+  const compareKicker = useCopy("compareKicker", "Comparativa por ubicación");
+  const compareTitle = useCopy("compareTitle", "El mismo nivel,");
+  const compareTitleAccent = useCopy("compareTitleAccent", "en cada ciudad.");
+  const compareLead = useCopy(
+    "compareLead",
+    "Precios reales del catálogo por nivel y ubicación. Dallas tiene la gama completa; Los Angeles, New York y Miami, una selección.",
+  );
+  const compareFineprint = useCopy(
+    "compareFineprint",
+    "Precios por mes. «Consultar» indica que el precio de ese plan no está publicado y se confirma en el portal de cliente.",
+  );
+  const whyKicker = useCopy("whyKicker", "Por qué Ryzen 9 9950X");
+  const whyTitle = useCopy("whyTitle", "Potencia de escritorio,");
+  const whyTitleAccent = useCopy("whyTitleAccent", "en tu servidor.");
+  const whyLead = useCopy(
+    "whyLead",
+    "Los VPS de CaluServers corren sobre procesadores AMD Ryzen 9 de alta frecuencia, con recursos dedicados que no se comparten.",
+  );
+  const detail1Title = useCopy("detail1Title", "Ryzen 9 9950X");
+  const detail1Text = useCopy(
+    "detail1Text",
+    "Alta frecuencia por núcleo para aplicaciones, juegos y cargas que dependen de un solo hilo. Recursos de CPU y RAM asignados, nunca compartidos.",
+  );
+  const detail2Title = useCopy("detail2Title", "DDR5 5600 MHz y NVMe Gen 5");
+  const detail2Text = useCopy(
+    "detail2Text",
+    "Memoria DDR5 de alta frecuencia y almacenamiento SSD NVMe Gen 5 en todos los planes, desde 20 GB hasta 960 GB según el nivel.",
+  );
+  const detail3Title = useCopy("detail3Title", "Red de hasta 20 Gbps");
+  const detail3Text = useCopy(
+    "detail3Text",
+    "Uplinks compartidos de 1 a 10 Gbps según el plan y la ubicación, con capacidad de red de hasta 20 Gbps donde la infraestructura lo permite.",
+  );
+  const detail4Title = useCopy("detail4Title", "IPv4 + IPv6 incluidos");
+  const detail4Text = useCopy(
+    "detail4Text",
+    "La dirección IPv4 está incluida en el precio, y en la mayoría de ubicaciones también IPv6, sin costo adicional.",
+  );
+  const details = [
+    { icon: iconVps, title: detail1Title, text: detail1Text },
+    { icon: iconRed, title: detail2Title, text: detail2Text },
+    { icon: iconSeguridad, title: detail3Title, text: detail3Text },
+    { icon: iconVps, title: detail4Title, text: detail4Text },
+  ];
+  const faqKicker = useCopy("faqKicker", "Preguntas frecuentes");
+  const faqTitle = useCopy("faqTitle", "VPS,");
+  const faqTitleAccent = useCopy("faqTitleAccent", "sin letra pequeña.");
+  const payload = usePageCopy();
+  const faq = Array.from({ length: 6 }, (_, idx) => {
+    const i = idx + 1;
+    return {
+      q: pc(payload, `faq${i}q`, ""),
+      a: pc(payload, `faq${i}a`, ""),
+    };
+  }).filter((x) => x.q && x.a);
+
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
   const [locationId, setLocationId] = useState("us-dallas");
   const [slide, setSlide] = useState(0);
@@ -93,28 +143,25 @@ export default function Vps() {
   return (
     <>
       <PageHero
-        kicker="VPS Hosting"
+        kicker={kicker}
         title={
           <>
-            Tu servidor. <span className="neon-text">Tus reglas.</span>
+            {title} <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Despliega infraestructura de nueva generación en segundos. Cómputo Ryzen de alta frecuencia, recursos dedicados y uplinks de hasta 20 Gbps en ubicaciones de Europa y EE. UU."
+        lead={lead}
       />
       <section className="wrap vps-location-section">
         <div className="section-head">
           <h2>
-            Servidores virtuales{" "}
-            <span className="neon-text">dedicados</span>
+            {locTitle}{" "}
+            <span className="neon-text">{locTitleAccent}</span>
           </h2>
-          <p>
-            Selecciona una ubicación cercana a tus usuarios para minimizar la
-            latencia.
-          </p>
+          <p>{locLead}</p>
         </div>
         <div className="loc-heading">
-          <b>Ubicaciones del datacenter</b>
-          <span>Los tiempos de ping dependen de tu conexión.</span>
+          <b>{locHeading}</b>
+          <span>{locHint}</span>
         </div>
         <div className="loc-grid">
           {enabledLocations.map((loc) => (
@@ -401,14 +448,14 @@ export default function Vps() {
       <section className="section">
         <div className="wrap">
           <SectionHead
-            kicker="Comparativa por ubicación"
+            kicker={compareKicker}
             title={
               <>
-                El mismo nivel,{" "}
-                <span className="neon-text">en cada ciudad.</span>
+                {compareTitle}{" "}
+                <span className="neon-text">{compareTitleAccent}</span>
               </>
             }
-            lead="Precios reales del catálogo por nivel y ubicación. Dallas tiene la gama completa; Los Angeles, New York y Miami, una selección."
+            lead={compareLead}
           />
           <CompareTable
             headers={["Nivel", "Dallas", "Los Angeles", "New York", "Miami"]}
@@ -427,8 +474,7 @@ export default function Vps() {
             }))}
           />
           <p className="fineprint" style={{ textAlign: "center" }}>
-            Precios por mes. «Consultar» indica que el precio de ese plan no
-            está publicado y se confirma en el portal de cliente.
+            {compareFineprint}
           </p>
         </div>
       </section>
@@ -436,67 +482,28 @@ export default function Vps() {
       <section className="section">
         <div className="wrap">
           <SectionHead
-            kicker="Por qué Ryzen 9 9950X"
+            kicker={whyKicker}
             title={
               <>
-                Potencia de escritorio,{" "}
-                <span className="neon-text">en tu servidor.</span>
+                {whyTitle}{" "}
+                <span className="neon-text">{whyTitleAccent}</span>
               </>
             }
-            lead="Los VPS de CaluServers corren sobre procesadores AMD Ryzen 9 de alta frecuencia, con recursos dedicados que no se comparten."
+            lead={whyLead}
           />
           <div className="detail-grid">
-            <article className="detail-card glass">
-              <div className="icon-chip">
-                <img src={iconVps} alt="" />
-              </div>
-              <div>
-                <h3>Ryzen 9 9950X</h3>
-                <p>
-                  Alta frecuencia por núcleo para aplicaciones, juegos y
-                  cargas que dependen de un solo hilo. Recursos de CPU y RAM
-                  asignados, nunca compartidos.
-                </p>
-              </div>
-            </article>
-            <article className="detail-card glass">
-              <div className="icon-chip">
-                <img src={iconRed} alt="" />
-              </div>
-              <div>
-                <h3>DDR5 5600 MHz y NVMe Gen 5</h3>
-                <p>
-                  Memoria DDR5 de alta frecuencia y almacenamiento SSD NVMe
-                  Gen 5 en todos los planes, desde 20 GB hasta 960 GB según
-                  el nivel.
-                </p>
-              </div>
-            </article>
-            <article className="detail-card glass">
-              <div className="icon-chip">
-                <img src={iconSeguridad} alt="" />
-              </div>
-              <div>
-                <h3>Red de hasta 20 Gbps</h3>
-                <p>
-                  Uplinks compartidos de 1 a 10 Gbps según el plan y la
-                  ubicación, con capacidad de red de hasta 20 Gbps donde la
-                  infraestructura lo permite.
-                </p>
-              </div>
-            </article>
-            <article className="detail-card glass">
-              <div className="icon-chip">
-                <img src={iconVps} alt="" />
-              </div>
-              <div>
-                <h3>IPv4 + IPv6 incluidos</h3>
-                <p>
-                  La dirección IPv4 está incluida en el precio, y en la
-                  mayoría de ubicaciones también IPv6, sin costo adicional.
-                </p>
-              </div>
-            </article>
+            {details.map((d) => (
+              <article className="detail-card glass" key={d.title}>
+                <div className="icon-chip">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={d.icon} alt="" />
+                </div>
+                <div>
+                  <h3>{d.title}</h3>
+                  <p>{d.text}</p>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -504,15 +511,15 @@ export default function Vps() {
       <section className="section">
         <div className="wrap">
           <SectionHead
-            kicker="Preguntas frecuentes"
+            kicker={faqKicker}
             title={
               <>
-                VPS,{" "}
-                <span className="neon-text">sin letra pequeña.</span>
+                {faqTitle}{" "}
+                <span className="neon-text">{faqTitleAccent}</span>
               </>
             }
           />
-          <Faq items={VPS_FAQ} />
+          <Faq items={faq} />
         </div>
       </section>
     </>

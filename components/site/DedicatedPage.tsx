@@ -6,43 +6,79 @@ const iconSeguridad = "/icons/servicio-seguridad.svg";
 import { useCatalog } from "@/lib/catalog-context";
 import { PageHero, PlanCard } from "@/components/site/SiteShell";
 import { Faq, SectionHead } from "@/components/site/Sections";
-
-const DEDICATED_FAQ = [
-  {
-    q: "¿Qué significa que el hardware sea dedicado?",
-    a: "El servidor físico es solo tuyo: CPU, RAM y almacenamiento no se comparten con ningún otro cliente. Eliges entre Intel Xeon, AMD Ryzen o AMD EPYC según el plan.",
-  },
-  {
-    q: "¿Puedo elegir el sistema operativo?",
-    a: "Sí. La selección de sistema operativo es parte de la configuración de cada servidor dedicado.",
-  },
-  {
-    q: "¿Cómo se gestiona el servidor?",
-    a: "Cada plan incluye opciones de gestión remota y red configurable, además de opciones de protección DDoS. Puedes administrarlo tú o pedir una configuración a medida.",
-  },
-  {
-    q: "¿Necesito una configuración que no está en la lista?",
-    a: "Sí, es posible. Habla con el equipo desde la página de Contacto y se arma el servidor que tu proyecto necesita.",
-  },
-  {
-    q: "¿Cuándo conviene un dedicado frente a un VPS?",
-    a: "Cuando necesitas todo el hardware para ti solo, sin vecinos: cargas exigentes, servidores de juegos con muchos jugadores o proyectos que piden CPU, RAM y disco dedicados de forma constante.",
-  },
-];
+import { useCopy, usePageCopy } from "@/lib/page-content-context";
+import { pc } from "@/lib/page-content";
 
 export default function Dedicated() {
-    const { catalog } = useCatalog();
+  const { catalog } = useCatalog();
   const plans = catalog.dedicated.filter((p) => p.active);
+  const kicker = useCopy("kicker", "Dedicated Servers");
+  const title = useCopy("title", "Bare-metal");
+  const titleAccent = useCopy("titleAccent", "power.");
+  const lead = useCopy(
+    "lead",
+    "Recursos dedicados y hardware configurable para cargas de trabajo exigentes.",
+  );
+  const popularTag = useCopy("popularTag", "Más popular");
+  const defaultTag = useCopy("defaultTag", "CALUSERVERS");
+  const customNotice = useCopy(
+    "customNotice",
+    "¿Necesitas una configuración a medida?",
+  );
+  const customCta = useCopy("customCta", "Habla con nuestro equipo");
+  const customSuffix = useCopy(
+    "customSuffix",
+    "y armamos el servidor que tu proyecto necesita.",
+  );
+  const useKicker = useCopy("useKicker", "Casos de uso");
+  const useTitle = useCopy("useTitle", "Para proyectos que necesitan");
+  const useTitleAccent = useCopy("useTitleAccent", "hardware propio.");
+  const useLead = useCopy(
+    "useLead",
+    "Cuando compartir recursos ya no alcanza, el servidor completo es tuyo: CPU, RAM y disco sin vecinos.",
+  );
+  const use1Title = useCopy("use1Title", "Servidores de juegos");
+  const use1Text = useCopy(
+    "use1Text",
+    "Hardware dedicado para comunidades y servidores de juegos que necesitan baja latencia, CPU de alta frecuencia y recursos estables con muchos jugadores conectados.",
+  );
+  const use2Title = useCopy("use2Title", "Aplicaciones exigentes");
+  const use2Text = useCopy(
+    "use2Text",
+    "Bases de datos, APIs y aplicaciones con carga constante que piden RAM y almacenamiento NVMe dedicados, con red configurable según el proyecto.",
+  );
+  const use3Title = useCopy("use3Title", "Proyectos con control total");
+  const use3Text = useCopy(
+    "use3Text",
+    "Elige tu sistema operativo, configura la red y la protección DDoS, y gestiona el servidor de forma remota. Nada compartido, nada que pedir prestado.",
+  );
+  const useCases = [
+    { icon: iconVps, title: use1Title, text: use1Text },
+    { icon: iconRed, title: use2Title, text: use2Text },
+    { icon: iconSeguridad, title: use3Title, text: use3Text },
+  ];
+  const faqKicker = useCopy("faqKicker", "Preguntas frecuentes");
+  const faqTitle = useCopy("faqTitle", "Dedicados,");
+  const faqTitleAccent = useCopy("faqTitleAccent", "sin letra pequeña.");
+  const payload = usePageCopy();
+  const faq = Array.from({ length: 5 }, (_, idx) => {
+    const i = idx + 1;
+    return {
+      q: pc(payload, `faq${i}q`, ""),
+      a: pc(payload, `faq${i}a`, ""),
+    };
+  }).filter((x) => x.q && x.a);
+
   return (
     <>
       <PageHero
-        kicker="Dedicated Servers"
+        kicker={kicker}
         title={
           <>
-            Bare-metal <span className="neon-text">power.</span>
+            {title} <span className="neon-text">{titleAccent}</span>
           </>
         }
-        lead="Recursos dedicados y hardware configurable para cargas de trabajo exigentes."
+        lead={lead}
       />
       <section className="wrap">
         <div className="plan-grid five">
@@ -51,73 +87,49 @@ export default function Dedicated() {
               key={plan.id}
               plan={plan}
               featured={i === 1}
-              tag={i === 1 ? "Más popular" : "CALUSERVERS"}
+              tag={i === 1 ? popularTag : defaultTag}
             />
           ))}
         </div>
         <p className="notice glass" style={{ marginTop: 24 }}>
-          ¿Necesitas una configuración a medida?{" "}
-          <Link href="/contact">Habla con nuestro equipo</Link> y armamos el
-          servidor que tu proyecto necesita.
+          {customNotice}{" "}
+          <Link href="/contact">{customCta}</Link> {customSuffix}
         </p>
         <section className="section">
           <SectionHead
-            kicker="Casos de uso"
+            kicker={useKicker}
             title={
               <>
-                Para proyectos que necesitan{" "}
-                <span className="neon-text">hardware propio.</span>
+                {useTitle}{" "}
+                <span className="neon-text">{useTitleAccent}</span>
               </>
             }
-            lead="Cuando compartir recursos ya no alcanza, el servidor completo es tuyo: CPU, RAM y disco sin vecinos."
+            lead={useLead}
           />
           <div className="use-case-grid">
-            <article className="use-case-card glass">
-              <div className="icon-chip">
-                <img src={iconVps} alt="" />
-              </div>
-              <h3>Servidores de juegos</h3>
-              <p>
-                Hardware dedicado para comunidades y servidores de juegos que
-                necesitan baja latencia, CPU de alta frecuencia y recursos
-                estables con muchos jugadores conectados.
-              </p>
-            </article>
-            <article className="use-case-card glass">
-              <div className="icon-chip">
-                <img src={iconRed} alt="" />
-              </div>
-              <h3>Aplicaciones exigentes</h3>
-              <p>
-                Bases de datos, APIs y aplicaciones con carga constante que
-                piden RAM y almacenamiento NVMe dedicados, con red
-                configurable según el proyecto.
-              </p>
-            </article>
-            <article className="use-case-card glass">
-              <div className="icon-chip">
-                <img src={iconSeguridad} alt="" />
-              </div>
-              <h3>Proyectos con control total</h3>
-              <p>
-                Elige tu sistema operativo, configura la red y la protección
-                DDoS, y gestiona el servidor de forma remota. Nada compartido,
-                nada que pedir prestado.
-              </p>
-            </article>
+            {useCases.map((c) => (
+              <article className="use-case-card glass" key={c.title}>
+                <div className="icon-chip">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.icon} alt="" />
+                </div>
+                <h3>{c.title}</h3>
+                <p>{c.text}</p>
+              </article>
+            ))}
           </div>
         </section>
         <section className="section">
           <SectionHead
-            kicker="Preguntas frecuentes"
+            kicker={faqKicker}
             title={
               <>
-                Dedicados,{" "}
-                <span className="neon-text">sin letra pequeña.</span>
+                {faqTitle}{" "}
+                <span className="neon-text">{faqTitleAccent}</span>
               </>
             }
           />
-          <Faq items={DEDICATED_FAQ} />
+          <Faq items={faq} />
         </section>
       </section>
     </>
