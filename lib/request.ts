@@ -1,0 +1,1 @@
+import "server-only";import {NextRequest} from "next/server";export function trustedWrite(req:NextRequest){const origin=req.headers.get("origin"),host=req.headers.get("host");if(!origin||!host)return false;try{const u=new URL(origin);return u.host===host&&(u.protocol==="https:"||(process.env.NODE_ENV==="development"&&u.protocol==="http:"))}catch{return false}}

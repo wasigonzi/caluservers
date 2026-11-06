@@ -1,0 +1,1 @@
+import {redirect} from "next/navigation";import {isAdmin} from "@/lib/auth";import LoginForm from "@/components/LoginForm";export default async function Login(){if(await isAdmin())redirect("/admin");return <div className="glass login"><div className="brand">CALU<span className="accent">SERVERS</span></div><h1>Acceso administrativo</h1><LoginForm/></div>}
