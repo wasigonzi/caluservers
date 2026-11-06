@@ -39,10 +39,54 @@ export interface ThemeSettings {
   gradient: string;
 }
 
+export type AppearancePreset = "default" | "ocean" | "midnight";
+
+export interface SiteContact {
+  email: string;
+  phone: string;
+  hours: string;
+}
+
+export interface SiteSocial {
+  x: string;
+  facebook: string;
+  linkedin: string;
+  discord: string;
+}
+
+export interface SiteContent {
+  heroEyebrow: string;
+  heroTitle: string;
+  heroTitleAccent: string;
+  heroLead: string;
+  heroCtaPrimary: string;
+  heroCtaSecondary: string;
+  contactLead: string;
+  footerBlurb: string;
+}
+
+export interface SiteVisibility {
+  trustStrip: boolean;
+  steps: boolean;
+  compare: boolean;
+  locations: boolean;
+  whyUs: boolean;
+  faq: boolean;
+}
+
+export interface SiteAppearance {
+  preset: AppearancePreset;
+}
+
 export interface SiteSettings {
   whmcs: string;
   theme: ThemeSettings;
   networkStatus: string;
+  contact: SiteContact;
+  social: SiteSocial;
+  content: SiteContent;
+  visibility: SiteVisibility;
+  appearance: SiteAppearance;
 }
 
 export interface Catalog {
@@ -527,14 +571,41 @@ export const SEED_CATALOG: Catalog = {
   settings: {
     whmcs: "https://client.caluservers.com",
     theme: {
-      primary: "#087bff",
-      secondary: "#087bff",
-      background: "#050914",
+      primary: "#00E5FF",
+      secondary: "#00B8D9",
+      background: "#070E15",
       panel: "#0b1425",
-      text: "#f4f8ff",
-      gradient: "linear-gradient(115deg,#075bff,#00d9ff)",
+      text: "#F4F4F4",
+      gradient: "linear-gradient(105deg,#00E5FF 0%,#00B8D9 55%,#0099c9 100%)",
     },
     networkStatus: "Todos los sistemas están operativos",
+    contact: {
+      email: "soporte@caluservers.com",
+      phone: "",
+      hours: "Soporte 24/7 por ticket",
+    },
+    social: { x: "", facebook: "", linkedin: "", discord: "" },
+    content: {
+      heroEyebrow: "Alojamiento de próxima generación",
+      heroTitle: "Impulsando tu",
+      heroTitleAccent: "mundo digital.",
+      heroLead:
+        "Almacenamiento SSD puro, LiteSpeed con LSCache, todo desde cPanel. Incluye SSL gratis, migración gratis desde cualquier proveedor y copias diarias.",
+      heroCtaPrimary: "Ver Hosting →",
+      heroCtaSecondary: "Ver VPS",
+      contactLead:
+        "Nuestro equipo está listo para ayudarte con ventas, soporte técnico y preguntas de cuenta.",
+      footerBlurb: "Soporte 24/7 por ticket, en inglés y español.",
+    },
+    visibility: {
+      trustStrip: true,
+      steps: true,
+      compare: true,
+      locations: true,
+      whyUs: true,
+      faq: true,
+    },
+    appearance: { preset: "default" },
   },
 };
 

@@ -57,6 +57,7 @@ const HOME_FAQ = [
 export default function Home() {
   useDocumentTitle("Web Hosting • VPS • Game • Dedicated Servers");
   const { catalog } = useCatalog();
+  const { content, visibility } = catalog.settings;
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
   const webMin = minPrice(catalog.webHosting.map((p) => p.price));
   const vpsMin = minPrice(catalog.vps.map((p) => p.price));
@@ -68,22 +69,19 @@ export default function Home() {
         <div className="wrap hero-grid">
           <div>
             <span className="eyebrow">
-              <i className="dot"></i> Alojamiento de próxima generación
+              <i className="dot"></i> {content.heroEyebrow}
             </span>
             <h1>
-              Impulsando tu <span className="neon-text">mundo digital.</span>
+              {content.heroTitle}{" "}
+              <span className="neon-text">{content.heroTitleAccent}</span>
             </h1>
-            <p className="lead">
-              Almacenamiento SSD puro, LiteSpeed con LSCache, todo desde
-              cPanel. Incluye SSL gratis, migración gratis desde cualquier
-              proveedor y copias diarias.
-            </p>
+            <p className="lead">{content.heroLead}</p>
             <div className="hero-ctas">
               <Link className="btn primary" to="/web-hosting">
-                Ver Hosting →
+                {content.heroCtaPrimary}
               </Link>
               <Link className="btn secondary" to="/vps">
-                Ver VPS
+                {content.heroCtaSecondary}
               </Link>
             </div>
             <div className="stats">
@@ -105,17 +103,19 @@ export default function Home() {
           </div>
           <SplineHero />
         </div>
-        <div className="wrap">
-          <TrustStrip
-            items={[
-              "Desde 2013",
-              "4 ubicaciones en EE. UU.",
-              "Ryzen 9 9950X",
-              "Protección DDoS",
-              "Soporte en español e inglés",
-            ]}
-          />
-        </div>
+        {visibility.trustStrip ? (
+          <div className="wrap">
+            <TrustStrip
+              items={[
+                "Desde 2013",
+                "4 ubicaciones en EE. UU.",
+                "Ryzen 9 9950X",
+                "Protección DDoS",
+                "Soporte en español e inglés",
+              ]}
+            />
+          </div>
+        ) : null}
       </section>
 
       <section className="section">
@@ -186,6 +186,7 @@ export default function Home() {
         </div>
       </section>
 
+      {visibility.steps ? (
       <section className="section">
         <div className="wrap">
           <SectionHead
@@ -216,7 +217,9 @@ export default function Home() {
           />
         </div>
       </section>
+      ) : null}
 
+      {visibility.compare ? (
       <section className="section">
         <div className="wrap">
           <SectionHead
@@ -284,7 +287,9 @@ export default function Home() {
           </p>
         </div>
       </section>
+      ) : null}
 
+      {visibility.locations ? (
       <section className="section">
         <div className="wrap">
           <SectionHead
@@ -319,7 +324,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+      ) : null}
 
+      {visibility.whyUs ? (
       <section className="section">
         <div className="wrap">
           <SectionHead
@@ -366,7 +373,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+      ) : null}
 
+      {visibility.faq ? (
       <section className="section">
         <div className="wrap">
           <SectionHead
@@ -381,6 +390,7 @@ export default function Home() {
           <Faq items={HOME_FAQ} />
         </div>
       </section>
+      ) : null}
 
       <section className="section">
         <div className="wrap">

@@ -18,9 +18,23 @@ import {
   signOut,
   signUpAdmin,
 } from "../lib/admin";
+import {
+  AdminSettingsForm,
+  type SettingsSection,
+} from "../components/AdminSettings";
 import { PageHero, useDocumentTitle } from "../components/Layout";
+import {
+  DEFAULT_SITE_SETTINGS,
+  validateSiteSettings,
+} from "../lib/siteSettings";
+import { SEED_CATALOG } from "../lib/catalog";
 
-type Tab = "planes" | "ubicaciones" | "ajustes";
+type Tab =
+  | "planes"
+  | "ubicaciones"
+  | "general"
+  | "contenido"
+  | "apariencia";
 
 const CATEGORY_LABELS: Record<Plan["category"], string> = {
   web: "Web Hosting",
@@ -60,10 +74,14 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [locations, setLocations] = useState<VpsLocation[]>([]);
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [settings, setSettings] = useState<SiteSettings | null>(
+    SEED_CATALOG.settings,
+  );
   const [editing, setEditing] = useState<Plan | null>(null);
   const [featuresText, setFeaturesText] = useState("");
+  const [planFilter, setPlanFilter] = useState("");
   const [status, setStatus] = useState("");
+  const [settingsFlash, setSettingsFlash] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
 
@@ -265,13 +283,36 @@ export default function Admin() {
   async function onSaveSettings(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
+    const invalid = validateSiteSettings(settings);
+    if (invalid) {
+      setSettingsFlash(invalid);
+      setStatus(invalid);
+      return;
+    }
     const res = await saveSettingsAdmin(settings);
-    setStatus(
-      res.ok ? "Ajustes guardados." : (res.error ?? "No se pudieron guardar."),
+    const msg = res.ok
+      ? "Ajustes guardados. La web pública los aplicará al recargar."
+      : (res.error ?? "No se pudieron guardar.");
+    setSettingsFlash(msg);
+    setStatus(msg);
+  }
+
+  function onRestoreSettingsDefaults() {
+    if (
+      !window.confirm(
+        "¿Restaurar General, Contenido y Apariencia a los valores por defecto del catálogo semilla? Deberás guardar para persistir.",
+      )
+    ) {
+      return;
+    }
+    setSettings(structuredClone(DEFAULT_SITE_SETTINGS));
+    setSettingsFlash(
+      "Valores por defecto cargados en el formulario. Pulsa Guardar para persistirlos.",
     );
   }
 
   if (!isSupabaseConfigured) {
+    const previewSettings = settings ?? SEED_CATALOG.settings;
     return (
       <>
         <PageHero
@@ -279,31 +320,51 @@ export default function Admin() {
           title="Panel de administración"
           lead="Gestiona planes, ubicaciones y ajustes del sitio."
         />
-        <section className="wrap">
+        <section className="wrap admin-wrap">
           <div className="glass notice" role="alert">
             <strong>Supabase no está configurado.</strong>
             <p>
-              El panel de administración necesita las variables de entorno{" "}
-              <code>VITE_SUPABASE_URL</code> y{" "}
-              <code>VITE_SUPABASE_ANON_KEY</code> en Vercel, y aplicar{" "}
-              <code>supabase/schema.sql</code> en el proyecto de Supabase.
-              Mientras tanto, la edición está desactivada — el sitio público
-              sigue mostrando el catálogo de referencia.
+              Define <code>VITE_SUPABASE_URL</code> y{" "}
+              <code>VITE_SUPABASE_ANON_KEY</code>, aplica{" "}
+              <code>supabase/schema.sql</code> (y el seed si procede). Abajo
+              puedes previsualizar la nueva estructura del panel; el guardado
+              está desactivado.
             </p>
           </div>
-          <form className="formbox glass" aria-disabled="true">
-            <div className="field">
-              <label htmlFor="a-email">Email</label>
-              <input id="a-email" type="email" disabled />
-            </div>
-            <div className="field">
-              <label htmlFor="a-pass">Contraseña</label>
-              <input id="a-pass" type="password" disabled />
-            </div>
-            <button className="btn primary" type="button" disabled>
-              Iniciar sesión
-            </button>
-          </form>
+          <div className="admin-tabs" role="tablist">
+            {(
+              [
+                ["general", "General"],
+                ["contenido", "Contenido"],
+                ["apariencia", "Apariencia"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                className={`admin-tab glass${tab === id ? " active" : ""}`}
+                onClick={() => setTab(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="admin-card glass">
+            <AdminSettingsForm
+              settings={previewSettings}
+              setSettings={setSettings}
+              section={
+                (tab === "contenido" || tab === "apariencia"
+                  ? tab
+                  : "general") as SettingsSection
+              }
+              onSave={(e) => e.preventDefault()}
+              onRestoreDefaults={() => undefined}
+              disabled
+            />
+          </div>
         </section>
       </>
     );
@@ -453,22 +514,26 @@ export default function Admin() {
         title="Panel de administración"
         lead={`Sesión iniciada como ${user.email ?? user.id}.`}
       />
-      <section className="wrap">
+      <section className="wrap admin-wrap">
         <div className="admin-tabs" role="tablist">
-          {(["planes", "ubicaciones", "ajustes"] as Tab[]).map((t) => (
+          {(
+            [
+              ["planes", "Planes"],
+              ["ubicaciones", "Ubicaciones"],
+              ["general", "General"],
+              ["contenido", "Contenido"],
+              ["apariencia", "Apariencia"],
+            ] as const
+          ).map(([id, label]) => (
             <button
-              key={t}
+              key={id}
               type="button"
               role="tab"
-              aria-selected={tab === t}
-              className={`admin-tab glass${tab === t ? " active" : ""}`}
-              onClick={() => setTab(t)}
+              aria-selected={tab === id}
+              className={`admin-tab glass${tab === id ? " active" : ""}`}
+              onClick={() => setTab(id)}
             >
-              {t === "planes"
-                ? "Planes"
-                : t === "ubicaciones"
-                  ? "Ubicaciones"
-                  : "Ajustes"}
+              {label}
             </button>
           ))}
           <button
@@ -521,6 +586,15 @@ export default function Admin() {
 
         {tab === "planes" && (
           <div className="admin-card glass">
+            <div className="field" style={{ marginBottom: 18 }}>
+              <label htmlFor="plan-filter">Buscar planes</label>
+              <input
+                id="plan-filter"
+                placeholder="Nombre, precio o ubicación…"
+                value={planFilter}
+                onChange={(e) => setPlanFilter(e.target.value)}
+              />
+            </div>
             {(["web", "vps", "dedicated"] as Plan["category"][]).map(
               (cat) => (
                 <div key={cat}>
@@ -537,6 +611,15 @@ export default function Admin() {
                   <ul className="admin-list">
                     {plans
                       .filter((p) => p.category === cat)
+                      .filter((p) => {
+                        const q = planFilter.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          p.name.toLowerCase().includes(q) ||
+                          p.price.toLowerCase().includes(q) ||
+                          p.locationId.toLowerCase().includes(q)
+                        );
+                      })
                       .sort((a, b) => a.sortOrder - b.sortOrder)
                       .map((p) => (
                         <li key={p.id} className="admin-row">
@@ -741,72 +824,21 @@ export default function Admin() {
           </div>
         )}
 
-        {tab === "ajustes" && settings && (
-          <div className="admin-card glass">
-            <form className="admin-form" onSubmit={onSaveSettings}>
-              <div className="field">
-                <label htmlFor="s-whmcs">URL del portal WHMCS</label>
-                <input
-                  id="s-whmcs"
-                  type="url"
-                  value={settings.whmcs}
-                  onChange={(e) =>
-                    setSettings({ ...settings, whmcs: e.target.value })
-                  }
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="s-status">Estado de la red</label>
-                <input
-                  id="s-status"
-                  value={settings.networkStatus}
-                  onChange={(e) =>
-                    setSettings({ ...settings, networkStatus: e.target.value })
-                  }
-                />
-              </div>
-              {(
-                [
-                  ["primary", "Color primario"],
-                  ["secondary", "Color secundario"],
-                  ["background", "Fondo"],
-                  ["panel", "Panel"],
-                  ["text", "Texto"],
-                ] as const
-              ).map(([key, label]) => (
-                <div className="field" key={key}>
-                  <label htmlFor={`s-${key}`}>{label}</label>
-                  <input
-                    id={`s-${key}`}
-                    value={settings.theme[key]}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        theme: { ...settings.theme, [key]: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-              ))}
-              <div className="field">
-                <label htmlFor="s-gradient">Gradiente</label>
-                <input
-                  id="s-gradient"
-                  value={settings.theme.gradient}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      theme: { ...settings.theme, gradient: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <button className="btn primary" type="submit">
-                Guardar ajustes
-              </button>
-            </form>
-          </div>
-        )}
+        {(tab === "general" ||
+          tab === "contenido" ||
+          tab === "apariencia") &&
+          settings && (
+            <div className="admin-card glass">
+              <AdminSettingsForm
+                settings={settings}
+                setSettings={setSettings}
+                section={tab}
+                onSave={onSaveSettings}
+                onRestoreDefaults={onRestoreSettingsDefaults}
+                status={settingsFlash}
+              />
+            </div>
+          )}
       </section>
     </>
   );

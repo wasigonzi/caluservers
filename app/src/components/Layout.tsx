@@ -8,6 +8,10 @@ import type { Plan } from "../lib/catalog";
 import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { useRevealOnScroll } from "./Interactive";
+import {
+  applySiteTheme,
+  socialEntries,
+} from "../lib/siteSettings";
 
 export function useDocumentTitle(title: string) {
   useEffect(() => {
@@ -213,7 +217,38 @@ export function Footer() {
         <div className="footer-grid">
           <div className="footer-brand">
             <img src={logoPrincipal} alt="CALUSERVERS" />
-            <p>Soporte 24/7 por ticket, en inglés y español.</p>
+            <p>{catalog.settings.content.footerBlurb}</p>
+            {catalog.settings.contact.email ? (
+              <p>
+                <a href={`mailto:${catalog.settings.contact.email}`}>
+                  {catalog.settings.contact.email}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.phone ? (
+              <p>
+                <a href={`tel:${catalog.settings.contact.phone.replace(/\s/g, "")}`}>
+                  {catalog.settings.contact.phone}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.hours ? (
+              <p className="muted">{catalog.settings.contact.hours}</p>
+            ) : null}
+            {socialEntries(catalog.settings.social).length > 0 ? (
+              <div className="footer-social">
+                {socialEntries(catalog.settings.social).map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div>
             <h4>Servicios</h4>
@@ -264,7 +299,11 @@ export function Footer() {
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
+  const { catalog } = useCatalog();
   useRevealOnScroll(mainRef);
+  useEffect(() => {
+    applySiteTheme(catalog.settings);
+  }, [catalog.settings]);
   // Admin: sin tab bar para no interferir con login/formularios.
   const showMobileTabBar = !pathname.startsWith("/admin");
   return (

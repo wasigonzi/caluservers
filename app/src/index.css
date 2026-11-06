@@ -45,7 +45,7 @@ img{max-width:100%;height:auto}
   box-shadow:var(--shadow-glass);
   backdrop-filter:blur(28px) saturate(1.25);-webkit-backdrop-filter:blur(28px) saturate(1.25);border-radius:var(--radius-lg)}
 .btn-calu,.btn{font:600 14px/1.2 'Sora',sans-serif;color:#001219;border:0;border-radius:14px;
-  padding:14px 24px;background:linear-gradient(105deg,#00E5FF 0%,#00B8D9 55%,#0099c9 100%);cursor:pointer;
+  padding:14px 24px;background:var(--calu-btn-gradient,linear-gradient(105deg,#00E5FF 0%,#00B8D9 55%,#0099c9 100%));cursor:pointer;
   text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;
   box-shadow:0 12px 32px rgba(0,229,255,.26), inset 0 1px 0 rgba(255,255,255,.35);transition:transform .22s var(--ease),box-shadow .22s var(--ease),filter .22s var(--ease);letter-spacing:.01em}
 .btn.primary{/* alias del CTA principal con el estilo por defecto del .btn */}
@@ -437,4 +437,24 @@ img{max-width:100%;height:auto}
   .has-mobile-tabbar .compare-bar{
     bottom:calc(var(--mobile-tabbar-h) + env(safe-area-inset-bottom,0px) + 12px);
   }
+}
+
+/* Admin settings premium */
+.admin-wrap{padding-bottom:40px}
+.admin-fieldset{border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:20px 18px 8px;margin:0 0 18px}
+.admin-fieldset legend{font:700 14px 'Sora',sans-serif;padding:0 8px;color:#fff}
+.admin-subhead{font:600 13px 'Sora',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--calu-cyan);margin:18px 0 10px}
+.admin-preview{padding:18px;margin:0 0 16px}
+.admin-preview h3{margin:8px 0}
+.admin-preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 16px}
+.admin-preset{display:flex;flex-direction:column;gap:8px;align-items:flex-start;text-align:left;padding:12px;cursor:pointer;color:#fff;font:600 13px 'Sora',sans-serif;background:rgba(255,255,255,.04)}
+.admin-preset.active{border-color:var(--calu-cyan);box-shadow:0 0 0 1px rgba(0,229,255,.35)}
+.admin-preset-swatch{display:block;width:100%;height:10px;border-radius:999px}
+.admin-color-row{display:flex;gap:10px;align-items:center}
+.admin-color-row input[type="color"]{width:44px;height:44px;padding:0;border:0;background:none;cursor:pointer}
+.footer-social{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.footer-social a{display:inline-block;padding:4px 0;margin-right:8px}
+@media(max-width:800px){
+  .admin-preset-grid{grid-template-columns:1fr}
+  .admin-tabs{gap:8px}
 }
