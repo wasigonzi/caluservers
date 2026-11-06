@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { TLDS } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
@@ -9,9 +9,36 @@ export default function Domains() {
   useDocumentTitle("Registro de dominios");
   const { catalog } = useCatalog();
   const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState(
     "La disponibilidad se verifica en el portal de cliente (WHMCS), con tu registrador de dominios.",
   );
+
+  /** Quita la extensión conocida al final del nombre, si la tiene. */
+  function stripTld(value: string): string {
+    const v = value.trim();
+    for (const t of TLDS) {
+      if (v.toLowerCase().endsWith(t)) return v.slice(0, v.length - t.length);
+    }
+    return v;
+  }
+
+  /** Rellena el buscador con la extensión elegida (reemplaza la anterior). */
+  function applyTld(tld: string) {
+    const base = stripTld(name);
+    if (!base) {
+      // Sin nombre todavía: deja la extensión y el cursor delante para
+      // que se escriba el nombre antes de ella.
+      setName(tld);
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.setSelectionRange(0, 0);
+      });
+      return;
+    }
+    setName(`${base}${tld}`);
+    inputRef.current?.focus();
+  }
 
   function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -35,6 +62,7 @@ export default function Domains() {
       <section className="wrap">
         <form className="domain-search glass" onSubmit={onSearch}>
           <input
+            ref={inputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Escribe tu dominio perfecto"
@@ -44,6 +72,24 @@ export default function Domains() {
             Buscar dominio →
           </button>
         </form>
+        <div
+          className="tld-chips"
+          role="group"
+          aria-label="Extensiones de dominio"
+        >
+          <span className="muted">Extensión:</span>
+          {TLDS.map((tld) => (
+            <button
+              key={tld}
+              type="button"
+              className={`tld-chip pill${name.toLowerCase().endsWith(tld) ? " selected" : ""}`}
+              aria-pressed={name.toLowerCase().endsWith(tld)}
+              onClick={() => applyTld(tld)}
+            >
+              {tld}
+            </button>
+          ))}
+        </div>
         <p className="notice" id="domain-result">
           {message}
         </p>
@@ -77,13 +123,19 @@ export default function Domains() {
         </section>
         <div className="cards">
           {TLDS.map((tld) => (
-            <div key={tld} className="card glass">
+            <button
+              key={tld}
+              type="button"
+              className="card glass tld-card"
+              onClick={() => applyTld(tld)}
+              aria-label={`Usar la extensión ${tld}`}
+            >
               <h3>{tld}</h3>
               <p>
                 Registro, renovación y transferencia gestionados por tu
                 registrador de dominios.
               </p>
-            </div>
+            </button>
           ))}
         </div>
       </section>

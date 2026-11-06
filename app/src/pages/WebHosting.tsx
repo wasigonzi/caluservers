@@ -5,6 +5,7 @@ import iconSeguridad from "../assets/icons/servicio-seguridad.svg";
 import iconSoporte from "../assets/icons/servicio-soporte.svg";
 import { useCatalog } from "../lib/useCatalog";
 import { PageHero, PlanCard, useDocumentTitle } from "../components/Layout";
+import { HostingQuiz } from "../components/HostingQuiz";
 import { Faq, SectionHead } from "../components/Sections";
 
 const WEB_FAQ = [
@@ -60,6 +61,19 @@ export default function WebHosting() {
             />
           ))}
         </div>
+        <section className="section">
+          <SectionHead
+            kicker="¿Cuál me conviene?"
+            title={
+              <>
+                Encuentra tu plan{" "}
+                <span className="neon-text">en 3 preguntas.</span>
+              </>
+            }
+            lead="Sin tecnicismos: responde y te decimos qué plan encaja con lo que necesitas."
+          />
+          <HostingQuiz plans={catalog.webHosting} />
+        </section>
         <section className="section">
           <SectionHead
             kicker="Qué incluye"

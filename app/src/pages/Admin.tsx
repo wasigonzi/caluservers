@@ -15,6 +15,7 @@ import {
   saveSettingsAdmin,
   signIn,
   signOut,
+  signUpAdmin,
 } from "../lib/admin";
 import { PageHero, useDocumentTitle } from "../components/Layout";
 
@@ -51,7 +52,10 @@ export default function Admin() {
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
   const [tab, setTab] = useState<Tab>("planes");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [locations, setLocations] = useState<VpsLocation[]>([]);
@@ -95,6 +99,49 @@ export default function Admin() {
     const res = await signIn(email, password);
     if (!res.ok || !res.data) {
       setAuthError(res.error ?? "No se pudo iniciar sesión.");
+      return;
+    }
+    setUser(res.data);
+    const admin = await ensureFirstAdmin(res.data.id);
+    if (!admin.ok) {
+      setAuthError(admin.error ?? "");
+      return;
+    }
+    if (!admin.data) {
+      setAuthError(
+        "Tu cuenta no tiene permisos de administrador. Pide a un administrador existente que te añada.",
+      );
+      return;
+    }
+    setIsAdmin(true);
+  }
+
+  async function onSignUp(e: FormEvent) {
+    e.preventDefault();
+    setAuthError("");
+    setAuthMessage("");
+    if (password.length < 8) {
+      setAuthError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setAuthError("Las contraseñas no coinciden.");
+      return;
+    }
+    const res = await signUpAdmin(email, password);
+    if (!res.ok) {
+      setAuthError(res.error ?? "No se pudo crear la cuenta.");
+      return;
+    }
+    if (res.needsConfirmation) {
+      setAuthMessage(
+        res.message ??
+          "Revisa tu correo para confirmar la cuenta y luego inicia sesión.",
+      );
+      return;
+    }
+    if (!res.data) {
+      setAuthError("No se pudo crear la cuenta.");
       return;
     }
     setUser(res.data);
@@ -259,41 +306,118 @@ export default function Admin() {
           lead="Inicia sesión con tu cuenta de administrador."
         />
         <section className="wrap">
-          <form className="formbox glass" onSubmit={onLogin}>
-            <div className="field">
-              <label htmlFor="l-email">Email</label>
-              <input
-                id="l-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="l-pass">Contraseña</label>
-              <input
-                id="l-pass"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {authError ? (
-              <p className="notice glass" role="alert">
-                {authError}
+          {authMode === "login" ? (
+            <form className="formbox glass" onSubmit={onLogin}>
+              <div className="field">
+                <label htmlFor="l-email">Email</label>
+                <input
+                  id="l-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="l-pass">Contraseña</label>
+                <input
+                  id="l-pass"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {authError ? (
+                <p className="notice glass" role="alert">
+                  {authError}
+                </p>
+              ) : null}
+              <button className="btn primary" type="submit">
+                Iniciar sesión
+              </button>
+              <p className="muted">
+                El primer usuario que entra al admin se convierte en
+                administrador. Los siguientes necesitan que un administrador
+                los añada.
               </p>
-            ) : null}
-            <button className="btn primary" type="submit">
-              Iniciar sesión
-            </button>
-            <p className="muted">
-              El primer usuario que entra al admin se convierte en
-              administrador. Los siguientes necesitan que un administrador los
-              añada.
-            </p>
-          </form>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setAuthMode("signup");
+                  setAuthError("");
+                  setAuthMessage("");
+                }}
+              >
+                Crear cuenta de administrador
+              </button>
+            </form>
+          ) : (
+            <form className="formbox glass" onSubmit={onSignUp}>
+              <div className="field">
+                <label htmlFor="s-email">Email</label>
+                <input
+                  id="s-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="s-pass">
+                  Contraseña (mínimo 8 caracteres)
+                </label>
+                <input
+                  id="s-pass"
+                  type="password"
+                  value={password}
+                  minLength={8}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="s-pass2">Confirmar contraseña</label>
+                <input
+                  id="s-pass2"
+                  type="password"
+                  value={confirmPassword}
+                  minLength={8}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {authError ? (
+                <p className="notice glass" role="alert">
+                  {authError}
+                </p>
+              ) : null}
+              {authMessage ? (
+                <p className="notice glass" role="status">
+                  {authMessage}
+                </p>
+              ) : null}
+              <button className="btn primary" type="submit">
+                Crear cuenta de administrador
+              </button>
+              <p className="muted">
+                La primera cuenta que se crea se convierte en administradora.
+              </p>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthError("");
+                  setAuthMessage("");
+                }}
+              >
+                Ya confirmé mi correo — iniciar sesión
+              </button>
+            </form>
+          )}
         </section>
       </>
     );

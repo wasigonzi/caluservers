@@ -50,6 +50,52 @@ export async function signOut(): Promise<void> {
   if (supabase) await supabase.auth.signOut();
 }
 
+export interface SignUpAdminResult {
+  ok: boolean;
+  /** true cuando Supabase creó la cuenta pero pide confirmarla por correo. */
+  needsConfirmation: boolean;
+  data?: AdminUser;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Crea la cuenta de administrador desde el panel. Distingue tres casos:
+ * sesión activa (se puede entrar ya), confirmación por correo pendiente
+ * (la cuenta existe pero hay que confirmar el email) y error.
+ */
+export async function signUpAdmin(
+  email: string,
+  password: string,
+): Promise<SignUpAdminResult> {
+  const err = guard();
+  if (err || !supabase) {
+    return { ok: false, needsConfirmation: false, error: err ?? NOT_CONFIGURED };
+  }
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    return { ok: false, needsConfirmation: false, error: error.message };
+  }
+  const user = data.user
+    ? { id: data.user.id, email: data.user.email }
+    : undefined;
+  if (data.session && user) {
+    return {
+      ok: true,
+      needsConfirmation: false,
+      data: user,
+      message: "Cuenta creada. Ya puedes entrar al panel.",
+    };
+  }
+  return {
+    ok: true,
+    needsConfirmation: true,
+    data: user,
+    message:
+      "Cuenta creada. Revisa tu correo para confirmar la cuenta y luego inicia sesión.",
+  };
+}
+
 export async function isAdmin(userId: string): Promise<boolean> {
   if (!supabase) return false;
   const { data, error } = await supabase

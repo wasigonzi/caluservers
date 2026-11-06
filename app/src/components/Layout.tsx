@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import logoPrincipal from "../assets/logo-principal.svg";
@@ -7,6 +7,7 @@ import { HERO_BG_DATA_URI } from "../lib/brand";
 import type { Plan } from "../lib/catalog";
 import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
+import { useRevealOnScroll } from "./Interactive";
 
 export function useDocumentTitle(title: string) {
   useEffect(() => {
@@ -133,6 +134,8 @@ export function Footer() {
 }
 
 export function Layout() {
+  const mainRef = useRef<HTMLElement>(null);
+  useRevealOnScroll(mainRef);
   return (
     <>
       <div
@@ -142,7 +145,7 @@ export function Layout() {
       />
       <TopBar />
       <Nav />
-      <main>
+      <main ref={mainRef}>
         <Outlet />
       </main>
       <Footer />
@@ -172,10 +175,15 @@ export function PlanCard({
   plan,
   featured,
   tag,
+  compareChecked,
+  onCompareToggle,
 }: {
   plan: Plan;
   featured?: boolean;
   tag?: string;
+  /** Si se pasa, muestra el checkbox "Comparar" del plan. */
+  compareChecked?: boolean;
+  onCompareToggle?: (id: string) => void;
 }) {
   const toConfirm = isPriceToConfirm(plan.price);
   return (
@@ -199,6 +207,16 @@ export function PlanCard({
           <li key={f}>{f}</li>
         ))}
       </ul>
+      {onCompareToggle ? (
+        <label className="checkline compare-check">
+          <input
+            type="checkbox"
+            checked={compareChecked ?? false}
+            onChange={() => onCompareToggle(plan.id)}
+          />
+          Comparar
+        </label>
+      ) : null}
       <a
         className="btn primary"
         href={plan.purchaseUrl}

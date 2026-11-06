@@ -4,8 +4,11 @@ import iconVps from "../assets/icons/servicio-vps.svg";
 import iconRed from "../assets/icons/servicio-red.svg";
 import iconSeguridad from "../assets/icons/servicio-seguridad.svg";
 import { isPriceToConfirm } from "../lib/catalog";
+import { parseVpsSpecs } from "../lib/vps";
 import { useCatalog } from "../lib/useCatalog";
 import { PageHero, PlanCard, useDocumentTitle } from "../components/Layout";
+import { AnimatedNumber } from "../components/Interactive";
+import { VpsConfigurator } from "../components/VpsConfigurator";
 import {
   CompareTable,
   Faq,
@@ -63,6 +66,29 @@ export default function Vps() {
     .filter((p) => p.locationId === (selected?.id ?? locationId))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Comparador: máximo 3 planes de la ubicación actual.
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const comparePlans = compareIds
+    .map((id) => plans.find((p) => p.id === id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
+  function changeLocation(id: string) {
+    setLocationId(id);
+    setCompareIds([]);
+    setCompareOpen(false);
+  }
+
+  function toggleCompare(id: string) {
+    const adding = !compareIds.includes(id);
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
+    if (adding) setCompareOpen(true);
+  }
+
   return (
     <>
       <PageHero
@@ -96,7 +122,7 @@ export default function Vps() {
               type="button"
               className={`loc-card glass${loc.id === selected?.id ? " selected" : ""}`}
               aria-pressed={loc.id === selected?.id}
-              onClick={() => setLocationId(loc.id)}
+              onClick={() => changeLocation(loc.id)}
             >
               <span className="loc-flag">{loc.flag}</span>
               <span className="loc-details">
@@ -113,13 +139,33 @@ export default function Vps() {
 
       <section className="wrap">
         <div className="section-head vps-plans-heading">
+          <span className="kicker">Arma tu VPS</span>
+          <h2>
+            Configura <span className="neon-text">a tu medida</span>
+          </h2>
+          <p>
+            Elige la ubicación y los recursos que necesitas: te recomendamos
+            el plan real que cubre esa configuración.
+          </p>
+        </div>
+        <VpsConfigurator
+          locations={enabledLocations}
+          locationId={selected?.id ?? locationId}
+          onLocationChange={changeLocation}
+          plans={catalog.vps}
+        />
+      </section>
+
+      <section className="wrap">
+        <div className="section-head vps-plans-heading">
           <span className="kicker">Elige tu configuración</span>
           <h2>
             Planes <span className="neon-text">VPS Hosting</span>
           </h2>
           <p>
             Configuraciones disponibles en la ubicación seleccionada. Los
-            precios varían por ubicación.
+            precios varían por ubicación. Marca hasta 3 planes para
+            compararlos.
           </p>
         </div>
         {plans.length > 0 ? (
@@ -130,6 +176,8 @@ export default function Vps() {
                 plan={plan}
                 featured={i === 1}
                 tag={i === 1 ? "Más popular" : "CALUSERVERS"}
+                compareChecked={compareIds.includes(plan.id)}
+                onCompareToggle={toggleCompare}
               />
             ))}
           </div>
@@ -139,6 +187,86 @@ export default function Vps() {
           </p>
         )}
       </section>
+
+      {comparePlans.length > 0 ? (
+        <div className="compare-bar glass" role="region" aria-label="Comparativa de planes">
+          <div className="compare-bar-info">
+            <strong>
+              Comparando {comparePlans.length} de 3:{" "}
+              {comparePlans.map((p) => p.name).join(" · ")}
+            </strong>
+            <span className="muted">
+              {selected?.city} · marca hasta 3 planes
+            </span>
+          </div>
+          <div className="compare-bar-actions">
+            <button
+              type="button"
+              className="btn primary small"
+              aria-expanded={compareOpen}
+              onClick={() => setCompareOpen((v) => !v)}
+            >
+              {compareOpen ? "Ocultar comparativa" : "Ver comparativa"}
+            </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => {
+                setCompareIds([]);
+                setCompareOpen(false);
+              }}
+            >
+              Limpiar
+            </button>
+          </div>
+          {compareOpen ? (
+            <div className="compare-panel">
+              <CompareTable
+                headers={["", ...comparePlans.map((p) => p.name)]}
+                rows={[
+                  {
+                    label: "Precio",
+                    cells: comparePlans.map((p) =>
+                      isPriceToConfirm(p.price) ? "Consultar" : `${p.price}/mes`,
+                    ),
+                  },
+                  {
+                    label: "vCores",
+                    cells: comparePlans.map((p) => {
+                      const s = parseVpsSpecs(p);
+                      return s.vCores !== null ? `${s.vCores} vCores` : "—";
+                    }),
+                  },
+                  {
+                    label: "Memoria RAM",
+                    cells: comparePlans.map((p) => {
+                      const s = parseVpsSpecs(p);
+                      return s.ramGb !== null ? `${s.ramGb} GB DDR5` : "—";
+                    }),
+                  },
+                  {
+                    label: "Almacenamiento",
+                    cells: comparePlans.map((p) => {
+                      const s = parseVpsSpecs(p);
+                      return s.storageGb !== null
+                        ? `${s.storageGb} GB NVMe Gen 5`
+                        : "—";
+                    }),
+                  },
+                  {
+                    label: "Uplink",
+                    cells: comparePlans.map((p) => parseVpsSpecs(p).uplink ?? "—"),
+                  },
+                  {
+                    label: "IP incluida",
+                    cells: comparePlans.map((p) => parseVpsSpecs(p).ip ?? "—"),
+                  },
+                ]}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <section className="section">
         <div className="wrap">
@@ -258,7 +386,9 @@ export default function Vps() {
                 </small>
               </div>
               <div className="glass big-stat">
-                <strong>20</strong>
+                <strong>
+                  <AnimatedNumber value={20} />
+                </strong>
                 <span>Gbps</span>
                 <small>High-speed network</small>
               </div>

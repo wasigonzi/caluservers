@@ -9,6 +9,7 @@ import iconSoporte from "../assets/icons/servicio-soporte.svg";
 import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { useDocumentTitle } from "../components/Layout";
+import { AnimatedNumber } from "../components/Interactive";
 import {
   CompareTable,
   Faq,
@@ -96,7 +97,9 @@ export default function Home() {
                 <span>Apoyo técnico</span>
               </div>
               <div className="stat glass">
-                <strong>99.9%</strong>
+                <strong>
+                  <AnimatedNumber value={99.9} decimals={1} suffix="%" />
+                </strong>
                 <span>Uptime</span>
               </div>
               <div className="stat glass">
