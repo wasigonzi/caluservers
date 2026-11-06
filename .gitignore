@@ -6,3 +6,5 @@ node_modules
 *.log
 *.tsbuildinfo
 .env.pooler.local
+.vercel
+.env*
