@@ -44,3 +44,13 @@ INSERT INTO public.calu_locations (id, name, city, flag, badge, enabled, sort_or
 INSERT INTO public.calu_locations (id, name, city, flag, badge, enabled, sort_order) VALUES ('nl-eygelshoven', 'Países Bajos', 'Eygelshoven', '🇳🇱', '', false, 7) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.calu_settings (key, value) VALUES ('whmcs', '"https://client.caluservers.com"'::jsonb), ('theme', '{"primary": "#087bff", "secondary": "#087bff", "background": "#050914", "panel": "#0b1425", "text": "#f4f8ff", "gradient": "linear-gradient(115deg,#075bff,#00d9ff)"}'::jsonb), ('network_status', '"Todos los sistemas están operativos"'::jsonb) ON CONFLICT (key) DO NOTHING;
+
+
+-- Ajustes extendidos (idempotente). Complementa whmcs/theme/network_status.
+INSERT INTO public.calu_settings (key, value) VALUES
+  ('contact', '{"email":"soporte@caluservers.com","phone":"","hours":"Soporte 24/7 por ticket"}'::jsonb),
+  ('social', '{"x":"","facebook":"","linkedin":"","discord":""}'::jsonb),
+  ('content', '{"heroEyebrow":"Alojamiento de próxima generación","heroTitle":"Impulsando tu","heroTitleAccent":"mundo digital.","heroLead":"Almacenamiento SSD puro, LiteSpeed con LSCache, todo desde cPanel. Incluye SSL gratis, migración gratis desde cualquier proveedor y copias diarias.","heroCtaPrimary":"Ver Hosting →","heroCtaSecondary":"Ver VPS","contactLead":"Nuestro equipo está listo para ayudarte con ventas, soporte técnico y preguntas de cuenta.","footerBlurb":"Soporte 24/7 por ticket, en inglés y español."}'::jsonb),
+  ('visibility', '{"trustStrip":true,"steps":true,"compare":true,"locations":true,"whyUs":true,"faq":true}'::jsonb),
+  ('appearance', '{"preset":"default"}'::jsonb)
+ON CONFLICT (key) DO NOTHING;

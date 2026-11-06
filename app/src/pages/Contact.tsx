@@ -30,9 +30,34 @@ export default function Contact() {
       <PageHero
         kicker="Contacto"
         title="Hablemos."
-        lead="Nuestro equipo está listo para ayudarte con ventas, soporte técnico y preguntas de cuenta."
+        lead={catalog.settings.content.contactLead}
       />
       <section className="wrap">
+        {(catalog.settings.contact.email ||
+          catalog.settings.contact.phone ||
+          catalog.settings.contact.hours) && (
+          <div className="glass notice contact-details" style={{ marginBottom: 18 }}>
+            {catalog.settings.contact.email ? (
+              <p>
+                Email:{" "}
+                <a href={`mailto:${catalog.settings.contact.email}`}>
+                  {catalog.settings.contact.email}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.phone ? (
+              <p>
+                Teléfono:{" "}
+                <a href={`tel:${catalog.settings.contact.phone.replace(/\s/g, "")}`}>
+                  {catalog.settings.contact.phone}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.hours ? (
+              <p>{catalog.settings.contact.hours}</p>
+            ) : null}
+          </div>
+        )}
         <form className="formbox glass" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="c-name">Nombre</label>

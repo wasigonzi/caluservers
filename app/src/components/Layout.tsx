@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import type { ReactNode, SVGProps } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import logoPrincipal from "../assets/logo-principal.svg";
 import monogramaCs from "../assets/monograma-cs.svg";
 import { HERO_BG_DATA_URI } from "../lib/brand";
@@ -8,6 +8,10 @@ import type { Plan } from "../lib/catalog";
 import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { useRevealOnScroll } from "./Interactive";
+import {
+  applySiteTheme,
+  socialEntries,
+} from "../lib/siteSettings";
 
 export function useDocumentTitle(title: string) {
   useEffect(() => {
@@ -22,6 +26,77 @@ const NAV_LINKS: { to: string; label: string }[] = [
   { to: "/dedicated", label: "Dedicados" },
   { to: "/domains", label: "Dominios" },
   { to: "/about", label: "Nosotros" },
+];
+
+type TabIconProps = SVGProps<SVGSVGElement>;
+
+function IconHome(props: TabIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        fill="currentColor"
+        d="M12 3.2 3.5 10.2a1 1 0 0 0-.3.7V20a1.2 1.2 0 0 0 1.2 1.2h5.1V15.5h4.9V21.2h5.1A1.2 1.2 0 0 0 20.8 20v-9.1a1 1 0 0 0-.3-.7L12 3.2Z"
+      />
+    </svg>
+  );
+}
+
+function IconHosting(props: TabIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        fill="currentColor"
+        d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v3A1.5 1.5 0 0 1 19 10.5H5A1.5 1.5 0 0 1 3.5 9V6A1.5 1.5 0 0 1 5 4.5Zm1.2 2.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM5 13.5h14a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 19 19.5H5A1.5 1.5 0 0 1 3.5 18v-3A1.5 1.5 0 0 1 5 13.5Zm1.2 2.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+      />
+    </svg>
+  );
+}
+
+function IconVps(props: TabIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        fill="currentColor"
+        d="M7.2 4.2h9.6A3 3 0 0 1 19.8 7.2v9.6a3 3 0 0 1-3 3H7.2a3 3 0 0 1-3-3V7.2a3 3 0 0 1 3-3Zm1.1 3.1a1.1 1.1 0 1 0 0 2.2h7.4a1.1 1.1 0 1 0 0-2.2H8.3Zm0 4.3a1.1 1.1 0 1 0 0 2.2h4.6a1.1 1.1 0 1 0 0-2.2H8.3Zm0 4.3a1.1 1.1 0 1 0 0 2.2h2.4a1.1 1.1 0 1 0 0-2.2H8.3Z"
+      />
+    </svg>
+  );
+}
+
+function IconDomains(props: TabIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        fill="currentColor"
+        d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19Zm0 1.8c-1.5 1.7-2.4 4.1-2.6 6.7h5.2c-.2-2.6-1.1-5-2.6-6.7Zm3.5.8c1.1 1.6 1.9 3.6 2.2 5.9h3c-.7-2.9-2.7-5.2-5.2-6.4ZM6.5 5.1C4 6.3 2 8.6 1.3 11.5h3c.3-2.3 1.1-4.3 2.2-5.9Zm-3.2 8.2C4 16.2 6 18.5 8.5 19.7c-1.1-1.6-1.9-3.6-2.2-5.9h-3Zm5.1 0c.2 2.6 1.1 5 2.6 6.7 1.5-1.7 2.4-4.1 2.6-6.7H8.4Zm7.1 0c-.3 2.3-1.1 4.3-2.2 5.9 2.5-1.2 4.5-3.5 5.2-6.4h-3Z"
+      />
+    </svg>
+  );
+}
+
+function IconClient(props: TabIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        fill="currentColor"
+        d="M12 3.5a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Zm0 10.2c3.9 0 7.3 2 7.3 4.5v.8A1.5 1.5 0 0 1 17.8 20.5H6.2A1.5 1.5 0 0 1 4.7 19v-.8c0-2.5 3.4-4.5 7.3-4.5Z"
+      />
+    </svg>
+  );
+}
+
+const MOBILE_TABS: {
+  key: string;
+  label: string;
+  to?: string;
+  external?: boolean;
+  Icon: (props: TabIconProps) => ReactNode;
+}[] = [
+  { key: "home", label: "Inicio", to: "/", Icon: IconHome },
+  { key: "hosting", label: "Hosting", to: "/web-hosting", Icon: IconHosting },
+  { key: "vps", label: "VPS", to: "/vps", Icon: IconVps },
+  { key: "domains", label: "Dominios", to: "/domains", Icon: IconDomains },
+  { key: "client", label: "Cliente", external: true, Icon: IconClient },
 ];
 
 export function TopBar() {
@@ -44,18 +119,19 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   return (
     <header className="nav glass">
-      <div className="wrap nav-in">
+      <div className="nav-in">
         <Link className="brand" to="/" aria-label="CaluServers - Inicio">
           <img src={logoPrincipal} alt="CALUSERVERS" />
         </Link>
         <button
           className="menu"
           aria-label="Abrir menú"
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
           ☰
         </button>
-        <nav className={`links${open ? " open" : ""}`}>
+        <nav className={`links${open ? " open" : ""}`} aria-label="Principal">
           {NAV_LINKS.map((l) => (
             <NavLink
               key={l.to}
@@ -69,7 +145,7 @@ export function Nav() {
           ))}
         </nav>
         <div className="nav-actions">
-          <a className="btn ghost" href={catalog.settings.whmcs}>
+          <a className="btn secondary" href={catalog.settings.whmcs}>
             Área de Cliente ↗
           </a>
           <Link className="btn primary" to="/domains">
@@ -81,6 +157,57 @@ export function Nav() {
   );
 }
 
+/** Navegación inferior estilo app: solo pantallas pequeñas vía CSS. */
+export function MobileTabBar() {
+  const { catalog } = useCatalog();
+  const whmcs = catalog.settings.whmcs;
+  return (
+    <nav className="mobile-tabbar" aria-label="Navegación móvil">
+      {MOBILE_TABS.map((tab) => {
+        const Icon = tab.Icon;
+        if (tab.external) {
+          return (
+            <a
+              key={tab.key}
+              className="mobile-tab"
+              href={whmcs}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="mobile-tab-icon">
+                <Icon />
+              </span>
+              <span className="mobile-tab-label">{tab.label}</span>
+            </a>
+          );
+        }
+        return (
+          <NavLink
+            key={tab.key}
+            to={tab.to!}
+            end={tab.to === "/"}
+            className={({ isActive }) =>
+              `mobile-tab${isActive ? " active" : ""}`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <span className="mobile-tab-icon">
+                  <Icon />
+                </span>
+                <span className="mobile-tab-label">{tab.label}</span>
+                {isActive ? (
+                  <span className="sr-only">(página actual)</span>
+                ) : null}
+              </>
+            )}
+          </NavLink>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function Footer() {
   const { catalog } = useCatalog();
   const whmcs = catalog.settings.whmcs;
@@ -88,9 +215,40 @@ export function Footer() {
     <footer className="footer">
       <div className="wrap">
         <div className="footer-grid">
-          <div>
+          <div className="footer-brand">
             <img src={logoPrincipal} alt="CALUSERVERS" />
-            <p>Soporte 24/7 por ticket, en inglés y español.</p>
+            <p>{catalog.settings.content.footerBlurb}</p>
+            {catalog.settings.contact.email ? (
+              <p>
+                <a href={`mailto:${catalog.settings.contact.email}`}>
+                  {catalog.settings.contact.email}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.phone ? (
+              <p>
+                <a href={`tel:${catalog.settings.contact.phone.replace(/\s/g, "")}`}>
+                  {catalog.settings.contact.phone}
+                </a>
+              </p>
+            ) : null}
+            {catalog.settings.contact.hours ? (
+              <p className="muted">{catalog.settings.contact.hours}</p>
+            ) : null}
+            {socialEntries(catalog.settings.social).length > 0 ? (
+              <div className="footer-social">
+                {socialEntries(catalog.settings.social).map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div>
             <h4>Servicios</h4>
@@ -123,7 +281,12 @@ export function Footer() {
             <img
               src={monogramaCs}
               alt=""
-              style={{ height: 22, width: "auto", verticalAlign: "middle", marginRight: 8 }}
+              style={{
+                height: 22,
+                width: "auto",
+                verticalAlign: "middle",
+                marginRight: 8,
+              }}
             />
             Hosting • VPS • Dedicated Servers
           </span>
@@ -135,9 +298,18 @@ export function Footer() {
 
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  const { catalog } = useCatalog();
   useRevealOnScroll(mainRef);
+  useEffect(() => {
+    applySiteTheme(catalog.settings);
+  }, [catalog.settings]);
+  // Admin: sin tab bar para no interferir con login/formularios.
+  const showMobileTabBar = !pathname.startsWith("/admin");
   return (
-    <>
+    <div
+      className={`site-shell${showMobileTabBar ? " has-mobile-tabbar" : ""}`}
+    >
       <div
         className="aurora"
         aria-hidden="true"
@@ -145,11 +317,12 @@ export function Layout() {
       />
       <TopBar />
       <Nav />
-      <main ref={mainRef}>
+      <main className="site-main" ref={mainRef}>
         <Outlet />
       </main>
       <Footer />
-    </>
+      {showMobileTabBar ? <MobileTabBar /> : null}
+    </div>
   );
 }
 

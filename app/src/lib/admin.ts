@@ -2,6 +2,12 @@
 // Sin Supabase configurado todas las funciones devuelven un error claro:
 // el admin NO finge logins ni guardados.
 import type { Plan, SiteSettings, VpsLocation } from "./catalog";
+import { SEED_CATALOG } from "./catalog";
+import {
+  DEFAULT_SITE_SETTINGS,
+  parseSiteSettings,
+  settingsToRows,
+} from "./siteSettings";
 import { supabase, TABLES, isSupabaseConfigured } from "./supabase";
 
 export interface AdminUser {
@@ -308,35 +314,13 @@ export async function fetchSettingsAdmin(): Promise<
     .from(TABLES.settings)
     .select("key, value");
   if (error) return { ok: false, error: error.message };
-  const settings: SiteSettings = {
-    whmcs: "",
-    theme: {
-      primary: "#087bff",
-      secondary: "#087bff",
-      background: "#050914",
-      panel: "#0b1425",
-      text: "#f4f8ff",
-      gradient: "linear-gradient(115deg,#075bff,#00d9ff)",
-    },
-    networkStatus: "",
+  return {
+    ok: true,
+    data: parseSiteSettings(
+      data as { key: string; value: unknown }[] | null,
+      SEED_CATALOG.settings,
+    ),
   };
-  for (const row of (data as { key: string; value: unknown }[] | null) ?? []) {
-    if (row.key === "whmcs" && typeof row.value === "string") {
-      settings.whmcs = row.value;
-    } else if (
-      row.key === "theme" &&
-      row.value &&
-      typeof row.value === "object"
-    ) {
-      settings.theme = {
-        ...settings.theme,
-        ...(row.value as Partial<SiteSettings["theme"]>),
-      };
-    } else if (row.key === "network_status" && typeof row.value === "string") {
-      settings.networkStatus = row.value;
-    }
-  }
-  return { ok: true, data: settings };
 }
 
 export async function saveSettingsAdmin(
@@ -344,14 +328,12 @@ export async function saveSettingsAdmin(
 ): Promise<AdminResult<void>> {
   const err = guard();
   if (err || !supabase) return { ok: false, error: err ?? NOT_CONFIGURED };
-  const rows = [
-    { key: "whmcs", value: settings.whmcs },
-    { key: "theme", value: settings.theme },
-    { key: "network_status", value: settings.networkStatus },
-  ];
+  const rows = settingsToRows(settings);
   const { error } = await supabase
     .from(TABLES.settings)
     .upsert(rows, { onConflict: "key" });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+export { DEFAULT_SITE_SETTINGS };

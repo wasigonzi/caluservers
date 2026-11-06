@@ -8,8 +8,9 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { Catalog, Plan, SiteSettings, VpsLocation } from "./catalog";
+import type { Catalog, Plan, VpsLocation } from "./catalog";
 import { SEED_CATALOG } from "./catalog";
+import { parseSiteSettings } from "./siteSettings";
 import { supabase, TABLES, isSupabaseConfigured } from "./supabase";
 
 export interface CatalogState {
@@ -100,20 +101,10 @@ async function loadCatalogFromSupabase(): Promise<Catalog | null> {
       const locations = (locsRes.data as LocationRow[] | null ?? []).map(
         rowToLocation,
       );
-      const settings: SiteSettings = {
-        whmcs: SEED_CATALOG.settings.whmcs,
-        theme: SEED_CATALOG.settings.theme,
-        networkStatus: SEED_CATALOG.settings.networkStatus,
-      };
-      for (const row of (settingsRes.data as { key: string; value: unknown }[] | null) ?? []) {
-        if (row.key === "whmcs" && typeof row.value === "string") {
-          settings.whmcs = row.value;
-        } else if (row.key === "theme" && row.value && typeof row.value === "object") {
-          settings.theme = { ...settings.theme, ...(row.value as Partial<SiteSettings["theme"]>) };
-        } else if (row.key === "network_status" && typeof row.value === "string") {
-          settings.networkStatus = row.value;
-        }
-      }
+      const settings = parseSiteSettings(
+        settingsRes.data as { key: string; value: unknown }[] | null,
+        SEED_CATALOG.settings,
+      );
       return {
         webHosting: plans.filter((p) => p.category === "web"),
         vps: plans.filter((p) => p.category === "vps"),

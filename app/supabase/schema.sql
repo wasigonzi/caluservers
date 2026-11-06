@@ -88,3 +88,27 @@ create policy "calu_settings_write_admin" on public.calu_settings
   for all to authenticated
   using (exists (select 1 from public.calu_admins where user_id = auth.uid()))
   with check (exists (select 1 from public.calu_admins where user_id = auth.uid()));
+
+
+-- ---------------------------------------------------------------------------
+-- Claves documentadas en calu_settings (value jsonb). Aplicar seed o upsert
+-- manual; NO requiere ALTER TABLE. Lectura pública (SELECT) + escritura admin.
+-- IMPORTANTE (Postgres RLS): UPDATE necesita también política SELECT.
+-- ---------------------------------------------------------------------------
+-- whmcs            string   URL del portal WHMCS (compras / área cliente)
+-- network_status   string   Texto del topbar
+-- theme            object   {primary,secondary,background,panel,text,gradient}
+-- contact          object   {email,phone,hours} — Contacto + footer
+-- social           object   {x,facebook,linkedin,discord} — footer si no vacío
+-- content          object   textos hero/CTA/contacto/footer
+-- visibility       object   flags booleanos de secciones homepage
+-- appearance       object   {preset: default|ocean|midnight}
+--
+-- Ejemplo de upsert seguro (ejecutar en SQL Editor tras schema.sql):
+-- insert into public.calu_settings (key, value) values
+--   ('contact', '{"email":"soporte@caluservers.com","phone":"","hours":"Soporte 24/7 por ticket"}'::jsonb),
+--   ('social', '{"x":"","facebook":"","linkedin":"","discord":""}'::jsonb),
+--   ('content', '{"heroEyebrow":"Alojamiento de próxima generación","heroTitle":"Impulsando tu","heroTitleAccent":"mundo digital.","heroLead":"…","heroCtaPrimary":"Ver Hosting →","heroCtaSecondary":"Ver VPS","contactLead":"…","footerBlurb":"Soporte 24/7 por ticket, en inglés y español."}'::jsonb),
+--   ('visibility', '{"trustStrip":true,"steps":true,"compare":true,"locations":true,"whyUs":true,"faq":true}'::jsonb),
+--   ('appearance', '{"preset":"default"}'::jsonb)
+-- on conflict (key) do update set value = excluded.value, updated_at = now();
