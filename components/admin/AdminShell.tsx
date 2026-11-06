@@ -17,7 +17,6 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "Estudio PRO", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
-      { label: "TEMP BD setup", href: "/admin/db-setup" },
     ],
   },
   {

@@ -37,10 +37,6 @@ Sin migración o sin DB: la web usa defaults; el editor muestra aviso y **no afi
 - Si `DATABASE_URL` o la publishable key de Vercel fallan (P1001 / Invalid API key), el CMS **no guarda**: solo sirve defaults. No tratar eso como éxito.
 - No crear proyecto nuevo sin confirmación del usuario. No tocar proyectos ajenos.
 
+## Estado BD (Vercel / Supabase)
 
-## TEMP `/api/admin/db-setup` (eliminar tras BD sana)
-
-- **GET** (sesión admin): `current_database` / `current_user` / tablas / forma de `DATABASE_URL` (host/user, sin password) / tablas esperadas.
-- **POST** (admin + `Origin` = Host): `{"action":"apply"}` crea `SiteSetting`/`CatalogConfig`/`PageContent` (IF NOT EXISTS, sin DROP); `probe_write` hace insert/delete transaccional; `diagnose` igual que GET.
-- No acepta SQL arbitrario. Respuestas 503 si BD no alcanza — no simula éxito.
-- Quitar la ruta cuando Supabase/Vercel responda bien.
+Con las variables actuales de Vercel, la conexión directa a `db.<ref>.supabase.co:5432` es **inalcanzable** desde el runtime (Prisma P1001). Falta la cadena oficial **Connect / Session pooler** de un proyecto Supabase **activo** y accesible. Hasta entonces el CMS sirve defaults y el guardado responde 503 (no es éxito). No simular persistencia.
