@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { reportDbError } from "@/lib/db-errors";
 import { SEED_CATALOG, type Catalog } from "@/lib/catalog";
 import {
   parseCatalogPayload,
@@ -15,7 +16,8 @@ export async function getCatalogPayload(): Promise<CatalogPayload> {
     if (!row) return seedCatalogPayload();
     const parsed = parseCatalogPayload(row.payload);
     return parsed ?? seedCatalogPayload();
-  } catch {
+  } catch (error) {
+    reportDbError(error, process.env.DATABASE_URL);
     return seedCatalogPayload();
   }
 }
