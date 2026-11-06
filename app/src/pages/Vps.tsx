@@ -1,7 +1,54 @@
 import { useState } from "react";
 import { RYZEN_DATA_URI } from "../lib/brand";
+import iconVps from "../assets/icons/servicio-vps.svg";
+import iconRed from "../assets/icons/servicio-red.svg";
+import iconSeguridad from "../assets/icons/servicio-seguridad.svg";
+import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { PageHero, PlanCard, useDocumentTitle } from "../components/Layout";
+import {
+  CompareTable,
+  Faq,
+  SectionHead,
+} from "../components/Sections";
+
+const VPS_TIERS = [
+  "Starter",
+  "Lite",
+  "Normal",
+  "Advanced",
+  "Deluxe",
+  "Ultimate",
+  "Mystic",
+  "Phantom",
+];
+
+const VPS_FAQ = [
+  {
+    q: "¿Tengo acceso root en mi VPS?",
+    a: "Sí. Todos los VPS incluyen acceso root / administrador total para instalar, configurar y administrar tu entorno como quieras.",
+  },
+  {
+    q: "¿Qué sistema operativo puedo instalar?",
+    a: "Hay distribuciones Linux disponibles y puedes reinstalar el servidor desde el panel cuando lo necesites. Elige el sistema que mejor se ajuste a tu proyecto.",
+  },
+  {
+    q: "¿Por qué el precio varía según la ubicación?",
+    a: "Cada ubicación tiene sus propios planes y precios. Dallas tiene la gama completa (de Starter a Phantom); Los Angeles, New York y Miami tienen una selección de planes con precios propios.",
+  },
+  {
+    q: "¿Qué significa «Consultar» en el VPS Normal de New York?",
+    a: "El precio de ese plan no está publicado en el catálogo en este momento. El precio a confirmar se muestra en el portal de cliente al hacer el pedido.",
+  },
+  {
+    q: "¿La red es realmente de 20 Gbps?",
+    a: "La capacidad de red llega hasta 20 Gbps donde la ubicación y el plan lo permitan. La velocidad máxima depende del plan, la ubicación y la disponibilidad real de infraestructura.",
+  },
+  {
+    q: "¿La IP está incluida en el precio?",
+    a: "Sí. Los planes incluyen IPv4, y en la mayoría de ubicaciones también IPv6, incluidos en el precio publicado.",
+  },
+];
 
 export default function Vps() {
   useDocumentTitle("VPS Hosting");
@@ -217,6 +264,124 @@ export default function Vps() {
               </div>
             </article>
           </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <SectionHead
+            kicker="Comparativa por ubicación"
+            title={
+              <>
+                El mismo nivel,{" "}
+                <span className="neon-text">en cada ciudad.</span>
+              </>
+            }
+            lead="Precios reales del catálogo por nivel y ubicación. Dallas tiene la gama completa; Los Angeles, New York y Miami, una selección."
+          />
+          <CompareTable
+            headers={["Nivel", "Dallas", "Los Angeles", "New York", "Miami"]}
+            rows={VPS_TIERS.map((tier) => ({
+              label: tier,
+              cells: ["us-dallas", "us-la", "us-ny", "us-miami"].map(
+                (locId) => {
+                  const plan = catalog.vps.find(
+                    (p) => p.locationId === locId && p.name === tier,
+                  );
+                  if (!plan) return "—";
+                  if (isPriceToConfirm(plan.price)) return "Consultar";
+                  return plan.price;
+                },
+              ),
+            }))}
+          />
+          <p className="fineprint" style={{ textAlign: "center" }}>
+            Precios por mes. «Consultar» indica que el precio de ese plan no
+            está publicado y se confirma en el portal de cliente.
+          </p>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <SectionHead
+            kicker="Por qué Ryzen 9 9950X"
+            title={
+              <>
+                Potencia de escritorio,{" "}
+                <span className="neon-text">en tu servidor.</span>
+              </>
+            }
+            lead="Los VPS de CaluServers corren sobre procesadores AMD Ryzen 9 de alta frecuencia, con recursos dedicados que no se comparten."
+          />
+          <div className="detail-grid">
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconVps} alt="" />
+              </div>
+              <div>
+                <h3>Ryzen 9 9950X</h3>
+                <p>
+                  Alta frecuencia por núcleo para aplicaciones, juegos y
+                  cargas que dependen de un solo hilo. Recursos de CPU y RAM
+                  asignados, nunca compartidos.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconRed} alt="" />
+              </div>
+              <div>
+                <h3>DDR5 5600 MHz y NVMe Gen 5</h3>
+                <p>
+                  Memoria DDR5 de alta frecuencia y almacenamiento SSD NVMe
+                  Gen 5 en todos los planes, desde 20 GB hasta 960 GB según
+                  el nivel.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconSeguridad} alt="" />
+              </div>
+              <div>
+                <h3>Red de hasta 20 Gbps</h3>
+                <p>
+                  Uplinks compartidos de 1 a 10 Gbps según el plan y la
+                  ubicación, con capacidad de red de hasta 20 Gbps donde la
+                  infraestructura lo permite.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconVps} alt="" />
+              </div>
+              <div>
+                <h3>IPv4 + IPv6 incluidos</h3>
+                <p>
+                  La dirección IPv4 está incluida en el precio, y en la
+                  mayoría de ubicaciones también IPv6, sin costo adicional.
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <SectionHead
+            kicker="Preguntas frecuentes"
+            title={
+              <>
+                VPS,{" "}
+                <span className="neon-text">sin letra pequeña.</span>
+              </>
+            }
+          />
+          <Faq items={VPS_FAQ} />
         </div>
       </section>
     </>

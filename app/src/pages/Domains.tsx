@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { TLDS } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { PageHero, useDocumentTitle } from "../components/Layout";
+import { SectionHead, Steps } from "../components/Sections";
 
 export default function Domains() {
   useDocumentTitle("Registro de dominios");
@@ -46,6 +47,34 @@ export default function Domains() {
         <p className="notice" id="domain-result">
           {message}
         </p>
+        <section className="section">
+          <SectionHead
+            kicker="Cómo funciona"
+            title={
+              <>
+                Tu dominio,{" "}
+                <span className="neon-text">en tres pasos.</span>
+              </>
+            }
+            lead="La búsqueda y la verificación de disponibilidad se hacen en el portal de cliente, con tu registrador de dominios."
+          />
+          <Steps
+            steps={[
+              {
+                title: "Busca tu dominio",
+                text: "Escribe el nombre que quieres en el buscador de arriba, con la extensión que prefieras (.com, .net, .org, .online, .info o .store).",
+              },
+              {
+                title: "Verifica la disponibilidad",
+                text: "La disponibilidad se comprueba en el portal de cliente (WHMCS). Si está libre, lo añades al carrito y completas el registro.",
+              },
+              {
+                title: "Gestiona todo en un lugar",
+                text: "Registro, renovación y transferencia se gestionan desde tu panel de cliente, junto a tus planes de hosting y VPS.",
+              },
+            ]}
+          />
+        </section>
         <div className="cards">
           {TLDS.map((tld) => (
             <div key={tld} className="card glass">

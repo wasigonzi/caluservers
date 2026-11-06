@@ -1,6 +1,38 @@
 import { INCLUDED_BENEFITS, TECH_SPECS } from "../lib/catalog";
+import iconHosting from "../assets/icons/servicio-hosting.svg";
+import iconRed from "../assets/icons/servicio-red.svg";
+import iconSeguridad from "../assets/icons/servicio-seguridad.svg";
+import iconSoporte from "../assets/icons/servicio-soporte.svg";
 import { useCatalog } from "../lib/useCatalog";
 import { PageHero, PlanCard, useDocumentTitle } from "../components/Layout";
+import { Faq, SectionHead } from "../components/Sections";
+
+const WEB_FAQ = [
+  {
+    q: "¿Qué panel de control incluye el hosting?",
+    a: "Todos los planes incluyen cPanel, con Softaculous Premium para instalar más de 250 scripts (incluido WordPress) en un clic.",
+  },
+  {
+    q: "¿El SSL es gratis?",
+    a: "Sí. Cada dominio y subdominio recibe un certificado SSL de Let's Encrypt que se renueva solo, sin costo adicional.",
+  },
+  {
+    q: "¿Cuántas cuentas de correo puedo crear?",
+    a: "El plan Calu Starter incluye 100 cuentas de correo; Professional y Business incluyen cuentas ilimitadas.",
+  },
+  {
+    q: "¿Puedo migrar mi sitio desde otro proveedor?",
+    a: "Sí. La migración gestionada es gratis: el equipo traslada tu sitio desde cualquier proveedor.",
+  },
+  {
+    q: "¿Qué pasa si mi sitio crece?",
+    a: "Puedes subir de plan dentro del mismo Web Hosting (de Starter a Professional o Business) o escalar a un VPS cuando necesites más recursos y control.",
+  },
+  {
+    q: "¿Hay garantía de devolución?",
+    a: "Sí. Si durante tu primer mes sientes que el hosting no es para ti, se reembolsan las tarifas de hosting.",
+  },
+];
 
 export default function WebHosting() {
   useDocumentTitle("Web Hosting");
@@ -29,6 +61,70 @@ export default function WebHosting() {
           ))}
         </div>
         <section className="section">
+          <SectionHead
+            kicker="Qué incluye"
+            title={
+              <>
+                Todo lo esencial,{" "}
+                <span className="neon-text">sin pagar aparte.</span>
+              </>
+            }
+            lead="Cada plan de Web Hosting trae lo mismo en lo básico: panel, instalador, seguridad y correo."
+          />
+          <div className="detail-grid">
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconHosting} alt="" />
+              </div>
+              <div>
+                <h3>cPanel incluido</h3>
+                <p>
+                  Gestiona dominios, correo, bases de datos MySQL y archivos
+                  desde el panel de control más usado del mundo.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconRed} alt="" />
+              </div>
+              <div>
+                <h3>Softaculous Premium · 250+ scripts</h3>
+                <p>
+                  WordPress y más de 250 aplicaciones se instalan en un clic,
+                  con el plugin LiteSpeed Cache listo para activar.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconSeguridad} alt="" />
+              </div>
+              <div>
+                <h3>SSL gratis y cuentas aisladas</h3>
+                <p>
+                  Certificado SSL de Let&apos;s Encrypt que se renueva solo, y
+                  CageFS mantiene cada cuenta en su propio espacio, aislada
+                  de los demás sitios del servidor.
+                </p>
+              </div>
+            </article>
+            <article className="detail-card glass">
+              <div className="icon-chip">
+                <img src={iconSoporte} alt="" />
+              </div>
+              <div>
+                <h3>Correo y soporte 24/7</h3>
+                <p>
+                  Cuentas de correo con tu dominio (100 en Starter,
+                  ilimitadas en Professional y Business) y soporte por ticket
+                  en inglés y español, todos los días del año.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section className="section">
           <div className="section-head">
             <span className="kicker">Incluido en todos los planes</span>
             <h2>Especificaciones técnicas completas</h2>
@@ -56,6 +152,18 @@ export default function WebHosting() {
               </article>
             ))}
           </div>
+        </section>
+        <section className="section">
+          <SectionHead
+            kicker="Preguntas frecuentes"
+            title={
+              <>
+                Hosting compartido,{" "}
+                <span className="neon-text">sin sorpresas.</span>
+              </>
+            }
+          />
+          <Faq items={WEB_FAQ} />
         </section>
       </section>
     </>

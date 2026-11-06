@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { LOGO_DATA_URI } from "../lib/brand";
+import logoPrincipal from "../assets/logo-principal.svg";
+import monogramaCs from "../assets/monograma-cs.svg";
+import { HERO_BG_DATA_URI } from "../lib/brand";
 import type { Plan } from "../lib/catalog";
 import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
@@ -43,7 +45,7 @@ export function Nav() {
     <header className="nav glass">
       <div className="wrap nav-in">
         <Link className="brand" to="/" aria-label="CaluServers - Inicio">
-          <img src={LOGO_DATA_URI} alt="CALUSERVERS" />
+          <img src={logoPrincipal} alt="CALUSERVERS" />
         </Link>
         <button
           className="menu"
@@ -86,7 +88,7 @@ export function Footer() {
       <div className="wrap">
         <div className="footer-grid">
           <div>
-            <img src={LOGO_DATA_URI} alt="CALUSERVERS" />
+            <img src={logoPrincipal} alt="CALUSERVERS" />
             <p>Soporte 24/7 por ticket, en inglés y español.</p>
           </div>
           <div>
@@ -116,7 +118,14 @@ export function Footer() {
             © {new Date().getFullYear()} CALUSERVERS. Todos los derechos
             reservados.
           </span>
-          <span>Hosting • VPS • Dedicated Servers</span>
+          <span>
+            <img
+              src={monogramaCs}
+              alt=""
+              style={{ height: 22, width: "auto", verticalAlign: "middle", marginRight: 8 }}
+            />
+            Hosting • VPS • Dedicated Servers
+          </span>
         </div>
       </div>
     </footer>
@@ -126,6 +135,11 @@ export function Footer() {
 export function Layout() {
   return (
     <>
+      <div
+        className="aurora"
+        aria-hidden="true"
+        style={{ backgroundImage: `url(${HERO_BG_DATA_URI})` }}
+      />
       <TopBar />
       <Nav />
       <main>
