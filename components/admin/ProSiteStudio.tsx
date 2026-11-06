@@ -16,6 +16,8 @@ import {
   type SiteSettings,
 } from "@/lib/site-settings";
 import { INTERNAL_PATHS } from "@/lib/safe-links";
+import type { BrandingSlot } from "@/lib/branding-upload";
+import BrandingAssetField from "@/components/admin/BrandingAssetField";
 
 type Tab =
   | "branding"
@@ -45,9 +47,11 @@ function deepEqual(a: unknown, b: unknown) {
 export default function ProSiteStudio({
   initialSettings,
   initialCatalog,
+  blobConfigured = false,
 }: {
   initialSettings: SiteSettings;
   initialCatalog: CatalogPayload;
+  blobConfigured?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("branding");
   const [query, setQuery] = useState("");
@@ -247,8 +251,9 @@ export default function ProSiteStudio({
         <section className="panel-block" aria-label="Branding">
           <h2>Branding personalizado</h2>
           <p className="muted">
-            Solo texto plano y URLs https. Sin HTML ni scripts. Vacío = recurso
-            local por defecto.
+            Texto plano sin HTML/scripts. Imágenes por subida a Vercel Blob o URL
+            https. Vacío = recurso local por defecto. Los cambios de imagen no se
+            publican hasta «Guardar y publicar».
           </p>
           <label className="field">
             Nombre de marca
@@ -274,44 +279,31 @@ export default function ProSiteStudio({
               }
             />
           </label>
+          <p className="muted">
+            Sube PNG/JPEG/WebP/GIF (favicon: PNG/ICO). SVG rechazado. Límite 2&nbsp;MB
+            favicon / 5&nbsp;MB imágenes. La URL https sigue disponible como alternativa.
+          </p>
           {(
             [
-              ["logoUrl", "Logo principal (https)"],
-              ["logoMobileUrl", "Logo móvil (https)"],
-              ["faviconUrl", "Favicon (https)"],
-              ["ogImageUrl", "Imagen social / OG (https)"],
+              ["logoUrl", "Logo principal"],
+              ["logoMobileUrl", "Logo móvil"],
+              ["faviconUrl", "Favicon"],
+              ["ogImageUrl", "Imagen social / OG"],
             ] as const
           ).map(([key, label]) => (
-            <div key={key} className="media-field">
-              <label className="field">
-                {label}
-                <input
-                  type="url"
-                  placeholder="https://…"
-                  value={settings.branding[key]}
-                  onChange={(e) =>
-                    patchSettings("branding", {
-                      ...settings.branding,
-                      [key]: e.target.value,
-                    })
-                  }
-                />
-              </label>
-              <div className="media-preview" aria-hidden={!settings.branding[key]}>
-                {settings.branding[key] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={settings.branding[key]}
-                    alt=""
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.opacity = "0.3";
-                    }}
-                  />
-                ) : (
-                  <span className="muted">Fallback local</span>
-                )}
-              </div>
-            </div>
+            <BrandingAssetField
+              key={key}
+              slot={key as BrandingSlot}
+              label={label}
+              value={settings.branding[key]}
+              blobConfigured={blobConfigured}
+              onChange={(url) =>
+                patchSettings("branding", {
+                  ...settings.branding,
+                  [key]: url,
+                })
+              }
+            />
           ))}
           <div className="media-preview logo-fallback">
             {/* eslint-disable-next-line @next/next/no-img-element */}

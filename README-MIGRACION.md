@@ -16,6 +16,7 @@
    - `AUTH_SECRET` (≥32 caracteres aleatorios)
    - `SETTINGS_ENCRYPTION_KEY` (64 hex)
    - `WHMCS_ALLOWED_HOST` (hostname HTTPS permitido para la API)
+   - `BLOB_READ_WRITE_TOKEN` (opcional; subida de branding — ver `docs/SITE_SETTINGS.md`)
 2. Aplicar esquema/migraciones **en tu entorno** (no se ejecutan desde este repositorio hacia producción remota):
    - Desarrollo: `npx prisma migrate dev` o `npx prisma db push`
    - Producción: `npx prisma migrate deploy`
