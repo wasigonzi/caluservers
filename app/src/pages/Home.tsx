@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
+import SplineHero from "../components/SplineHero";
 import iconHosting from "../assets/icons/servicio-hosting.svg";
 import iconVps from "../assets/icons/servicio-vps.svg";
 import iconDedicados from "../assets/icons/servicio-dedicados.svg";
@@ -10,8 +10,6 @@ import { isPriceToConfirm } from "../lib/catalog";
 import { useCatalog } from "../lib/useCatalog";
 import { useDocumentTitle } from "../components/Layout";
 import { AnimatedNumber } from "../components/Interactive";
-// Three.js va en su propio chunk: el hero carga primero y el robot después.
-const RobotHero = lazy(() => import("../components/RobotHero"));
 import {
   CompareTable,
   Faq,
@@ -110,9 +108,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <Suspense fallback={<div className="robot-hero" />}>
-            <RobotHero />
-          </Suspense>
+          <SplineHero />
         </div>
         <div className="wrap">
           <TrustStrip
