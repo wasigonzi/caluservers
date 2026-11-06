@@ -44,7 +44,7 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   return (
     <header className="nav glass">
-      <div className="wrap nav-in">
+      <div className="nav-in">
         <Link className="brand" to="/" aria-label="CaluServers - Inicio">
           <img src={logoPrincipal} alt="CALUSERVERS" />
         </Link>
@@ -88,7 +88,7 @@ export function Footer() {
     <footer className="footer">
       <div className="wrap">
         <div className="footer-grid">
-          <div>
+          <div className="footer-brand">
             <img src={logoPrincipal} alt="CALUSERVERS" />
             <p>Soporte 24/7 por ticket, en inglés y español.</p>
           </div>
