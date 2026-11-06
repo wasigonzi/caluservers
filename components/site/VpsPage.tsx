@@ -63,6 +63,7 @@ export default function Vps() {
   const selected =
     enabledLocations.find((l) => l.id === locationId) ?? enabledLocations[0];
   const plans = catalog.vps
+    .filter((p) => p.active)
     .filter((p) => p.locationId === (selected?.id ?? locationId))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 

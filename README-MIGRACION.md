@@ -19,7 +19,7 @@
 2. Aplicar esquema/migraciones **en tu entorno** (no se ejecutan desde este repositorio hacia producción remota):
    - Desarrollo: `npx prisma migrate dev` o `npx prisma db push`
    - Producción: `npx prisma migrate deploy`
-3. La migración `20261106120000_site_settings` crea la tabla `SiteSetting` (ajustes públicos). Sin ella, la web usa defaults de `lib/site-settings.ts` / `SEED_CATALOG`.
+3. Migraciones: `20261106120000_site_settings` (`SiteSetting`) y `20261106140000_catalog_config` (`CatalogConfig`) (ajustes públicos). Sin ella, la web usa defaults de `lib/site-settings.ts` / `SEED_CATALOG`.
 
 ## Arranque
 
@@ -30,7 +30,7 @@ npm run dev
 ```
 
 - Web pública: `/`, `/web-hosting`, `/vps`, `/dedicated`, `/domains`, `/about`, `/contact`, legales, `/abuse`, `/client`
-- Admin: `/admin/login` → dashboard WHMCS, `/admin/settings` (API cifrada), `/admin/site` (General / Contenido / Apariencia)
+- Admin: `/admin/login` → dashboard WHMCS, `/admin/settings` (API cifrada), `/admin/site` (Estudio PRO: branding, secciones, catálogo, SEO, nav)
 
 ## Seguridad
 

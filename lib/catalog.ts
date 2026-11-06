@@ -12,12 +12,18 @@ export interface Plan {
   category: PlanCategory;
   name: string;
   price: string;
+  /** Precio tachado opcional (oferta). */
+  priceWas?: string;
   description: string;
   features: string[];
   locationId: string;
   purchaseUrl: string;
   sortOrder: number;
   active: boolean;
+  /** Etiqueta corta visible en la tarjeta (ej. Popular). */
+  badge?: string;
+  /** Destaca el plan en home / listados. */
+  featured?: boolean;
 }
 
 export interface VpsLocation {
@@ -54,17 +60,6 @@ export interface SiteSocial {
   discord: string;
 }
 
-export interface SiteContent {
-  heroEyebrow: string;
-  heroTitle: string;
-  heroTitleAccent: string;
-  heroLead: string;
-  heroCtaPrimary: string;
-  heroCtaSecondary: string;
-  contactLead: string;
-  footerBlurb: string;
-}
-
 export interface SiteVisibility {
   trustStrip: boolean;
   steps: boolean;
@@ -72,10 +67,101 @@ export interface SiteVisibility {
   locations: boolean;
   whyUs: boolean;
   faq: boolean;
+  /** Sección de planes destacados en home. */
+  featuredPlans: boolean;
+  /** CTA final de home. */
+  cta: boolean;
+  /** Bloque de servicios (hosting/vps/dedicados). */
+  services: boolean;
 }
+
+export type SafeFontId = "system" | "sora-montserrat" | "exo-sora" | "inter";
+export type RadiusToken = "sm" | "md" | "lg";
+export type ShadowToken = "soft" | "medium" | "strong";
 
 export interface SiteAppearance {
   preset: AppearancePreset;
+  font: SafeFontId;
+  radius: RadiusToken;
+  shadow: ShadowToken;
+}
+
+export interface BrandingSettings {
+  siteName: string;
+  tagline: string;
+  /** URL https del logo; vacío = /assets/logo-principal.svg */
+  logoUrl: string;
+  /** Logo compacto / móvil; vacío = logo principal o monograma */
+  logoMobileUrl: string;
+  faviconUrl: string;
+  ogImageUrl: string;
+}
+
+export interface SeoSettings {
+  title: string;
+  description: string;
+  ogTitle: string;
+  ogDescription: string;
+}
+
+export interface ChromeSettings {
+  headerCtaLabel: string;
+  /** Ruta interna permitida o https */
+  headerCtaHref: string;
+  footerCtaLabel: string;
+  footerCtaHref: string;
+  clientAreaLabel: string;
+  showNetworkStatus: boolean;
+}
+
+export type HomeSectionId =
+  | "hero"
+  | "trustStrip"
+  | "services"
+  | "steps"
+  | "compare"
+  | "featuredPlans"
+  | "locations"
+  | "whyUs"
+  | "faq"
+  | "cta";
+
+export interface HomeSection {
+  id: HomeSectionId;
+  enabled: boolean;
+}
+
+export interface MobileNavItem {
+  key: string;
+  label: string;
+  /** Ruta interna, "whmcs" o https permitido */
+  href: string;
+  enabled: boolean;
+}
+
+export interface SiteContent {
+  heroEyebrow: string;
+  heroTitle: string;
+  heroTitleAccent: string;
+  heroLead: string;
+  heroCtaPrimary: string;
+  heroCtaSecondary: string;
+  /** Destino CTA primario: ruta interna o https */
+  heroCtaPrimaryHref: string;
+  heroCtaSecondaryHref: string;
+  contactLead: string;
+  footerBlurb: string;
+  servicesKicker: string;
+  servicesTitle: string;
+  servicesLead: string;
+  featuredKicker: string;
+  featuredTitle: string;
+  featuredLead: string;
+  ctaKicker: string;
+  ctaTitle: string;
+  ctaLead: string;
+  ctaButtonLabel: string;
+  ctaButtonHref: string;
 }
 
 export interface SiteSettings {
@@ -87,6 +173,12 @@ export interface SiteSettings {
   content: SiteContent;
   visibility: SiteVisibility;
   appearance: SiteAppearance;
+  branding: BrandingSettings;
+  seo: SeoSettings;
+  chrome: ChromeSettings;
+  /** Orden y activación de secciones home (fuente de verdad; visibility se sincroniza). */
+  sections: HomeSection[];
+  mobileNav: MobileNavItem[];
 }
 
 export interface Catalog {
@@ -122,12 +214,15 @@ export const SEED_CATALOG: Catalog = {
       category: "web",
       name: "Calu Professional",
       price: "$6.99",
+      priceWas: "$9.99",
       description: "Perfecto para múltiples sitios.",
       features: ["50 GB NVMe SSD", "Sitios web ilimitados", "Unlimited Email Accounts", "Free SSL", "cPanel", "Softaculous Premium — 250+ Scripts"],
       locationId: "us-dallas",
       purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/web-hosting/calu-professional",
       sortOrder: 1,
       active: true,
+      badge: "Popular",
+      featured: true,
     },
     {
       id: "wh2",
@@ -593,9 +688,22 @@ export const SEED_CATALOG: Catalog = {
         "Almacenamiento SSD puro, LiteSpeed con LSCache, todo desde cPanel. Incluye SSL gratis, migración gratis desde cualquier proveedor y copias diarias.",
       heroCtaPrimary: "Ver Hosting →",
       heroCtaSecondary: "Ver VPS",
+      heroCtaPrimaryHref: "/web-hosting",
+      heroCtaSecondaryHref: "/vps",
       contactLead:
         "Nuestro equipo está listo para ayudarte con ventas, soporte técnico y preguntas de cuenta.",
       footerBlurb: "Soporte 24/7 por ticket, en inglés y español.",
+      servicesKicker: "Nuestros servicios",
+      servicesTitle: "Infraestructura que te impulsa hacia adelante.",
+      servicesLead: "Elige la plataforma adecuada para tu sitio web, aplicación o carga de trabajo empresarial.",
+      featuredKicker: "Planes destacados",
+      featuredTitle: "Empieza con la configuración adecuada.",
+      featuredLead: "Selección de planes marcados como destacados en el catálogo.",
+      ctaKicker: "¿Estás listo?",
+      ctaTitle: "Tu próximo proyecto comienza aquí.",
+      ctaLead: "Encuentra un plan de alojamiento que se ajuste a tus objetivos.",
+      ctaButtonLabel: "Comenzar →",
+      ctaButtonHref: "/web-hosting",
     },
     visibility: {
       trustStrip: true,
@@ -604,8 +712,52 @@ export const SEED_CATALOG: Catalog = {
       locations: true,
       whyUs: true,
       faq: true,
+      featuredPlans: true,
+      cta: true,
+      services: true,
     },
-    appearance: { preset: "default" },
+    appearance: { preset: "default", font: "sora-montserrat", radius: "lg", shadow: "medium" },
+    branding: {
+      siteName: "CaluServers",
+      tagline: "Hosting • VPS • Dedicated Servers",
+      logoUrl: "",
+      logoMobileUrl: "",
+      faviconUrl: "",
+      ogImageUrl: "",
+    },
+    seo: {
+      title: "CaluServers | Web Hosting • VPS • Dedicated",
+      description: "Hosting web, VPS y servidores dedicados con infraestructura premium. Portal de clientes en WHMCS.",
+      ogTitle: "CaluServers | Hosting & VPS",
+      ogDescription: "Infraestructura premium para sitios, apps y cargas exigentes.",
+    },
+    chrome: {
+      headerCtaLabel: "Comenzar",
+      headerCtaHref: "/domains",
+      footerCtaLabel: "Área de Cliente",
+      footerCtaHref: "whmcs",
+      clientAreaLabel: "Área de Cliente ↗",
+      showNetworkStatus: true,
+    },
+    sections: [
+      { id: "hero", enabled: true },
+      { id: "trustStrip", enabled: true },
+      { id: "services", enabled: true },
+      { id: "steps", enabled: true },
+      { id: "compare", enabled: true },
+      { id: "featuredPlans", enabled: true },
+      { id: "locations", enabled: true },
+      { id: "whyUs", enabled: true },
+      { id: "faq", enabled: true },
+      { id: "cta", enabled: true },
+    ],
+    mobileNav: [
+      { key: "home", label: "Inicio", href: "/", enabled: true },
+      { key: "hosting", label: "Hosting", href: "/web-hosting", enabled: true },
+      { key: "vps", label: "VPS", href: "/vps", enabled: true },
+      { key: "domains", label: "Dominios", href: "/domains", enabled: true },
+      { key: "client", label: "Cliente", href: "whmcs", enabled: true },
+    ],
   },
 };
 

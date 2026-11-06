@@ -38,6 +38,7 @@ const WEB_FAQ = [
 
 export default function WebHosting() {
     const { catalog } = useCatalog();
+  const plans = catalog.webHosting.filter((p) => p.active);
   return (
     <>
       <PageHero
@@ -52,7 +53,7 @@ export default function WebHosting() {
       />
       <section className="wrap">
         <div className="plan-grid">
-          {catalog.webHosting.map((plan, i) => (
+          {plans.map((plan, i) => (
             <PlanCard
               key={plan.id}
               plan={plan}
