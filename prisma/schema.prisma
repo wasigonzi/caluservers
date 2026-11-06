@@ -21,3 +21,11 @@ model AdminAudit {
   details   String?  @db.Text
   createdAt DateTime @default(now())
 }
+
+model CaluSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("calu_settings")
+}
