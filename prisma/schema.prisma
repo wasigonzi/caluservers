@@ -1,15 +1,23 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-model IntegrationConfig {
-  id String @id @default("whmcs")
-  endpoint String
-  encryptedCredentials String @db.Text
-  updatedAt DateTime @updatedAt
+generator client {
+  provider = "prisma-client-js"
 }
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model IntegrationConfig {
+  id                   String   @id @default("whmcs")
+  endpoint             String
+  encryptedCredentials String   @db.Text
+  updatedAt            DateTime @updatedAt
+}
+
 model AdminAudit {
-  id String @id @default(cuid())
-  action String
-  entityId String?
-  details String? @db.Text
+  id        String   @id @default(cuid())
+  action    String
+  entityId  String?
+  details   String?  @db.Text
   createdAt DateTime @default(now())
 }
