@@ -22,7 +22,7 @@ export default async function SiteAdminPage() {
         Branding (URL o subida a Vercel Blob), apariencia, contenido, secciones,
         catálogo, SEO y navegación. Publicación unificada. Requiere migraciones{" "}
         <code>SiteSetting</code> / <code>CatalogConfig</code> y, para subidas,{" "}
-        <code>BLOB_READ_WRITE_TOKEN</code>. WHMCS API en «Conexión WHMCS».
+        <code>BLOB_READ_WRITE_TOKEN</code>. WHM / cPanel de sólo lectura en «Conexión WHM».
       </p>
       <div className="studio-container">
         <ProSiteStudio

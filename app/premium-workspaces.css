@@ -925,3 +925,13 @@
 .brand-contrast .contrast-status { margin:6px 0; }
 .brand-contrast .warn { color:#ffd38a; }
 .brand-contrast>.muted { font-size:10px; line-height:1.6; }
+
+.admin-app .whm-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.whm-state { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:16px; border:1px solid #00e5ff33; border-radius:12px; margin-bottom:20px; }
+.whm-state>span { margin-left:auto; color:#a7becf; font-size:12px; }
+.whm-settings .field small { display:block; color:#9fb6c9; line-height:1.7; margin-top:8px; font-size:12px; }
+.whm-help { margin-top:28px; padding-top:20px; border-top:1px solid #ffffff1a; color:#a7becf; font-size:13px; line-height:1.8; }
+.whm-help summary { cursor:pointer; color:#c2f8ff; font-weight:650; }
+.whm-help li { margin-bottom:10px; }
+.whm-query-time { font-size:12px; margin-top:18px; }
+@media(max-width:600px) { .admin-app .whm-metrics { grid-template-columns:1fr; } }

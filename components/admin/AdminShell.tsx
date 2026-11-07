@@ -4,12 +4,8 @@ import {
   LayoutDashboard,
   Palette,
   FileText,
-  Users,
   Server,
-  ShoppingBag,
-  Receipt,
   Package,
-  LifeBuoy,
   Settings,
   ExternalLink,
   Menu,
@@ -23,12 +19,8 @@ const NAV_ICONS = {
   "/admin": LayoutDashboard,
   "/admin/site": Palette,
   "/admin/pages": FileText,
-  "/admin/clients": Users,
-  "/admin/services": Server,
-  "/admin/orders": ShoppingBag,
-  "/admin/invoices": Receipt,
-  "/admin/products": Package,
-  "/admin/tickets": LifeBuoy,
+  "/admin/accounts": Server,
+  "/admin/packages": Package,
   "/admin/settings": Settings,
 };
 type NavItem = { label: string; href: keyof typeof NAV_ICONS };
@@ -47,19 +39,15 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "Catálogo & WHMCS",
+    title: "WHM / cPanel",
     items: [
-      { label: "Clientes", href: "/admin/clients" },
-      { label: "Servicios", href: "/admin/services" },
-      { label: "Pedidos", href: "/admin/orders" },
-      { label: "Facturas", href: "/admin/invoices" },
-      { label: "Productos", href: "/admin/products" },
-      { label: "Tickets", href: "/admin/tickets" },
+      { label: "Cuentas", href: "/admin/accounts" },
+      { label: "Paquetes", href: "/admin/packages" },
     ],
   },
   {
     title: "Ajustes",
-    items: [{ label: "Conexión WHMCS", href: "/admin/settings" }],
+    items: [{ label: "Conexión WHM", href: "/admin/settings" }],
   },
 ];
 

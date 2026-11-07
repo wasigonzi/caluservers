@@ -1,1 +1,13 @@
-import {NextRequest,NextResponse} from "next/server";import {requireAdmin} from "@/lib/auth";import {saveConfiguration} from "@/lib/whmcs";import {trustedWrite} from "@/lib/request";export const runtime="nodejs";export async function POST(req:NextRequest){try{await requireAdmin()}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}if(!trustedWrite(req))return NextResponse.json({error:"Forbidden"},{status:403});try{const d=await req.json();if(typeof d.url!=="string"||!["identifier","secret","accessKey"].every(k=>d[k]===undefined||typeof d[k]==="string"))return NextResponse.json({error:"Invalid payload"},{status:400});await saveConfiguration(d);return NextResponse.json({ok:true})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Error"},{status:400})}}
+import { NextRequest } from "next/server";
+import { whmGuard, whmJson } from "@/lib/whm-http";
+export async function POST(req: NextRequest) {
+  const denied = await whmGuard(req, true);
+  if (denied) return denied;
+  return whmJson(
+    {
+      error:
+        "Configuración anterior retirada. Usa /api/admin/whm/settings; los datos históricos se conservan.",
+    },
+    410,
+  );
+}

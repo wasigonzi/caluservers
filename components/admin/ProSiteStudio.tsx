@@ -47,7 +47,7 @@ const TABS: { id: Tab; label: string; keywords: string }[] = [
   {
     id: "content",
     label: "Contenido",
-    keywords: "hero cta textos contacto redes whmcs",
+    keywords: "hero cta textos contacto redes portal",
   },
   { id: "sections", label: "Secciones", keywords: "orden home visibilidad" },
   { id: "catalog", label: "Catálogo", keywords: "planes precio productos" },
@@ -228,7 +228,7 @@ export default function ProSiteStudio({
 
   const hrefOptions = [
     ...INTERNAL_PATHS.map((p) => ({ value: p, label: p })),
-    { value: "whmcs", label: "Portal WHMCS" },
+    { value: "whmcs", label: "Portal de clientes" },
   ];
 
   return (
@@ -657,7 +657,7 @@ export default function ProSiteStudio({
             <Link href="/admin/pages">Páginas / contenido</Link>.
           </p>
           <label className="field">
-            URL portal WHMCS (https)
+            URL del portal de clientes (https)
             <input
               type="url"
               value={settings.whmcs}
@@ -900,7 +900,7 @@ export default function ProSiteStudio({
           <h2>Catálogo de planes</h2>
           <p className="muted">
               Edita planes reales (semilla + guardado en CatalogConfig). No es
-              CRUD live de WHMCS; el enlace de compra debe ser https al portal.
+              gestión de cuentas WHM; el enlace de compra existente debe ser https al portal.
           </p>
           <div className="tabs compact">
             {(
@@ -1024,7 +1024,7 @@ export default function ProSiteStudio({
                   />
                 </label>
                 <label className="field wide">
-                  URL compra WHMCS (https)
+                  URL de compra existente (https)
                   <input
                     type="url"
                     value={plan.purchaseUrl}

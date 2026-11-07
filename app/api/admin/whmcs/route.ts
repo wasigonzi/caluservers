@@ -1,1 +1,13 @@
-import {NextRequest,NextResponse} from "next/server";import {requireAdmin} from "@/lib/auth";import {READ_ACTIONS,whmcsCall} from "@/lib/whmcs";export const runtime="nodejs";export async function GET(req:NextRequest){try{await requireAdmin()}catch{return NextResponse.json({error:"Unauthorized"},{status:401})}const section=req.nextUrl.searchParams.get("section")||"";if(!(section in READ_ACTIONS))return NextResponse.json({error:"Invalid section"},{status:400});try{return NextResponse.json(await whmcsCall(READ_ACTIONS[section as keyof typeof READ_ACTIONS],{limitnum:"50"}),{headers:{"Cache-Control":"private, no-store"}})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"WHMCS unavailable"},{status:502})}}
+import { NextRequest } from "next/server";
+import { whmGuard, whmJson } from "@/lib/whm-http";
+export async function GET(req: NextRequest) {
+  const denied = await whmGuard(req, false);
+  if (denied) return denied;
+  return whmJson(
+    {
+      error:
+        "La integración WHMCS está desactivada. Usa WHM / cPanel; no se han eliminado datos anteriores.",
+    },
+    410,
+  );
+}

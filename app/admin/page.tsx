@@ -1,48 +1,20 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  Palette,
-  FileText,
-  ArrowUpRight,
-  PlugZap,
-  Users,
-  ShoppingBag,
-  Receipt,
-  Server,
-} from "lucide-react";
+import { Palette, FileText, ArrowUpRight, PlugZap } from "lucide-react";
 import { isAdmin } from "@/lib/auth";
-import { configuration, whmcsCall } from "@/lib/whmcs";
+import { whmConfiguration } from "@/lib/whm";
+import { safeWhmError } from "@/lib/whm-security";
+import WhmReadPanel from "@/components/admin/WhmReadPanel";
 export const dynamic = "force-dynamic";
-async function count(action: string) {
-  try {
-    return String(
-      (await whmcsCall(action, { limitnum: "1" })).totalresults ?? "—",
-    );
-  } catch {
-    return "—";
-  }
-}
 export default async function Admin() {
   if (!(await isAdmin())) redirect("/admin/login");
-  let configured = false;
+  let configured = false,
+    storageError = "";
   try {
-    configured = !!(await configuration());
-  } catch {}
-  const actions = [
-    "GetClients",
-    "GetOrders",
-    "GetInvoices",
-    "GetClientsProducts",
-  ];
-  const values = configured
-    ? await Promise.all(actions.map(count))
-    : ["—", "—", "—", "—"];
-  const metrics = [
-    { label: "Clientes", Icon: Users, href: "/admin/clients" },
-    { label: "Pedidos", Icon: ShoppingBag, href: "/admin/orders" },
-    { label: "Facturas", Icon: Receipt, href: "/admin/invoices" },
-    { label: "Servicios", Icon: Server, href: "/admin/services" },
-  ];
+    configured = (await whmConfiguration()).configured;
+  } catch (error) {
+    storageError = safeWhmError(error).message;
+  }
   return (
     <>
       <header className="dashboard-heading">
@@ -88,44 +60,18 @@ export default async function Admin() {
           </span>
         </Link>
       </section>
-      <div className="dashboard-section-heading">
-        <div>
-          <h2>Operaciones</h2>
-          <p className="muted">
-            Datos de WHMCS · «—» indica información no disponible, no un valor
-            cero.
-          </p>
-        </div>
-        <span className="pill">
-          {configured ? "Configuración disponible" : "Sin conexión configurada"}
-        </span>
-      </div>
-      <div className="metrics">
-        {metrics.map(({ label, Icon, href }, i) => (
-          <Link className="glass metric" href={href} key={label}>
-            <div className="metric-label">
-              <Icon size={18} aria-hidden="true" />
-              {label}
-            </div>
-            <strong>{values[i]}</strong>
-            <span className="muted">
-              {values[i] === "—" ? "No disponible" : "Total consultado"}
-            </span>
-          </Link>
-        ))}
-      </div>
+      <WhmReadPanel configured={configured} storageError={storageError} />
       <section className="dashboard-integration">
         <PlugZap size={22} aria-hidden="true" />
         <div>
-          <h3>Integración WHMCS</h3>
+          <h3>Conexión WHM / cPanel</h3>
           <p className="muted">
-            {configured
-              ? "La configuración guardada no garantiza conectividad. Los datos disponibles aparecen arriba."
-              : "Conecta el sistema para consultar registros reales. El editor del sitio sigue disponible."}
+            Consulta cuentas y paquetes sin crear, suspender, cambiar
+            contraseñas ni gestionar facturas.
           </p>
         </div>
         <Link className="btn secondary" href="/admin/settings">
-          Revisar conexión →
+          Revisar configuración →
         </Link>
       </section>
     </>
