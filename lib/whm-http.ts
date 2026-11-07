@@ -49,10 +49,11 @@ export function whmFailure(error: unknown) {
   const safe = safeWhmError(error);
   const status =
     safe.code === "invalid" ||
+    safe.code === "confirmation" ||
     safe.code === "identity" ||
     safe.code === "blocked"
       ? 400
-      : safe.code === "pending"
+      : safe.code === "pending" || safe.code === "conflict"
         ? 409
         : 502;
   return whmJson({ error: safe.message, code: safe.code }, status);

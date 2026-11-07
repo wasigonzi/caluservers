@@ -4,6 +4,14 @@ import { isIP } from "node:net";
 export const WHM_ACTIONS = ["listaccts", "listpkgs"] as const;
 export type WhmAction = (typeof WHM_ACTIONS)[number];
 const MESSAGES = {
+  package_advanced:
+    "Este paquete tiene opciones o extensiones avanzadas que no pueden conservarse con seguridad aquí. Edítalo desde WHM; no se enviaron cambios.",
+  confirmation:
+    "Confirma la operación escribiendo exactamente la cuenta o paquete afectado.",
+  conflict:
+    "Los datos cambiaron o el recurso no está disponible. Actualiza antes de confirmar otra vez.",
+  uncertain:
+    "No se pudo confirmar el resultado. La operación podría haberse aplicado. Revisa los datos antes de volver a intentarlo.",
   invalid:
     "Configura un servidor HTTPS en el puerto 2087, usuario WHM y token válido.",
   blocked:
@@ -29,7 +37,8 @@ export class WhmError extends Error {
   }
 }
 export function safeWhmError(error: unknown) {
-  return error instanceof WhmError && Object.prototype.hasOwnProperty.call(MESSAGES, error.code)
+  return error instanceof WhmError &&
+    Object.prototype.hasOwnProperty.call(MESSAGES, error.code)
     ? { code: error.code, message: MESSAGES[error.code] }
     : { code: "storage", message: MESSAGES.storage };
 }

@@ -98,7 +98,7 @@ export default function SettingsForm({
                 ? "Configuración guardada · sin verificar"
                 : "Pendiente configuración"}
         </strong>
-        <span>Sólo lectura</span>
+        <span>Token sólo servidor</span>
       </div>
       {storageError ? (
         <p className="error" role="alert">
@@ -206,9 +206,11 @@ export default function SettingsForm({
           </li>
           <li>
             En WHM → Development → Manage API Tokens, crea un token restringido
-            a <code>list-accts</code> y <code>list-pkgs</code>. No habilites
-            Everything, crear cuentas, cambiar contraseñas, sesiones o gestionar
-            tokens.
+            a <code>list-accts</code> y <code>list-pkgs</code>. Para gestión,
+            habilita sólo las acciones necesarias (create-acct, suspend-acct,
+            upgrade-account, create-pkg, edit-pkg), sujeto a tu proveedor. No
+            concedas Everything, cambiar contraseñas, sesiones ni gestionar
+            tokens. La aplicación no eleva ACL.
           </li>
           <li>
             Un reseller sólo verá lo que sus privilegios permiten. El servidor
@@ -217,8 +219,9 @@ export default function SettingsForm({
           </li>
           <li>
             Guarda y pulsa Probar conexión. HTTP 200 no basta: ambas operaciones
-            deben devolver <code>metadata.result=1</code>. No gestiona pedidos,
-            cobros ni facturas.
+            deben devolver <code>metadata.result=1</code>. La prueba no modifica
+            cuentas. La gestión confirmada está en Cuentas/Paquetes; no gestiona
+            pedidos, cobros ni facturas.
           </li>
         </ol>
         <a
