@@ -318,3 +318,28 @@ test("catalog count SSR shows known availability immediately, honest loading, an
   assert.match(home, /<CatalogPlanCount/);
   assert.ok(!home.includes("AnimatedNumber"), "availability must not count up from an invented zero");
 });
+
+
+test("palette reports text, primary and accent ratios separately without global AA claims", () => {
+  const h = harness();
+  const Contrast = h.load("components/admin/BrandContrast.tsx").default;
+  const theme = {background:"#fff",text:"#000",primary:"#777777",secondary:"#767676"};
+  const render = () => h.render(Contrast, {theme});
+  let tree = render();
+  const pair = key => nodes(tree,n=>n.props?.["data-contrast-pair"]===key)[0];
+  assert.match(renderToStaticMarkup(pair("text")), /21.00:1/);
+  assert.match(renderToStaticMarkup(pair("primary")), /4.48:1.*No alcanza 4.5:1/);
+  assert.match(renderToStaticMarkup(pair("secondary")), /4.54:1.*AA para texto normal/);
+  assert.match(renderToStaticMarkup(tree), /No certifica toda la interfaz/);
+  theme.primary = "invalid"; tree=render();
+  assert.match(renderToStaticMarkup(pair("primary")), /sin medición/);
+  theme.primary = "#000"; tree=render();
+  assert.match(renderToStaticMarkup(pair("primary")), /21.00:1.*AA para texto normal/);
+});
+test("branding preview stays top-aligned; sticky is restricted to tall desktop viewports", () => {
+  const css = readFileSync(resolve(root,"app/premium-workspaces.css"),"utf8");
+  const base = css.match(/\.brand-preview-aside\s*\{([^}]+)\}/)[1];
+  assert.match(base,/position:\s*static/);
+  assert.match(base,/align-self:\s*start/);
+  assert.match(css,/@media \(min-width: 1201px\) and \(min-height: 1000px\)\s*\{\s*\.brand-preview-aside\s*\{\s*position: sticky/);
+});

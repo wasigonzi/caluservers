@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Palette, ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { Palette, ImageIcon } from "lucide-react";
 import BrandingPreview from "@/components/admin/BrandingPreview";
-import { contrastRatio, changedSettingGroups } from "@/lib/branding-preview";
+import BrandContrast from "@/components/admin/BrandContrast";
+import { changedSettingGroups } from "@/lib/branding-preview";
 import { useEffect, useMemo, useState } from "react";
 import type { Plan, PlanCategory } from "@/lib/catalog";
 import type { CatalogPayload } from "@/lib/catalog-validate";
@@ -89,10 +90,6 @@ export default function ProSiteStudio({
     !deepEqual(settings, savedSettings) || !deepEqual(catalog, savedCatalog);
 
   const busy = status === "saving" || uploading.size > 0;
-  const contrast = contrastRatio(
-    settings.theme.background,
-    settings.theme.text,
-  );
   const changedGroups =
     changedSettingGroups(settings, savedSettings).length +
     (deepEqual(catalog, savedCatalog) ? 0 : 1);
@@ -460,23 +457,7 @@ export default function ProSiteStudio({
                   </label>
                 ))}
           </div>
-              <p
-                className={
-                  contrast !== null && contrast >= 4.5
-                    ? "contrast-status ok"
-                    : "contrast-status error"
-                }
-                role="status"
-              >
-                {contrast !== null && contrast >= 4.5 ? (
-                  <CheckCircle2 size={16} aria-hidden="true" />
-                ) : (
-                  <AlertCircle size={16} aria-hidden="true" />
-                )}
-                {contrast === null
-                  ? "Introduce colores hex válidos para medir contraste."
-                  : `Texto / fondo: ${contrast.toFixed(2)}:1 · ${contrast >= 4.5 ? "Cumple AA para texto normal" : "Necesita al menos 4.5:1"}`}
-              </p>
+              <BrandContrast theme={settings.theme} />
               <button
                 type="button"
                 className="btn secondary"
