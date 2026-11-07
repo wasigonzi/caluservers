@@ -935,3 +935,20 @@
 .whm-help li { margin-bottom:10px; }
 .whm-query-time { font-size:12px; margin-top:18px; }
 @media(max-width:600px) { .admin-app .whm-metrics { grid-template-columns:1fr; } }
+
+/* WHM management: native modal traps focus and keeps background inert. */
+.whm-management-toolbar { display:flex; align-items:center; gap:1rem; margin:1.25rem 0; flex-wrap:wrap; }
+.whm-row-actions { display:flex; gap:.5rem; flex-wrap:wrap; min-width:12rem; }
+.whm-row-actions .btn { padding:.55rem .75rem; font-size:.8rem; }
+.whm-stale { color:#f5d28b; border-color:rgba(245,210,139,.35); }
+.whm-dialog { color:var(--text,#edf4ff); background:var(--panel,#101c2d); border:1px solid var(--border,rgba(255,255,255,.14)); border-radius:1.25rem; padding:1.5rem; width:min(42rem,calc(100vw - 2rem)); max-height:calc(100dvh - 3rem); overflow:auto; box-shadow:0 2rem 6rem #0008; }
+.whm-dialog::backdrop { background:#030812bb; backdrop-filter:blur(5px); }
+.whm-dialog-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.whm-dialog-heading h2 { margin:.25rem 0 .75rem; }
+.whm-dialog fieldset { border:0; padding:0; margin:1rem 0; min-width:0; }
+.whm-quota-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.whm-confirmation { display:flex; align-items:flex-start; gap:.75rem; padding:1rem; background:#e4af5212; border:1px solid #e4af5240; border-radius:.75rem; }
+.whm-confirmation svg { flex-shrink:0; color:#f5d28b; }.whm-confirmation p { margin:0; }
+.whm-ack { display:flex; align-items:flex-start; gap:.75rem; font-size:.85rem; line-height:1.6; }
+.whm-ack input { width:1rem; height:1rem; margin-top:.25rem; flex-shrink:0; }
+@media(max-width:600px) { .whm-quota-grid { grid-template-columns:1fr; } .whm-dialog { padding:1rem; } }

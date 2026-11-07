@@ -46,11 +46,12 @@ export default async function SectionPage({
   }
   return (
     <>
-      <p className="accent">WHM / SÓLO LECTURA</p>
+      <p className="accent">WHM / GESTIÓN CONFIRMADA</p>
       <h1>
         {section === "accounts" ? "Cuentas cPanel" : "Paquetes de hosting"}
       </h1>
       <WhmReadPanel
+        key={section}
         mode={section === "accounts" ? "listaccts" : "listpkgs"}
         configured={configured}
         storageError={error}

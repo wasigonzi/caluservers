@@ -22,7 +22,12 @@ function loader(mocks = {}) {
   const hooks = {
     ...React,
     useId: () => "test-id",
-    useRef: () => ({ current: null }),
+    useEffect: () => {},
+    useRef(initial) {
+      const i = cursor++;
+      if (!(i in states)) states[i] = { current: initial };
+      return states[i];
+    },
     useState(initial) {
       const i = cursor++;
       if (!(i in states))
@@ -86,6 +91,8 @@ function loader(mocks = {}) {
         exports: module.exports,
         require: localRequire,
         URL,
+        URLSearchParams,
+        AbortController,
         Buffer,
         Request,
         Response,
@@ -157,8 +164,9 @@ function transportMock({
         req.destroy = () => {
           queueMicrotask(() => req.emit("close"));
         };
-        req.end = () =>
-          queueMicrotask(() => {
+        req.end = (body) => {
+          calls[calls.length - 1].body = body;
+          return queueMicrotask(() => {
             if (fail) {
               req.emit("error", Error(TOKEN + " private transport stack"));
               req.emit("close");
@@ -186,6 +194,7 @@ function transportMock({
             }
             req.emit("close");
           });
+        };
         return req;
       },
     },
@@ -384,7 +393,8 @@ test("AES-GCM uses fresh IV, separates WHM context, tamper rejects safely and pu
   assert.notEqual(a, b);
   assert.ok(!a.includes(TOKEN));
   assert.equal(w.decryptWhm(a).token, TOKEN);
-  const damaged=a.split(":"); damaged[2]=(damaged[2][0]==="0"?"1":"0")+damaged[2].slice(1);
+  const damaged = a.split(":");
+  damaged[2] = (damaged[2][0] === "0" ? "1" : "0") + damaged[2].slice(1);
   assert.throws(() => w.decryptWhm(damaged.join(":")));
   assert.throws(() => w.decryptWhm(a.replace("v1:", "")));
   const publicConfig = w.publicWhmConfig(HOST, credentials);
@@ -694,32 +704,781 @@ test("active admin pages/API no longer import or call WHMCS; public catalog rema
   assert.ok(!client.includes("NEXT_PUBLIC"));
 });
 
-
 test("DNS and HTTPS have bounded deadlines and clean up timers without retry", async () => {
-  const timers=[];
-  const set=(fn,ms)=>{const timer={fn,ms,cleared:false};timers.push(timer);return timer;};
-  const clear=timer=>{timer.cleared=true;};
-  let h=loader({setTimeout:set,clearTimeout:clear,"node:dns/promises":{lookup:()=>new Promise(()=>{})}});
-  const pending=h.load("lib/whm-transport.ts").publicTarget("whm.example.net");
-  assert.equal(timers[0].ms,3000);timers[0].fn();await assert.rejects(pending,e=>e.code==="timeout");assert.equal(timers[0].cleared,true);
-  let calls=0;
-  h=loader({setTimeout:set,clearTimeout:clear,"node:dns/promises":{lookup:async()=>[{address:"8.8.8.8",family:4}]},"node:https":{request(){calls++;const req=new EventEmitter();req.destroy=()=>req.emit("close");req.end=()=>timers.findLast(t=>t.ms===10000).fn();return req;}}});
-  await assert.rejects(h.load("lib/whm-transport.ts").readWhm(HOST,{username:"root",token:TOKEN},"listaccts"),e=>e.code==="timeout");
-  assert.equal(calls,1);assert.equal(timers.findLast(t=>t.ms===10000).cleared,true);
+  const timers = [];
+  const set = (fn, ms) => {
+    const timer = { fn, ms, cleared: false };
+    timers.push(timer);
+    return timer;
+  };
+  const clear = (timer) => {
+    timer.cleared = true;
+  };
+  let h = loader({
+    setTimeout: set,
+    clearTimeout: clear,
+    "node:dns/promises": { lookup: () => new Promise(() => {}) },
+  });
+  const pending = h
+    .load("lib/whm-transport.ts")
+    .publicTarget("whm.example.net");
+  assert.equal(timers[0].ms, 3000);
+  timers[0].fn();
+  await assert.rejects(pending, (e) => e.code === "timeout");
+  assert.equal(timers[0].cleared, true);
+  let calls = 0;
+  h = loader({
+    setTimeout: set,
+    clearTimeout: clear,
+    "node:dns/promises": {
+      lookup: async () => [{ address: "8.8.8.8", family: 4 }],
+    },
+    "node:https": {
+      request() {
+        calls++;
+        const req = new EventEmitter();
+        req.destroy = () => req.emit("close");
+        req.end = () => timers.findLast((t) => t.ms === 10000).fn();
+        return req;
+      },
+    },
+  });
+  await assert.rejects(
+    h
+      .load("lib/whm-transport.ts")
+      .readWhm(HOST, { username: "root", token: TOKEN }, "listaccts"),
+    (e) => e.code === "timeout",
+  );
+  assert.equal(calls, 1);
+  assert.equal(timers.findLast((t) => t.ms === 10000).cleared, true);
 });
-test("configuration GET and save are admin guarded before storage, save additionally requires Origin",async()=>{
-  for(const scenario of ["unauth","bad-origin"]){
-    let storage=0;
-    const h=loader({"@/lib/auth":{requireAdmin:async()=>{if(scenario==="unauth")throw Error(TOKEN);}},"@/lib/whm":{whmConfiguration:async()=>{storage++;return {};},saveWhmConfiguration:async()=>{storage++;return {};}}});
-    const route=h.load("app/api/admin/whm/settings/route.ts");
-    const response=await route.POST(request({url:HOST,username:"root",token:TOKEN},"https://evil.example.net"));
-    assert.equal(response.status,scenario==="unauth"?401:403);assert.equal(storage,0);
-    if(scenario==="unauth"){const get=await route.GET(new NextRequest("https://app.example.net/api/admin/whm/settings"));assert.equal(get.status,401);assert.equal(storage,0);}
+test("configuration GET and save are admin guarded before storage, save additionally requires Origin", async () => {
+  for (const scenario of ["unauth", "bad-origin"]) {
+    let storage = 0;
+    const h = loader({
+      "@/lib/auth": {
+        requireAdmin: async () => {
+          if (scenario === "unauth") throw Error(TOKEN);
+        },
+      },
+      "@/lib/whm": {
+        whmConfiguration: async () => {
+          storage++;
+          return {};
+        },
+        saveWhmConfiguration: async () => {
+          storage++;
+          return {};
+        },
+      },
+    });
+    const route = h.load("app/api/admin/whm/settings/route.ts");
+    const response = await route.POST(
+      request(
+        { url: HOST, username: "root", token: TOKEN },
+        "https://evil.example.net",
+      ),
+    );
+    assert.equal(response.status, scenario === "unauth" ? 401 : 403);
+    assert.equal(storage, 0);
+    if (scenario === "unauth") {
+      const get = await route.GET(
+        new NextRequest("https://app.example.net/api/admin/whm/settings"),
+      );
+      assert.equal(get.status, 401);
+      assert.equal(storage, 0);
+    }
   }
 });
 
+test("safe error serialization ignores even a mutated typed error message/stack/cause", () => {
+  const w = loader().load("lib/whm-security.ts");
+  const error = new w.WhmError("rejected");
+  error.message = TOKEN;
+  error.stack = TOKEN;
+  error.cause = { token: TOKEN };
+  const safe = w.safeWhmError(error);
+  assert.equal(safe.code, "rejected");
+  assert.equal(JSON.stringify(safe).includes(TOKEN), false);
+});
 
-test("safe error serialization ignores even a mutated typed error message/stack/cause",()=>{
-  const w=loader().load("lib/whm-security.ts");const error=new w.WhmError("rejected");error.message=TOKEN;error.stack=TOKEN;error.cause={token:TOKEN};
-  const safe=w.safeWhmError(error);assert.equal(safe.code,"rejected");assert.equal(JSON.stringify(safe).includes(TOKEN),false);
+// Management cases below use ONLY local canaries and mocked storage/WHM.
+const PASS = "LOCAL_ONLY_Strong!Password987";
+const creation = () => ({
+  action: "createacct",
+  username: "alice",
+  domain: "alice.example.net",
+  password: PASS,
+  plan: "starter",
+  confirmation: "alice",
+  notificationsAcknowledged: true,
+});
+const packageInput = (action) => ({
+  action,
+  name: "starter",
+  quota: "1024",
+  bwlimit: "2048",
+  maxpop: "10",
+  maxsql: "5",
+  confirmation: "starter",
+  notificationsAcknowledged: true,
+});
+test("management schema allows only six concrete actions, strong explicit password, exact confirmation and notification acknowledgement", () => {
+  const parse = loader().load(
+    "lib/whm-management-schema.ts",
+  ).parseWhmManagement;
+  assert.equal(parse(creation()).params.showpass, "n");
+  assert.equal(parse(creation()).params.forcedns, "0");
+  assert.equal(parse(creation()).params.reseller, "0");
+  assert.equal(parse(packageInput("addpkg")).params.maxpop, "10");
+  for (const action of [
+    "removeacct",
+    "killpkg",
+    "passwd",
+    "api_token_create",
+    "setacls",
+    "https://evil.example.net",
+  ]) {
+    assert.throws(() => parse({ ...creation(), action }));
+  }
+  for (const patch of [
+    { confirmation: "other" },
+    { notificationsAcknowledged: false },
+    { password: "weak" },
+    { password: "alice_123456789ABCDEFGHIJKLMNOP!" },
+    { username: "123abc" },
+    { username: "testuser" },
+    { domain: "https://example.net/x" },
+    { endpoint: "https://evil.example.net:2087" },
+    { contactemail: "nobody@example.net" },
+    { owner: "root" },
+    { reseller: "1" },
+  ])
+    assert.throws(() => parse({ ...creation(), ...patch }));
+  for (const value of [
+    "",
+    "-1",
+    "0",
+    "1e4",
+    "NaN",
+    "Infinity",
+    "1.5",
+    "1000000000",
+  ]) {
+    assert.throws(() => parse({ ...packageInput("editpkg"), quota: value }));
+  }
+  assert.equal(
+    parse({ ...packageInput("editpkg"), quota: "unlimited" }).params.quota,
+    "unlimited",
+  );
+  assert.throws(() =>
+    parse({
+      action: "suspendacct",
+      user: "alice",
+      reason: "\r\nsecret",
+      confirmation: "alice",
+      notificationsAcknowledged: true,
+    }),
+  );
+  assert.throws(() =>
+    parse({
+      action: "suspendacct",
+      user: "alice",
+      reason: " ",
+      confirmation: "alice",
+      notificationsAcknowledged: true,
+    }),
+  );
+});
+test("mutation HTTPS uses fixed POST form, never query secrets or raw WHM output; HTTP200 result0 fails", async () => {
+  for (const result of [1, 0]) {
+    const t = transportMock({
+      command: "createacct",
+      result,
+      data: { password: PASS, token: TOKEN },
+    });
+    const h = loader({
+      "node:https": t.module,
+      "node:dns/promises": {
+        lookup: async () => [{ address: "8.8.8.8", family: 4 }],
+      },
+    });
+    const run = h
+      .load("lib/whm-transport.ts")
+      .writeWhm(HOST, { username: "root", token: TOKEN }, creation());
+    if (result === 1)
+      assert.deepEqual(JSON.parse(JSON.stringify(await run)), { ok: true });
+    else
+      await assert.rejects(
+        run,
+        (e) => e.code === "rejected" && !e.message.includes(TOKEN),
+      );
+    assert.equal(t.calls.length, 1);
+    const call = t.calls[0];
+    assert.equal(call.options.method, "POST");
+    assert.equal(call.url.pathname, "/json-api/createacct");
+    assert.equal(call.url.search, "");
+    assert.equal(call.options.rejectUnauthorized, true);
+    assert.equal(new URLSearchParams(call.body).get("password"), PASS);
+    assert.equal(new URLSearchParams(call.body).get("showpass"), "n");
+    assert.equal(call.url.href.includes(PASS), false);
+    assert.equal(call.url.href.includes(TOKEN), false);
+  }
+});
+test("mutation allowlist/confirmation/SSRF reject before transport and no mutation retries after network uncertainty", async () => {
+  let calls = 0;
+  const h = loader({
+    "node:dns/promises": {
+      lookup: async () => [{ address: "8.8.8.8", family: 4 }],
+    },
+    "node:https": {
+      request() {
+        calls++;
+        throw Error(PASS + TOKEN);
+      },
+    },
+  });
+  const write = h.load("lib/whm-transport.ts").writeWhm;
+  for (const input of [
+    { ...creation(), action: "removeacct" },
+    { ...creation(), confirmation: "wrong" },
+  ])
+    await assert.rejects(
+      write(HOST, { username: "root", token: TOKEN }, input),
+    );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    write(
+      "https://127.0.0.1:2087",
+      { username: "root", token: TOKEN },
+      creation(),
+    ),
+    (e) => e.code === "blocked",
+  );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    write(HOST, { username: "root", token: TOKEN }, creation()),
+    (e) => e.code === "uncertain" && !e.message.includes(TOKEN),
+  );
+  assert.equal(calls, 1);
+});
+const originalPackage = () => ({
+  metadata: { result: 1, command: "getpkginfo", version: 1 },
+  data: {
+    pkg: {
+      QUOTA: "1024",
+      BWLIMIT: "2048",
+      MAXPOP: "10",
+      MAXSQL: "5",
+      CPMOD: "jupiter",
+      FEATURELIST: "custom",
+      LANG: "es",
+      HASSHELL: "0",
+      CGI: "1",
+      IP: "0",
+      DIGESTAUTH: "n",
+      MAXFTP: "2",
+      _PACKAGE_EXTENSIONS: "",
+    },
+  },
+});
+test("package edit preserves unrelated settings and refuses unknown extensions instead of resetting them", () => {
+  const preserve = loader().load(
+    "lib/whm-transport.ts",
+  ).preservedPackageSettings;
+  const params = preserve(originalPackage());
+  assert.equal(params.featurelist, "custom");
+  assert.equal(params.cpmod, "jupiter");
+  assert.equal(params.language, "es");
+  assert.equal(params.ip, "n");
+  assert.equal(params.digestauth, "0");
+  assert.equal(params.maxftp, "2");
+  for (const patch of [
+    { _PACKAGE_EXTENSIONS: "advanced" },
+    { NEW_UNKNOWN_FEATURE: "value" },
+    { FEATURELIST: null },
+  ]) {
+    const data = originalPackage();
+    Object.assign(data.data.pkg, patch);
+    assert.throws(
+      () => preserve(data),
+      (e) => e.code === "package_advanced",
+    );
+  }
+});
+function managementFixture({
+  writeFailure = false,
+  auditStartFails = false,
+  auditEndFails = false,
+  accountState = "0",
+  packagesExist = true,
+} = {}) {
+  const writes = [],
+    audits = [],
+    reads = [];
+  let h;
+  const db = {
+    integrationConfig: {
+      findUnique: async () => ({
+        endpoint: HOST,
+        encryptedCredentials: "LOCAL_CIPHER_PLACEHOLDER",
+      }),
+    },
+    adminAudit: {
+      create: async (args) => {
+        if (auditStartFails) throw Error(TOKEN);
+        audits.push(args);
+        return { id: "local-audit" };
+      },
+      update: async (args) => {
+        if (auditEndFails) throw Error(TOKEN);
+        audits.push(args);
+        return {};
+      },
+    },
+  };
+  h = loader({
+    "@/lib/db": { db },
+    "@/lib/whm": { decryptWhm: () => ({ username: "root", token: TOKEN }) },
+    "@/lib/whm-transport": {
+      readWhm: async (_e, _c, action) => {
+        reads.push(action);
+        return {
+          rows:
+            action === "listaccts"
+              ? [{ user: "alice", suspended: accountState }]
+              : packagesExist
+                ? [{ name: "starter" }]
+                : [],
+          total: 1,
+          truncated: false,
+        };
+      },
+      writeWhm: async (_e, _c, input) => {
+        writes.push(input.action);
+        if (writeFailure)
+          throw new (h.load("lib/whm-security.ts").WhmError)("rejected");
+        return { ok: true };
+      },
+    },
+  });
+  return {
+    manage: h.load("lib/whm-management.ts").manageWhm,
+    writes,
+    audits,
+    reads,
+  };
+}
+test("management preflight validates current account state/package, audits safe actor/action/outcome/target only", async () => {
+  const f = managementFixture();
+  const input = {
+    action: "suspendacct",
+    user: "alice",
+    reason: PASS,
+    confirmation: "alice",
+    notificationsAcknowledged: true,
+  };
+  const result = await f.manage(input);
+  assert.equal(result.ok, true);
+  assert.deepEqual(f.writes, ["suspendacct"]);
+  assert.equal(f.audits.length, 2);
+  const audit = JSON.stringify(f.audits);
+  assert.equal(audit.includes(PASS), false);
+  assert.equal(audit.includes(TOKEN), false);
+  assert.equal(audit.includes(HOST), false);
+  assert.match(audit, /configured-admin/);
+  assert.match(audit, /confirmed/);
+  const stale = managementFixture({ accountState: "1" });
+  await assert.rejects(stale.manage(input), (e) => e.code === "conflict");
+  assert.equal(stale.writes.length, 0);
+  assert.match(JSON.stringify(stale.audits), /not-confirmed/);
+  const unknown = managementFixture({ packagesExist: false });
+  await assert.rejects(
+    unknown.manage({
+      action: "changepackage",
+      user: "alice",
+      pkg: "starter",
+      confirmation: "alice",
+      notificationsAcknowledged: true,
+    }),
+    (e) => e.code === "conflict",
+  );
+  assert.equal(unknown.writes.length, 0);
+});
+test("audit failure before dispatch prevents mutation; after confirmed mutation cannot encourage duplicate retry", async () => {
+  const input = {
+    action: "unsuspendacct",
+    user: "alice",
+    confirmation: "alice",
+    notificationsAcknowledged: true,
+  };
+  const start = managementFixture({ auditStartFails: true, accountState: "1" });
+  await assert.rejects(start.manage(input));
+  assert.equal(start.writes.length, 0);
+  const end = managementFixture({ auditEndFails: true, accountState: "1" });
+  const result = await end.manage(input);
+  assert.equal(result.ok, true);
+  assert.equal(result.auditRecorded, false);
+  assert.equal(end.writes.length, 1);
+  const rejected = managementFixture({ writeFailure: true, accountState: "1" });
+  await assert.rejects(rejected.manage(input), (e) => e.code === "rejected");
+  assert.match(JSON.stringify(rejected.audits), /not-confirmed/);
+});
+test("management route authenticates and validates Origin before body/service; no generic GET or destructive endpoint", async () => {
+  for (const scenario of ["unauth", "origin"]) {
+    let calls = 0;
+    const h = loader({
+      "@/lib/auth": {
+        requireAdmin: async () => {
+          if (scenario === "unauth") throw Error(TOKEN);
+        },
+      },
+      "@/lib/whm-management": {
+        manageWhm: async () => {
+          calls++;
+          return { ok: true };
+        },
+      },
+    });
+    const route = h.load("app/api/admin/whm/manage/route.ts");
+    const r = await route.POST(request(creation(), "https://evil.example.net"));
+    assert.equal(r.status, scenario === "unauth" ? 401 : 403);
+    assert.equal(calls, 0);
+    assert.equal(route.GET, undefined);
+    assert.equal(route.DELETE, undefined);
+    assert.equal((await r.text()).includes(TOKEN), false);
+  }
+  const h = loader({
+    "@/lib/whm-management": {
+      manageWhm: async () => {
+        throw Error(PASS + TOKEN);
+      },
+    },
+  });
+  const r = await h
+    .load("app/api/admin/whm/manage/route.ts")
+    .POST(request(creation()));
+  const value = await r.text();
+  assert.equal(value.includes(PASS), false);
+  assert.equal(value.includes(TOKEN), false);
+});
+function field(tree, text) {
+  const label = nodes(
+    tree,
+    (n) =>
+      n.type === "label" &&
+      React.Children.toArray(n.props.children)
+        .filter((v) => typeof v === "string")
+        .join("")
+        .startsWith(text),
+  )[0];
+  assert.ok(label, `Missing label ${text}`);
+  return nodes(label, (n) =>
+    ["input", "select", "textarea"].includes(n.type),
+  )[0];
+}
+test("account dialog does not send until typed confirmation+ack; clears password immediately, blocks duplicate pending submit", async () => {
+  let finish,
+    calls = 0,
+    success = 0,
+    body;
+  const h = loader({
+    fetch: async (_url, options) => {
+      calls++;
+      body = JSON.parse(options.body);
+      return new Promise((resolve) => {
+        finish = () =>
+          resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              action: "createacct",
+              target: "alice",
+              auditRecorded: true,
+            }),
+          });
+      });
+    },
+  });
+  const Dialog = h.load("components/admin/WhmManagementDialog.tsx").default,
+    props = {
+      action: "createacct",
+      packages: [{ name: "starter" }],
+      onClose: () => {},
+      onSuccess: () => {
+        success++;
+      },
+    };
+  const render = () => h.render(Dialog, props);
+  assert.equal(calls, 0);
+  await nodes(render(), (n) => n.type === "form")[0].props.onSubmit({
+    preventDefault() {},
+  });
+  assert.equal(calls, 0);
+  for (const [label, value] of [
+    ["Usuario cPanel", "alice"],
+    ["Dominio principal", "alice.example.net"],
+    ["Contraseña inicial", PASS],
+    ["Paquete real", "starter"],
+    ["Escribe", "alice"],
+  ])
+    field(render(), label).props.onChange({ target: { value } });
+  nodes(
+    render(),
+    (n) => n.type === "input" && n.props.type === "checkbox",
+  )[0].props.onChange({ target: { checked: true } });
+  const pending = nodes(render(), (n) => n.type === "form")[0].props.onSubmit({
+    preventDefault() {},
+  });
+  assert.equal(field(render(), "Contraseña inicial").props.value, "");
+  assert.equal(calls, 1);
+  await nodes(render(), (n) => n.type === "form")[0].props.onSubmit({
+    preventDefault() {},
+  });
+  assert.equal(calls, 1);
+  assert.equal(body.password, PASS);
+  assert.equal(body.confirmation, "alice");
+  finish();
+  await pending;
+  assert.equal(success, 1);
+});
+test("uncertain management response locks resubmit, never renders raw errors or password", async () => {
+  let calls = 0;
+  const h = loader({
+    fetch: async () => {
+      calls++;
+      throw Error(PASS + TOKEN);
+    },
+  });
+  const Dialog = h.load("components/admin/WhmManagementDialog.tsx").default,
+    props = {
+      action: "unsuspendacct",
+      row: { user: "alice" },
+      packages: [],
+      onClose: () => {},
+      onSuccess: () => assert.fail("Must not claim success"),
+    };
+  const render = () => h.render(Dialog, props);
+  field(render(), "Escribe").props.onChange({ target: { value: "alice" } });
+  nodes(
+    render(),
+    (n) => n.type === "input" && n.props.type === "checkbox",
+  )[0].props.onChange({ target: { checked: true } });
+  await nodes(render(), (n) => n.type === "form")[0].props.onSubmit({
+    preventDefault() {},
+  });
+  const tree = render();
+  assert.equal(
+    nodes(tree, (n) => n.type === "button" && n.props.type === "submit")[0]
+      .props.disabled,
+    true,
+  );
+  const html = renderToStaticMarkup(tree);
+  assert.equal(html.includes(PASS), false);
+  assert.equal(html.includes(TOKEN), false);
+  assert.match(html, /Podría haberse aplicado/);
+  await nodes(render(), (n) => n.type === "form")[0].props.onSubmit({
+    preventDefault() {},
+  });
+  assert.equal(calls, 1);
+});
+
+test("editpkg transport fetches real config then sends preserved options plus explicit quota patch; extensions stop before write", async () => {
+  for (const advanced of [false, true]) {
+    const pkg = originalPackage();
+    if (advanced) pkg.data.pkg._PACKAGE_EXTENSIONS = "third-party-extension";
+    const read = transportMock({ command: "getpkginfo", data: pkg.data }),
+      write = transportMock({ command: "editpkg", data: { pkg: "starter" } });
+    const h = loader({
+      "node:dns/promises": {
+        lookup: async () => [{ address: "8.8.8.8", family: 4 }],
+      },
+      "node:https": {
+        request: (url, ...args) =>
+          (url.pathname.endsWith("getpkginfo") ? read : write).module.request(
+            url,
+            ...args,
+          ),
+      },
+    });
+    const call = h
+      .load("lib/whm-transport.ts")
+      .writeWhm(
+        HOST,
+        { username: "root", token: TOKEN },
+        { ...packageInput("editpkg"), quota: "4096" },
+      );
+    if (advanced) {
+      await assert.rejects(call, (e) => e.code === "package_advanced");
+      assert.equal(write.calls.length, 0);
+    } else {
+      await call;
+      assert.equal(read.calls.length, 1);
+      assert.equal(read.calls[0].options.method, "GET");
+      assert.equal(read.calls[0].url.searchParams.get("pkg"), "starter");
+      assert.equal(write.calls.length, 1);
+      const body = new URLSearchParams(write.calls[0].body);
+      assert.equal(body.get("quota"), "4096");
+      assert.equal(body.get("featurelist"), "custom");
+      assert.equal(body.get("cpmod"), "jupiter");
+      assert.equal(body.get("maxftp"), "2");
+      assert.equal(write.calls[0].url.search, "");
+    }
+  }
+});
+test("all management operations execute only their validated fixed action; missing package and invalid confirmation never dispatch", async () => {
+  for (const input of [
+    {
+      ...creation(),
+      username: "bob",
+      domain: "bob.example.net",
+      confirmation: "bob",
+    },
+    {
+      action: "changepackage",
+      user: "alice",
+      pkg: "starter",
+      confirmation: "alice",
+      notificationsAcknowledged: true,
+    },
+    packageInput("editpkg"),
+    { ...packageInput("addpkg"), name: "newplan", confirmation: "newplan" },
+  ]) {
+    const f = managementFixture();
+    const result = await f.manage(input);
+    assert.equal(result.ok, true);
+    assert.deepEqual(f.writes, [input.action]);
+  }
+  const f = managementFixture();
+  await assert.rejects(f.manage({ ...creation(), confirmation: "incorrect" }));
+  assert.equal(f.reads.length, 0);
+  assert.equal(f.audits.length, 0);
+  assert.equal(f.writes.length, 0);
+});
+test("account table actions reflect actual suspension state and opening a dialog never mutates", () => {
+  let mutations = 0;
+  const h = loader({
+    fetch: async () => {
+      mutations++;
+      throw Error("Forbidden real network");
+    },
+    "@/components/admin/useWhmAutoRead": {
+      useWhmAutoRead: (operation) => ({
+        result:
+          operation === "listpkgs"
+            ? { rows: [{ name: "starter" }], total: 1, truncated: false }
+            : {
+                rows: [
+                  {
+                    user: "alice",
+                    domain: "alice.example.net",
+                    plan: "starter",
+                    suspended: "1",
+                    diskused: "1",
+                    disklimit: "100",
+                  },
+                ],
+                total: 1,
+                truncated: false,
+              },
+        lastRead: "2026-11-06T12:00:00Z",
+        busy: false,
+        error: false,
+        paused: false,
+        refresh() {},
+      }),
+    },
+  });
+  const Panel = h.load("components/admin/WhmReadPanel.tsx").default,
+    render = () => h.render(Panel, { configured: true, mode: "listaccts" });
+  const tree = render();
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /Reactivar cuenta/);
+  assert.equal(html.includes("Suspender cuenta"), false);
+  const button = nodes(
+    tree,
+    (n) => n.type === "button" && n.props.children === "Reactivar cuenta",
+  )[0];
+  assert.ok(button);
+  button.props.onClick();
+  assert.equal(mutations, 0);
+  const after = render();
+  const modal = nodes(
+    after,
+    (n) => typeof n.type === "function" && n.props.action === "unsuspendacct",
+  )[0];
+  assert.equal(modal.props.row.user, "alice");
+  assert.equal(mutations, 0);
+});
+
+test("stale account UI keeps verified previous rows on refresh failure and never invents an empty zero", () => {
+  const h = loader({
+    "@/components/admin/useWhmAutoRead": {
+      useWhmAutoRead: () => ({
+        result: {
+          rows: [
+            {
+              user: "alice",
+              domain: "alice.example.net",
+              plan: "starter",
+              suspended: "0",
+              diskused: "5",
+              disklimit: "100",
+            },
+          ],
+          total: 1,
+          truncated: false,
+        },
+        lastRead: "2026-11-06T12:00:00Z",
+        busy: false,
+        error: true,
+        paused: false,
+        refresh() {},
+      }),
+    },
+  });
+  const tree = h.render(h.load("components/admin/WhmReadPanel.tsx").default, {
+    configured: true,
+    mode: "listaccts",
+  });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /alice.example.net/);
+  assert.match(html, /Datos anteriores/);
+  assert.match(html, /Halifax/);
+  assert.equal(html.includes("No hay registros accesibles"), false);
+});
+test("initial automatic dashboard loading renders unavailable dashes instead of fabricated zero metrics", () => {
+  const h = loader({
+    "@/components/admin/useWhmAutoRead": {
+      useWhmAutoRead: () => ({
+        result: null,
+        lastRead: null,
+        busy: true,
+        error: false,
+        paused: false,
+        refresh() {},
+      }),
+    },
+  });
+  const tree = h.render(h.load("components/admin/WhmReadPanel.tsx").default, {
+    configured: true,
+  });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /<strong>—<\/strong>/);
+  assert.equal(html.includes("<strong>0</strong>"), false);
+});
+
+test("package HTML validation is valid under modern browser v flag and permits reseller-style names", () => {
+  const h = loader();
+  const Dialog = h.load("components/admin/WhmManagementDialog.tsx").default;
+  const tree = h.render(Dialog, {
+    action: "addpkg",
+    packages: [],
+    onClose() {},
+    onSuccess() {},
+  });
+  const name = field(tree, "Nombre del paquete");
+  const pattern = new RegExp(`^(?:${name.props.pattern})$`, "v");
+  assert.equal(pattern.test("reseller_business-pro"), true);
+  assert.equal(pattern.test("../escape"), false);
 });

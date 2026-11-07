@@ -66,8 +66,8 @@ export default async function Admin() {
         <div>
           <h3>Conexión WHM / cPanel</h3>
           <p className="muted">
-            Consulta cuentas y paquetes sin crear, suspender, cambiar
-            contraseñas ni gestionar facturas.
+            Administra cuentas y paquetes con confirmación explícita. Sin
+            eliminación, cambios de contraseña ni facturación.
           </p>
         </div>
         <Link className="btn secondary" href="/admin/settings">

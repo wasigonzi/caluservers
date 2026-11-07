@@ -1,9 +1,44 @@
 "use client";
 import { useState } from "react";
+import WhmManagementDialog, {
+  WHM_ACTION_LABELS,
+} from "@/components/admin/WhmManagementDialog";
+import type { WhmManagementAction } from "@/lib/whm-management-schema";
+import { useWhmAutoRead } from "@/components/admin/useWhmAutoRead";
 import Link from "next/link";
 import { RefreshCw, Server, Layers3 } from "lucide-react";
 import type { WhmRows } from "@/lib/whm-transport";
 
+function validRows(value: unknown): value is WhmRows {
+  if (!value || typeof value !== "object") return false;
+  const rows = value as WhmRows;
+  return (
+    Array.isArray(rows.rows) &&
+    rows.rows.length <= 100 &&
+    Number.isSafeInteger(rows.total) &&
+    rows.total >= rows.rows.length &&
+    typeof rows.truncated === "boolean" &&
+    rows.rows.every(
+      (row) =>
+        row &&
+        typeof row === "object" &&
+        Object.values(row).every(
+          (v) => typeof v === "string" && v.length <= 120,
+        ),
+    )
+  );
+}
+function validOverview(value: unknown): value is Overview {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Overview;
+  return (
+    item.connected === true &&
+    typeof item.checkedAt === "string" &&
+    Number.isFinite(Date.parse(item.checkedAt)) &&
+    validRows(item.accounts) &&
+    validRows(item.packages)
+  );
+}
 type Overview = {
   connected: true;
   checkedAt: string;
@@ -19,41 +54,28 @@ export default function WhmReadPanel({
   mode?: "overview" | "listaccts" | "listpkgs";
   storageError?: string;
 }) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const [result, setResult] = useState<Overview | WhmRows | null>(null);
-  async function read() {
-    setBusy(true);
-    setError("");
-    setResult(null);
-    try {
-      const r = await fetch("/api/admin/whm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operation: mode }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw Error("not-confirmed");
-      if (
-        mode === "overview"
-          ? data.connected !== true ||
-            typeof data.checkedAt !== "string" ||
-            !Number.isFinite(Date.parse(data.checkedAt)) ||
-            !Array.isArray(data.accounts?.rows) ||
-            !Array.isArray(data.packages?.rows)
-          : !Array.isArray(data.rows)
-      )
-        throw Error("invalid");
-      setResult(data);
-    } catch {
-      setError(
-        "Lectura no confirmada. Revisa la configuración, permisos del token y conectividad HTTPS con el servidor. No se reintentó automáticamente.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  const overview = mode === "overview" && result ? (result as Overview) : null;
+  const [management, setManagement] = useState<{
+    action: WhmManagementAction;
+    row?: Record<string, string>;
+  } | null>(null);
+  const [notice, setNotice] = useState("");
+  const managing = Boolean(management);
+  const operation = mode;
+  const { result, lastRead, busy, error, paused, refresh } = useWhmAutoRead<
+    Overview | WhmRows
+  >(
+    operation,
+    configured && !storageError && !managing,
+    operation === "overview" ? validOverview : validRows,
+  );
+  const relatedPackages = useWhmAutoRead<WhmRows>(
+    "listpkgs",
+    mode === "listaccts" && configured && !storageError && !managing,
+    validRows,
+  );
+  const packages = relatedPackages.result?.rows || [];
+  const overview =
+    operation === "overview" && result ? (result as Overview) : null;
   const table = mode !== "overview" && result ? (result as WhmRows) : null;
   const columns =
     mode === "listaccts"
@@ -84,15 +106,18 @@ export default function WhmReadPanel({
                 : "Paquetes accesibles"}
           </h2>
           <p className="muted">
-            Sólo lectura · alcance del usuario root/reseller. Sin facturación ni
-            cambios de cuentas.
+            Lectura automática cada 45 segundos mientras esta pestaña esté
+            visible y online. Alcance del usuario root/reseller.
           </p>
         </div>
         <button
           type="button"
           className="btn secondary"
-          disabled={!configured || busy || Boolean(storageError)}
-          onClick={read}
+          disabled={!configured || busy || paused || Boolean(storageError)}
+          onClick={() => {
+            refresh();
+            if (mode === "listaccts") relatedPackages.refresh();
+          }}
         >
           <RefreshCw size={15} aria-hidden="true" />
           {busy ? "Consultando…" : "Consultar ahora"}
@@ -105,21 +130,68 @@ export default function WhmReadPanel({
             ? "Pendiente configuración: servidor, usuario y token."
             : busy
               ? "Consultando WHM por HTTPS…"
-              : error
-                ? "No conectado / lectura fallida"
-                : result
-                  ? "Lectura confirmada por WHM"
-                  : "Configuración guardada; datos aún no consultados."}
+              : paused
+                ? "Actualización en pausa (pestaña oculta, offline o gestión activa)"
+                : error
+                  ? "No conectado / lectura fallida"
+                  : result
+                    ? "Lectura confirmada por WHM"
+                    : "Cargando datos WHM…"}
       </p>
       {storageError || error ? (
         <p role="alert" className="error">
-          {storageError || error}
+          {storageError ||
+            "No se pudo actualizar. Los datos anteriores se conservan; próximo intento con espera progresiva. Revisa conectividad y permisos."}
         </p>
       ) : null}
       {!configured ? (
         <Link className="btn secondary" href="/admin/settings">
           Configurar WHM →
         </Link>
+      ) : null}
+      {notice ? (
+        <p className="ok" role="status">
+          {notice}
+        </p>
+      ) : null}
+      {mode !== "overview" ? (
+        <div className="whm-management-toolbar">
+          <button
+            type="button"
+            className="btn"
+            disabled={
+              !result ||
+              busy ||
+              error ||
+              paused ||
+              (mode === "listaccts" && !packages.length)
+            }
+            onClick={() => {
+              setNotice("");
+              setManagement({
+                action: mode === "listaccts" ? "createacct" : "addpkg",
+              });
+            }}
+          >
+            {mode === "listaccts" ? "Crear cuenta" : "Crear paquete"}
+          </button>
+          <span className="muted">
+            Confirmación obligatoria · permisos WHM comprobados por operación ·
+            sin eliminación ni cambio de contraseña
+          </span>
+        </div>
+      ) : null}
+      {management ? (
+        <WhmManagementDialog
+          action={management.action}
+          row={management.row}
+          packages={packages}
+          onClose={() => setManagement(null)}
+          onSuccess={(message) => {
+            setNotice(message);
+            setManagement(null);
+          }}
+        />
       ) : null}
       {mode === "overview" ? (
         <div className="metrics whm-metrics">
@@ -146,15 +218,21 @@ export default function WhmReadPanel({
           ))}
         </div>
       ) : null}
-      {overview ? (
+      {result && (error || paused) ? (
+        <span className="pill whm-stale" role="status">
+          Datos anteriores · pendientes de actualizar
+        </span>
+      ) : null}
+      {lastRead ? (
         <p className="muted whm-query-time">
           Última consulta:{" "}
           {new Intl.DateTimeFormat("es", {
             dateStyle: "short",
             timeStyle: "short",
             timeZone: "America/Halifax",
-          }).format(new Date(overview.checkedAt))}{" "}
-          (Halifax). Los datos no se actualizan automáticamente.
+          }).format(new Date(lastRead))}{" "}
+          (Halifax). Actualización automática 45s; se pausa al ocultar la
+          pestaña o perder conexión.
         </p>
       ) : null}
       {table ? (
@@ -170,6 +248,7 @@ export default function WhmReadPanel({
                   {columns.map(([key, label]) => (
                     <th key={key}>{label}</th>
                   ))}
+                  <th>Gestión</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,6 +265,43 @@ export default function WhmReadPanel({
                           : (row[key] ?? "—")}
                       </td>
                     ))}
+                    <td>
+                      <div className="whm-row-actions">
+                        {(mode === "listaccts"
+                          ? [
+                              row.suspended === "1"
+                                ? "unsuspendacct"
+                                : "suspendacct",
+                              "changepackage",
+                            ]
+                          : ["editpkg"]
+                        ).map((action) => (
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            key={action}
+                            disabled={
+                              busy ||
+                              error ||
+                              paused ||
+                              (mode === "listaccts" &&
+                                (!["0", "1"].includes(row.suspended) ||
+                                  (action === "changepackage" &&
+                                    !packages.length)))
+                            }
+                            onClick={() => {
+                              setNotice("");
+                              setManagement({
+                                action: action as WhmManagementAction,
+                                row,
+                              });
+                            }}
+                          >
+                            {WHM_ACTION_LABELS[action as WhmManagementAction]}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
