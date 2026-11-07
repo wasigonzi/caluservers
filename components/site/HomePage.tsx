@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import SafeLink from "@/components/site/SafeLink";
+import ServiceFinder from "@/components/site/ServiceFinder";
 import SplineHero from "@/components/site/SplineHero";
 const iconHosting = "/icons/servicio-hosting.svg";
 const iconVps = "/icons/servicio-vps.svg";
@@ -13,7 +14,7 @@ import { isPriceToConfirm } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
 import { PlanCard } from "@/components/site/SiteShell";
 import type { HomeSectionId } from "@/lib/site-settings";
-import { AnimatedNumber } from "@/components/site/Interactive";
+import CatalogPlanCount from "@/components/site/CatalogPlanCount";
 import {
   CompareTable,
   Faq,
@@ -63,12 +64,48 @@ export default function Home() {
   const { catalog } = useCatalog();
   const statSupportLabel = useCopy("statSupportLabel", "Apoyo técnico");
   const faq = [
-    { q: useCopy("faq1q", "¿Cómo compro un plan?"), a: useCopy("faq1a", "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.") },
-    { q: useCopy("faq2q", "¿Cómo recibo soporte si algo falla?"), a: useCopy("faq2a", "El soporte es 24/7 por ticket, en inglés y español. Abre un ticket desde el área de cliente o desde la página de Contacto y el equipo te responde.") },
-    { q: useCopy("faq3q", "¿Dónde están ubicados los servidores?"), a: useCopy("faq3a", "Los VPS están disponibles en cuatro ubicaciones de Estados Unidos: Dallas, Los Angeles, New York y Miami. Puedes elegir la más cercana a tus usuarios para minimizar la latencia.") },
-    { q: useCopy("faq4q", "¿El VPS incluye acceso root?"), a: useCopy("faq4a", "Sí. Los VPS y los servidores dedicados incluyen acceso root / administrador total: instalas lo que quieras, eliges tu sistema operativo y gestionas el entorno a tu manera.") },
-    { q: useCopy("faq5q", "¿Qué sistema operativo puedo elegir?"), a: useCopy("faq5a", "En VPS hay distribuciones Linux disponibles y en los dedicados la selección de sistema operativo es parte de la configuración. También puedes reinstalar y gestionar el servidor desde el panel.") },
-    { q: useCopy("faq6q", "¿Qué incluye el Web Hosting?"), a: useCopy("faq6a", "Todos los planes de hosting incluyen cPanel, Softaculous Premium con más de 250 scripts, SSL gratis, cuentas de correo y almacenamiento NVMe SSD. La migración desde cualquier proveedor es gratis.") },
+    {
+      q: useCopy("faq1q", "¿Cómo compro un plan?"),
+      a: useCopy(
+        "faq1a",
+        "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.",
+      ),
+    },
+    {
+      q: useCopy("faq2q", "¿Cómo recibo soporte si algo falla?"),
+      a: useCopy(
+        "faq2a",
+        "El soporte es 24/7 por ticket, en inglés y español. Abre un ticket desde el área de cliente o desde la página de Contacto y el equipo te responde.",
+      ),
+    },
+    {
+      q: useCopy("faq3q", "¿Dónde están ubicados los servidores?"),
+      a: useCopy(
+        "faq3a",
+        "Los VPS están disponibles en cuatro ubicaciones de Estados Unidos: Dallas, Los Angeles, New York y Miami. Puedes elegir la más cercana a tus usuarios para minimizar la latencia.",
+      ),
+    },
+    {
+      q: useCopy("faq4q", "¿El VPS incluye acceso root?"),
+      a: useCopy(
+        "faq4a",
+        "Sí. Los VPS y los servidores dedicados incluyen acceso root / administrador total: instalas lo que quieras, eliges tu sistema operativo y gestionas el entorno a tu manera.",
+      ),
+    },
+    {
+      q: useCopy("faq5q", "¿Qué sistema operativo puedo elegir?"),
+      a: useCopy(
+        "faq5a",
+        "En VPS hay distribuciones Linux disponibles y en los dedicados la selección de sistema operativo es parte de la configuración. También puedes reinstalar y gestionar el servidor desde el panel.",
+      ),
+    },
+    {
+      q: useCopy("faq6q", "¿Qué incluye el Web Hosting?"),
+      a: useCopy(
+        "faq6a",
+        "Todos los planes de hosting incluyen cPanel, Softaculous Premium con más de 250 scripts, SSL gratis, cuentas de correo y almacenamiento NVMe SSD. La migración desde cualquier proveedor es gratis.",
+      ),
+    },
   ];
   const trustItems = [
     useCopy("trust1", "Desde 2013"),
@@ -77,12 +114,36 @@ export default function Home() {
     useCopy("trust4", "Soporte en español e inglés"),
   ];
   const stepsKicker = useCopy("stepsKicker", "Cómo funciona");
-  const stepsTitle = useCopy("stepsTitle", "De la idea al servidor en tres pasos");
-  const stepsLead = useCopy("stepsLead", "Sin procesos complicados: eliges, compras en el portal seguro y lo gestionas desde tu panel de cliente.");
+  const stepsTitle = useCopy(
+    "stepsTitle",
+    "De la idea al servidor en tres pasos",
+  );
+  const stepsLead = useCopy(
+    "stepsLead",
+    "Sin procesos complicados: eliges, compras en el portal seguro y lo gestionas desde tu panel de cliente.",
+  );
   const stepItems = [
-    { title: useCopy("step1Title", "Elige tu plan"), text: useCopy("step1Text", "Compara Web Hosting, VPS y Dedicados y escoge la configuración que se ajuste a tu proyecto y tu presupuesto.") },
-    { title: useCopy("step2Title", "Compra segura en WHMCS"), text: useCopy("step2Text", "El pedido se completa en el portal de cliente de CaluServers, donde también gestionas facturación y renovaciones.") },
-    { title: useCopy("step3Title", "Gestiónalo desde tu panel"), text: useCopy("step3Text", "Accede a cPanel, a tu VPS con root total o a tu servidor dedicado, y abre tickets de soporte 24/7 cuando lo necesites.") },
+    {
+      title: useCopy("step1Title", "Elige tu plan"),
+      text: useCopy(
+        "step1Text",
+        "Compara Web Hosting, VPS y Dedicados y escoge la configuración que se ajuste a tu proyecto y tu presupuesto.",
+      ),
+    },
+    {
+      title: useCopy("step2Title", "Compra segura en WHMCS"),
+      text: useCopy(
+        "step2Text",
+        "El pedido se completa en el portal de cliente de CaluServers, donde también gestionas facturación y renovaciones.",
+      ),
+    },
+    {
+      title: useCopy("step3Title", "Gestiónalo desde tu panel"),
+      text: useCopy(
+        "step3Text",
+        "Accede a cPanel, a tu VPS con root total o a tu servidor dedicado, y abre tickets de soporte 24/7 cuando lo necesites.",
+      ),
+    },
   ];
   const { content, visibility, sections, whmcs } = catalog.settings;
   const enabledLocations = catalog.locations.filter((l) => l.enabled);
@@ -103,7 +164,7 @@ export default function Home() {
 
   const blocks: Record<HomeSectionId, ReactNode> = {
     hero: (
-      <section className="hero" key="hero">
+      <section className="hero premium-home-hero" key="hero">
         <div className="wrap hero-grid">
           <div>
             <span className="eyebrow">
@@ -137,9 +198,17 @@ export default function Home() {
               </div>
               <div className="stat glass">
                 <strong>
-                  <AnimatedNumber value={99.9} decimals={1} suffix="%" />
+                  <CatalogPlanCount
+                    count={
+                      [
+                        ...catalog.webHosting,
+                        ...catalog.vps,
+                        ...catalog.dedicated,
+                      ].filter((p) => p.active).length
+                    }
+                  />
                 </strong>
-                <span>Uptime</span>
+                <span>Planes disponibles</span>
               </div>
               <div className="stat glass">
                 <strong>NVMe</strong>
@@ -147,15 +216,37 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <SplineHero />
+          <div className="premium-hero-stage">
+            <SplineHero />
+            <ServiceFinder
+              options={[
+                {
+                  name: "Web Hosting",
+                  href: "/web-hosting",
+                  price: webMin,
+                  count: catalog.webHosting.filter((p) => p.active).length,
+                },
+                {
+                  name: "VPS",
+                  href: "/vps",
+                  price: vpsMin,
+                  count: catalog.vps.filter((p) => p.active).length,
+                },
+                {
+                  name: "Dedicados",
+                  href: "/dedicated",
+                  price: dedMin,
+                  count: catalog.dedicated.filter((p) => p.active).length,
+                },
+              ]}
+            />
+          </div>
         </div>
       </section>
     ),
     trustStrip: visibility.trustStrip ? (
       <div className="wrap" key="trust">
-        <TrustStrip
-            items={trustItems}
-        />
+        <TrustStrip items={trustItems} />
       </div>
     ) : null,
     services: visibility.services ? (
@@ -241,8 +332,7 @@ export default function Home() {
             kicker="Comparativa"
             title={
               <>
-                ¿Web Hosting, VPS o{" "}
-                <span className="neon-text">Dedicado?</span>
+                ¿Web Hosting, VPS o <span className="neon-text">Dedicado?</span>
               </>
             }
             lead="Precios y especificaciones reales del catálogo. Si tu sitio crece, puedes escalar al siguiente nivel."
@@ -266,7 +356,11 @@ export default function Home() {
               },
               {
                 label: "Acceso root",
-                cells: ["No · Panel cPanel", "Sí · Root total", "Sí · Hardware propio"],
+                cells: [
+                  "No · Panel cPanel",
+                  "Sí · Root total",
+                  "Sí · Hardware propio",
+                ],
               },
               {
                 label: "Ideal para",
@@ -291,7 +385,9 @@ export default function Home() {
           />
           <div className="cards">
             {featured.length ? (
-              featured.map((plan) => <PlanCard key={plan.id} plan={plan} featured />)
+              featured.map((plan) => (
+                <PlanCard key={plan.id} plan={plan} featured />
+              ))
             ) : (
               <p className="muted">
                 Marca planes como «Destacado» en el panel de catálogo para
@@ -317,7 +413,9 @@ export default function Home() {
           />
           <div className="loc-show-grid">
             {enabledLocations.map((loc) => {
-              const count = catalog.vps.filter((p) => p.locationId === loc.id).length;
+              const count = catalog.vps.filter(
+                (p) => p.locationId === loc.id,
+              ).length;
               return (
                 <article key={loc.id} className="loc-show-card glass">
                   <span className="loc-flag">{loc.flag}</span>
@@ -388,7 +486,8 @@ export default function Home() {
             kicker="Preguntas frecuentes"
             title={
               <>
-                Dudas comunes, <span className="neon-text">respuestas claras.</span>
+                Dudas comunes,{" "}
+                <span className="neon-text">respuestas claras.</span>
               </>
             }
           />
@@ -425,7 +524,11 @@ export default function Home() {
         if (!sec.enabled) return null;
         const node = blocks[sec.id];
         if (!node) return null;
-        return <div key={sec.id} className={`home-section home-section--${sec.id}`}>{node}</div>;
+        return (
+          <div key={sec.id} className={`home-section home-section--${sec.id}`}>
+            {node}
+          </div>
+        );
       })}
     </>
   );

@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Palette, ImageIcon } from "lucide-react";
+import BrandingPreview from "@/components/admin/BrandingPreview";
+import BrandContrast from "@/components/admin/BrandContrast";
+import { changedSettingGroups } from "@/lib/branding-preview";
 import { useEffect, useMemo, useState } from "react";
 import type { Plan, PlanCategory } from "@/lib/catalog";
 import type { CatalogPayload } from "@/lib/catalog-validate";
@@ -10,7 +14,6 @@ import {
   SECTION_LABELS,
   SAFE_FONTS,
   applySiteTheme,
-  logoSrc,
   type AppearancePreset,
   type HomeSectionId,
   type SafeFontId,
@@ -31,9 +34,21 @@ type Tab =
   | "preview";
 
 const TABS: { id: Tab; label: string; keywords: string }[] = [
-  { id: "branding", label: "Branding", keywords: "logo marca nombre favicon og" },
-  { id: "appearance", label: "Apariencia", keywords: "color tipografia radio sombra preset" },
-  { id: "content", label: "Contenido", keywords: "hero cta textos contacto redes whmcs" },
+  {
+    id: "branding",
+    label: "Branding",
+    keywords: "logo marca nombre favicon og",
+  },
+  {
+    id: "appearance",
+    label: "Apariencia",
+    keywords: "color tipografia radio sombra preset",
+  },
+  {
+    id: "content",
+    label: "Contenido",
+    keywords: "hero cta textos contacto redes portal",
+  },
   { id: "sections", label: "Secciones", keywords: "orden home visibilidad" },
   { id: "catalog", label: "Catálogo", keywords: "planes precio productos" },
   { id: "seo", label: "SEO", keywords: "titulo description open graph" },
@@ -55,38 +70,58 @@ export default function ProSiteStudio({
   blobConfigured?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("branding");
+  const [compareSaved, setCompareSaved] = useState(false);
+  const [uploading, setUploading] = useState<Set<BrandingSlot>>(
+    () => new Set(),
+  );
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState(initialSettings);
   const [savedSettings, setSavedSettings] = useState(initialSettings);
   const [catalog, setCatalog] = useState(initialCatalog);
   const [savedCatalog, setSavedCatalog] = useState(initialCatalog);
   const [preview, setPreview] = useState<"desktop" | "mobile">("desktop");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [message, setMessage] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanCategory | "all">("all");
 
   const dirty =
     !deepEqual(settings, savedSettings) || !deepEqual(catalog, savedCatalog);
 
+  const busy = status === "saving" || uploading.size > 0;
+  const changedGroups =
+    changedSettingGroups(settings, savedSettings).length +
+    (deepEqual(catalog, savedCatalog) ? 0 : 1);
   useEffect(() => {
-    applySiteTheme(settings);
-  }, [settings]);
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const visibleTabs = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return TABS;
     return TABS.filter(
-      (t) =>
-        t.label.toLowerCase().includes(q) || t.keywords.includes(q),
+      (t) => t.label.toLowerCase().includes(q) || t.keywords.includes(q),
     );
   }, [query]);
 
-  function patchSettings<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
+  function patchSettings<K extends keyof SiteSettings>(
+    key: K,
+    value: SiteSettings[K],
+  ) {
     setSettings((s) => ({ ...s, [key]: value }));
     setStatus("idle");
+    setMessage("");
   }
 
   async function publish() {
+    if (busy) return;
     setStatus("saving");
     setMessage("");
     try {
@@ -97,15 +132,18 @@ export default function ProSiteStudio({
       });
       const d1 = await r1.json();
       if (!r1.ok) throw new Error(d1.error || "Error al guardar ajustes");
+      setSettings(d1.settings);
+      setSavedSettings(d1.settings);
       const r2 = await fetch("/api/admin/catalog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ catalog }),
       });
       const d2 = await r2.json();
-      if (!r2.ok) throw new Error(d2.error || "Error al guardar catálogo");
-      setSettings(d1.settings);
-      setSavedSettings(d1.settings);
+      if (!r2.ok)
+        throw new Error(
+          `Los ajustes del sitio se guardaron, pero el catálogo sigue pendiente: ${d2.error || "Error al guardar catálogo"}`,
+        );
       setCatalog(d2.catalog);
       setSavedCatalog(d2.catalog);
       applySiteTheme(d1.settings);
@@ -162,7 +200,11 @@ export default function ProSiteStudio({
     patchSettings("sections", next);
   }
 
-  function updatePlan(category: PlanCategory, id: string, patch: Partial<Plan>) {
+  function updatePlan(
+    category: PlanCategory,
+    id: string,
+    patch: Partial<Plan>,
+  ) {
     setCatalog((c) => {
       const key =
         category === "web"
@@ -186,11 +228,24 @@ export default function ProSiteStudio({
 
   const hrefOptions = [
     ...INTERNAL_PATHS.map((p) => ({ value: p, label: p })),
-    { value: "whmcs", label: "Portal WHMCS" },
+    { value: "whmcs", label: "Portal de clientes" },
   ];
 
   return (
-    <div className="pro-studio">
+    <div className="pro-studio" aria-busy={busy}>
+      <div className="studio-intro">
+        <span className="studio-icon">
+          <Palette size={24} aria-hidden="true" />
+        </span>
+        <div>
+          <p className="studio-eyebrow">TU MARCA, EN CADA DETALLE</p>
+          <h2>Estudio de marca</h2>
+          <p className="muted">Diseña, compara y publica cuando estés listo.</p>
+        </div>
+        <span className="studio-storage">
+          {blobConfigured ? "Subidas disponibles" : "Imágenes por URL"}
+        </span>
+      </div>
       <div className="pro-toolbar">
         <label className="pro-search">
           <span className="sr-only">Buscar ajustes</span>
@@ -204,20 +259,26 @@ export default function ProSiteStudio({
         <div className="pro-actions">
           {dirty ? (
             <span className="pill warn" role="status">
-              Cambios sin guardar
+              {changedGroups}{" "}
+              {changedGroups === 1 ? "grupo modificado" : "grupos modificados"}
             </span>
           ) : (
             <span className="pill ok" role="status">
-              Sincronizado
+              Sin cambios pendientes
             </span>
           )}
-          <button type="button" className="btn secondary" onClick={restoreAll}>
+          <button
+            type="button"
+            className="btn secondary"
+            disabled={busy}
+            onClick={restoreAll}
+          >
             Restaurar defaults
           </button>
           <button
             type="button"
             className="btn"
-            disabled={status === "saving" || !dirty}
+            disabled={busy || !dirty}
             onClick={publish}
           >
             {status === "saving" ? "Publicando…" : "Guardar y publicar"}
@@ -225,7 +286,7 @@ export default function ProSiteStudio({
         </div>
       </div>
       <p
-        role="status"
+        role={status === "error" ? "alert" : "status"}
         className={
           status === "error" ? "error" : status === "saved" ? "ok" : "muted"
         }
@@ -233,13 +294,16 @@ export default function ProSiteStudio({
         {message}
       </p>
 
-      <div className="tabs" role="tablist" aria-label="Ajustes PRO">
+      <div
+        className="tabs studio-navigation"
+        role="group"
+        aria-label="Secciones del estudio"
+      >
         {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"
-            role="tab"
-            aria-selected={tab === t.id}
+            aria-pressed={tab === t.id}
             className={tab === t.id ? "active" : ""}
             onClick={() => setTab(t.id)}
           >
@@ -247,14 +311,32 @@ export default function ProSiteStudio({
           </button>
         ))}
       </div>
+      {visibleTabs.length === 0 ? (
+        <p className="muted" role="status">
+          No hay secciones con ese nombre. Borra la búsqueda para ver todas.
+        </p>
+      ) : null}
 
+      <fieldset className="studio-fields" disabled={busy}>
       {tab === "branding" ? (
-        <section className="panel-block" aria-label="Branding">
-          <h2>Branding personalizado</h2>
+          <section
+            className="panel-block branding-workbench"
+            aria-label="Branding"
+          >
+            <div className="brand-editor">
+              <div className="studio-section-title">
+                <span>01</span>
+                <div>
+                  <h2>Identidad de marca</h2>
           <p className="muted">
-            Texto plano sin HTML/scripts. Imágenes por subida a Vercel Blob o URL
-            https. Vacío = recurso local por defecto. Los cambios de imagen no se
-            publican hasta «Guardar y publicar».
+                    El nombre y los recursos que te representan.
+                  </p>
+                </div>
+              </div>
+              <p className="muted">
+                Texto plano sin HTML/scripts. Imágenes por subida a Vercel Blob
+                o URL https. Vacío = recurso local por defecto. Los cambios de
+                imagen no se publican hasta «Guardar y publicar».
           </p>
           <label className="field">
             Nombre de marca
@@ -280,9 +362,19 @@ export default function ProSiteStudio({
               }
             />
           </label>
+              <div className="studio-section-title">
+                <span>
+                  <ImageIcon size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <h3>Biblioteca visual</h3>
+                  <p className="muted">Un recurso para cada contexto.</p>
+                </div>
+              </div>
           <p className="muted">
-            Sube PNG/JPEG/WebP/GIF (favicon: PNG/ICO). SVG rechazado. Límite 2&nbsp;MB
-            favicon / 5&nbsp;MB imágenes. La URL https sigue disponible como alternativa.
+                Sube PNG/JPEG/WebP/GIF (favicon: PNG/ICO). SVG rechazado. Límite
+                2&nbsp;MB favicon / 5&nbsp;MB imágenes. La URL https sigue
+                disponible como alternativa.
           </p>
           {(
             [
@@ -298,6 +390,14 @@ export default function ProSiteStudio({
               label={label}
               value={settings.branding[key]}
               blobConfigured={blobConfigured}
+                  onBusyChange={(value) =>
+                    setUploading((current) => {
+                      const next = new Set(current);
+                      if (value) next.add(key);
+                      else next.delete(key);
+                      return next;
+                    })
+                  }
               onChange={(url) =>
                 patchSettings("branding", {
                   ...settings.branding,
@@ -306,15 +406,102 @@ export default function ProSiteStudio({
               }
             />
           ))}
-          <div className="media-preview logo-fallback">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc(settings.branding)} alt="Logo efectivo desktop" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoSrc(settings.branding, true)}
-              alt="Logo efectivo móvil"
+              <div className="studio-section-title">
+                <span>03</span>
+                <div>
+                  <h3>Paleta de marca</h3>
+                  <p className="muted">
+                    Los mismos colores de Apariencia, sin cambiar de contexto.
+                  </p>
+                </div>
+              </div>
+              <div className="brand-palette">
+                {(
+                  [
+                    ["primary", "Primario"],
+                    ["secondary", "Acento"],
+                    ["background", "Fondo"],
+                    ["panel", "Panel"],
+                    ["text", "Texto"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label className="field" key={key}>
+                    {label}
+                    <span className="brand-color-input">
+                      <span
+                        style={{
+                          background: /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(
+                            settings.theme[key],
+                          )
+                            ? settings.theme[key]
+                            : "transparent",
+                        }}
+                        aria-hidden="true"
             />
+                      <input
+                        value={settings.theme[key]}
+                        spellCheck={false}
+                        aria-invalid={
+                          !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(
+                            settings.theme[key],
+                          )
+                        }
+                        onChange={(e) =>
+                          patchSettings("theme", {
+                            ...settings.theme,
+                            [key]: e.target.value,
+                          })
+                        }
+                      />
+                    </span>
+                  </label>
+                ))}
           </div>
+              <BrandContrast theme={settings.theme} />
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setTab("appearance")}
+              >
+                Tipografía y estilo →
+              </button>
+            </div>
+            <aside
+              className="brand-preview-aside"
+              aria-label="Comparación de marca"
+            >
+              <div
+                className="brand-compare-toggle"
+                role="group"
+                aria-label="Versión a visualizar"
+              >
+                <button
+                  type="button"
+                  aria-pressed={!compareSaved}
+                  onClick={() => setCompareSaved(false)}
+                >
+                  Borrador
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={compareSaved}
+                  onClick={() => setCompareSaved(true)}
+                >
+                  Guardado
+                </button>
+              </div>
+              <BrandingPreview
+                settings={compareSaved ? savedSettings : settings}
+                device={preview}
+                onDeviceChange={setPreview}
+                saved={compareSaved}
+              />
+              <p className="muted">
+                {dirty
+                  ? "El borrador aún no está publicado. Compara con el último estado guardado antes de publicar."
+                  : "Estás viendo los ajustes cargados. Edita un campo para previsualizar los cambios."}
+              </p>
+            </aside>
         </section>
       ) : null}
 
@@ -392,7 +579,8 @@ export default function ProSiteStudio({
               onChange={(e) =>
                 patchSettings("appearance", {
                   ...settings.appearance,
-                  radius: e.target.value as SiteSettings["appearance"]["radius"],
+                    radius: e.target
+                      .value as SiteSettings["appearance"]["radius"],
                 })
               }
             >
@@ -408,7 +596,8 @@ export default function ProSiteStudio({
               onChange={(e) =>
                 patchSettings("appearance", {
                   ...settings.appearance,
-                  shadow: e.target.value as SiteSettings["appearance"]["shadow"],
+                    shadow: e.target
+                      .value as SiteSettings["appearance"]["shadow"],
                 })
               }
             >
@@ -424,7 +613,8 @@ export default function ProSiteStudio({
               onChange={(e) =>
                 patchSettings("appearance", {
                   ...settings.appearance,
-                  density: e.target.value as SiteSettings["appearance"]["density"],
+                    density: e.target
+                      .value as SiteSettings["appearance"]["density"],
                 })
               }
             >
@@ -440,7 +630,8 @@ export default function ProSiteStudio({
               onChange={(e) =>
                 patchSettings("appearance", {
                   ...settings.appearance,
-                  surface: e.target.value as SiteSettings["appearance"]["surface"],
+                    surface: e.target
+                      .value as SiteSettings["appearance"]["surface"],
                 })
               }
             >
@@ -450,8 +641,9 @@ export default function ProSiteStudio({
             </select>
           </label>
           <p className="muted">
-            Tipografías son pares heading/body de un set seguro (sin CSS arbitrario).
-            El contraste fondo/texto se valida al guardar (mín. 4.5:1).
+              Tipografías son pares heading/body de un set seguro (sin CSS
+              arbitrario). El contraste fondo/texto se valida al guardar (mín.
+              4.5:1).
           </p>
         </section>
       ) : null}
@@ -460,11 +652,12 @@ export default function ProSiteStudio({
         <section className="panel-block">
           <h2>Contenido, contacto y CTAs</h2>
           <p className="muted">
-            Hero home y CTAs globales aquí. Textos por página (FAQ, pasos, about, etc.) en{" "}
+              Hero home y CTAs globales aquí. Textos por página (FAQ, pasos,
+              about, etc.) en{" "}
             <Link href="/admin/pages">Páginas / contenido</Link>.
           </p>
           <label className="field">
-            URL portal WHMCS (https)
+            URL del portal de clientes (https)
             <input
               type="url"
               value={settings.whmcs}
@@ -657,7 +850,8 @@ export default function ProSiteStudio({
         <section className="panel-block">
           <h2>Secciones del home</h2>
           <p className="muted">
-            Activa y reordena con ▲/▼. El orden se aplica realmente en la home.
+              Activa y reordena con ▲/▼. El orden se aplica realmente en la
+              home.
           </p>
           <ul className="section-list">
             {settings.sections.map((sec, index) => (
@@ -705,8 +899,8 @@ export default function ProSiteStudio({
         <section className="panel-block">
           <h2>Catálogo de planes</h2>
           <p className="muted">
-            Edita planes reales (semilla + guardado en CatalogConfig). No es CRUD
-            live de WHMCS; el enlace de compra debe ser https al portal.
+              Edita planes reales (semilla + guardado en CatalogConfig). No es
+              gestión de cuentas WHM; el enlace de compra existente debe ser https al portal.
           </p>
           <div className="tabs compact">
             {(
@@ -830,7 +1024,7 @@ export default function ProSiteStudio({
                   />
                 </label>
                 <label className="field wide">
-                  URL compra WHMCS (https)
+                  URL de compra existente (https)
                   <input
                     type="url"
                     value={plan.purchaseUrl}
@@ -980,66 +1174,32 @@ export default function ProSiteStudio({
       {tab === "preview" ? (
         <section className="panel-block">
           <h2>Vista previa segura</h2>
-          <div className="tabs compact">
-            <button
-              type="button"
-              className={preview === "desktop" ? "active" : ""}
-              onClick={() => setPreview("desktop")}
-            >
-              Desktop
-            </button>
-            <button
-              type="button"
-              className={preview === "mobile" ? "active" : ""}
-              onClick={() => setPreview("mobile")}
-            >
-              Móvil 390
-            </button>
-          </div>
-          <div
-            className={`preview-frame ${preview}`}
-            style={{
-              background: settings.theme.background,
-              color: settings.theme.text,
-              fontFamily: SAFE_FONTS[settings.appearance.font].css,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc(settings.branding, preview === "mobile")} alt="" />
-            <p className="kicker">{settings.content.heroEyebrow}</p>
-            <h3>
-              {settings.content.heroTitle}{" "}
-              <span style={{ color: settings.theme.primary }}>
-                {settings.content.heroTitleAccent}
-              </span>
-            </h3>
-            <p className="muted">{settings.content.heroLead}</p>
-            <span
-              className="btn"
-              style={{ background: settings.theme.gradient, pointerEvents: "none" }}
-            >
-              {settings.content.heroCtaPrimary}
-            </span>
-            <p className="fineprint">
-              Secciones activas:{" "}
-              {settings.sections
-                .filter((s) => s.enabled)
-                .map((s) => SECTION_LABELS[s.id])
-                .join(" → ")}
-            </p>
-          </div>
+            <BrandingPreview
+              settings={settings}
+              device={preview}
+              onDeviceChange={setPreview}
+            />
           <p className="muted">
-            La vista previa no ejecuta HTML remoto. Los cambios no publicados no
-            afectan a visitantes hasta «Guardar y publicar».
+              La vista previa no ejecuta HTML remoto. Los cambios no publicados
+              no afectan a visitantes hasta «Guardar y publicar».
           </p>
         </section>
       ) : null}
-
+      </fieldset>
       <div className="form-actions sticky-actions">
+        <span className="studio-save-summary" role="status">
+          {uploading.size
+            ? "Subiendo archivo; espera antes de publicar."
+            : status === "saving"
+              ? "Guardando ajustes y catálogo…"
+              : dirty
+                ? "Borrador local · aún no publicado"
+                : "Sin cambios pendientes"}
+        </span>
         <button
           type="button"
           className="btn"
-          disabled={status === "saving" || !dirty}
+          disabled={busy || !dirty}
           onClick={publish}
         >
           {status === "saving" ? "Publicando…" : "Guardar y publicar"}
@@ -1053,7 +1213,7 @@ export default function ProSiteStudio({
             setStatus("idle");
             setMessage("Cambios locales descartados.");
           }}
-          disabled={!dirty}
+          disabled={busy || !dirty}
         >
           Descartar
         </button>

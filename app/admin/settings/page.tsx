@@ -1,1 +1,36 @@
-import {redirect} from "next/navigation";import {isAdmin} from "@/lib/auth";import {configuration} from "@/lib/whmcs";import SettingsForm from "@/components/SettingsForm";export const dynamic="force-dynamic";export default async function Settings(){if(!await isAdmin())redirect("/admin/login");let url="",configured=false;try{const c=await configuration();url=c?.endpoint||"";configured=!!c}catch{}return <><p className="accent">INTEGRACIONES</p><h1>Conexión WHMCS API</h1><p className="muted">El Identifier, Secret y Access Key se cifran en PostgreSQL. Nunca se muestran después de guardarse.</p><div className="glass"><SettingsForm url={url} configured={configured}/></div></>}
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/auth";
+import { whmConfiguration, type WhmPublicConfig } from "@/lib/whm";
+import { safeWhmError } from "@/lib/whm-security";
+import SettingsForm from "@/components/SettingsForm";
+export const dynamic = "force-dynamic";
+export default async function Settings() {
+  if (!(await isAdmin())) redirect("/admin/login");
+  let initial: WhmPublicConfig = {
+      url: "",
+      username: "",
+      configured: false,
+      hasToken: false,
+      state: "pending",
+    },
+    error = "";
+  try {
+    initial = await whmConfiguration();
+  } catch (e) {
+    error = safeWhmError(e).message;
+  }
+  return (
+    <>
+      <p className="accent">SERVIDOR / SÓLO LECTURA</p>
+      <h1>Conexión WHM / cPanel</h1>
+      <p className="muted">
+        Configura servidor, usuario y API token aquí. Cifrado en el servidor;
+        ninguna contraseña ni token guardado se muestra después. No cambia
+        cuentas ni facturación.
+      </p>
+      <div className="glass">
+        <SettingsForm initial={initial} storageError={error} />
+      </div>
+    </>
+  );
+}

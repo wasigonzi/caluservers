@@ -1,1 +1,60 @@
-import {redirect,notFound} from "next/navigation";import {isAdmin} from "@/lib/auth";import {READ_ACTIONS,whmcsCall,type Section} from "@/lib/whmcs";export const dynamic="force-dynamic";const keys:Record<Section,string>={clients:"clients",orders:"orders",invoices:"invoices",services:"products",products:"products",tickets:"tickets"};const nested:Record<Section,string>={clients:"client",orders:"order",invoices:"invoice",services:"product",products:"product",tickets:"ticket"};const cols:Record<Section,string[]>={clients:["id","firstname","lastname","email","status"],orders:["id","userid","date","amount","status"],invoices:["id","userid","total","duedate","status"],services:["id","clientid","name","domain","status"],products:["pid","name","type","paytype"],tickets:["tid","subject","name","status"]};export default async function SectionPage({params}:{params:Promise<{section:string}>}){const {section}=await params;if(!(section in READ_ACTIONS))notFound();if(!await isAdmin())redirect("/admin/login");const kind=section as Section;let rows:Record<string,unknown>[]=[];let message="";try{const data=await whmcsCall(READ_ACTIONS[kind],{limitnum:"50"});const group=data[keys[kind]] as Record<string,unknown>|undefined;const r=group?.[nested[kind]];rows=Array.isArray(r)?r:r?[r as Record<string,unknown>]:[]}catch(e){message=e instanceof Error?e.message:"Error"}return <><p className="accent">WHMCS / EN VIVO</p><h1>{section.toUpperCase()}</h1>{message&&<p className="error">{message}</p>}<div className="glass" style={{overflowX:"auto"}}><table><thead><tr>{cols[kind].map(k=><th key={k}>{k}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{cols[kind].map(k=><td key={k}>{String(r[k]??"—").slice(0,120)}</td>)}</tr>)}</tbody></table>{!rows.length&&!message&&<p className="muted">No hay registros.</p>}</div></>}
+import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
+import { isAdmin } from "@/lib/auth";
+import { whmConfiguration } from "@/lib/whm";
+import { safeWhmError } from "@/lib/whm-security";
+import WhmReadPanel from "@/components/admin/WhmReadPanel";
+export const dynamic = "force-dynamic";
+export default async function SectionPage({
+  params,
+}: {
+  params: Promise<{ section: string }>;
+}) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const { section } = await params;
+  if (
+    [
+      "clients",
+      "orders",
+      "invoices",
+      "services",
+      "products",
+      "tickets",
+    ].includes(section)
+  )
+    return (
+      <>
+        <h1>Sección anterior retirada</h1>
+        <p className="muted">
+          No se han eliminado clientes, pedidos, facturas ni otros datos
+          históricos. La integración activa ahora consulta únicamente cuentas y
+          paquetes WHM; no reemplaza facturación ni convierte productos en
+          pedidos.
+        </p>
+        <Link className="btn" href="/admin">
+          Ir al dashboard →
+        </Link>
+      </>
+    );
+  if (section !== "accounts" && section !== "packages") notFound();
+  let configured = false,
+    error = "";
+  try {
+    configured = (await whmConfiguration()).configured;
+  } catch (e) {
+    error = safeWhmError(e).message;
+  }
+  return (
+    <>
+      <p className="accent">WHM / SÓLO LECTURA</p>
+      <h1>
+        {section === "accounts" ? "Cuentas cPanel" : "Paquetes de hosting"}
+      </h1>
+      <WhmReadPanel
+        mode={section === "accounts" ? "listaccts" : "listpkgs"}
+        configured={configured}
+        storageError={error}
+      />
+    </>
+  );
+}

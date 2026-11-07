@@ -16,15 +16,15 @@ export default async function SiteAdminPage() {
   const blobConfigured = isBlobConfiguredEnv();
   return (
     <>
-      <p className="accent">ESTUDIO DEL SITIO · PRO</p>
-      <h1>Configuración avanzada</h1>
+      <p className="accent">IDENTIDAD / EXPERIENCIA</p>
+      <h1>Tu marca, bajo control</h1>
       <p className="muted">
         Branding (URL o subida a Vercel Blob), apariencia, contenido, secciones,
         catálogo, SEO y navegación. Publicación unificada. Requiere migraciones{" "}
         <code>SiteSetting</code> / <code>CatalogConfig</code> y, para subidas,{" "}
-        <code>BLOB_READ_WRITE_TOKEN</code>. WHMCS API en «Conexión WHMCS».
+        <code>BLOB_READ_WRITE_TOKEN</code>. WHM / cPanel de sólo lectura en «Conexión WHM».
       </p>
-      <div className="glass">
+      <div className="studio-container">
         <ProSiteStudio
           initialSettings={settings}
           initialCatalog={catalog}
