@@ -14,7 +14,7 @@ import { isPriceToConfirm } from "@/lib/catalog";
 import { useCatalog } from "@/lib/catalog-context";
 import { PlanCard } from "@/components/site/SiteShell";
 import type { HomeSectionId } from "@/lib/site-settings";
-import { AnimatedNumber } from "@/components/site/Interactive";
+import CatalogPlanCount from "@/components/site/CatalogPlanCount";
 import {
   CompareTable,
   Faq,
@@ -198,8 +198,8 @@ export default function Home() {
               </div>
               <div className="stat glass">
                 <strong>
-                  <AnimatedNumber
-                    value={
+                  <CatalogPlanCount
+                    count={
                       [
                         ...catalog.webHosting,
                         ...catalog.vps,

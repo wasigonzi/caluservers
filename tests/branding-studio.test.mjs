@@ -298,3 +298,23 @@ test("large file uses existing Blob client and real progress callback; failure p
   assert.match(html, /Upload failed/);
   assert.match(html, /original.png/);
 });
+
+
+test("catalog count SSR shows known availability immediately, honest loading, and real empty zero", () => {
+  const h = harness();
+  const Count = h.load("components/site/CatalogPlanCount.tsx").default;
+  const loaded = renderToStaticMarkup(h.render(Count, { count: 32 }));
+  assert.match(loaded, />32<\/span>/);
+  assert.ok(!loaded.includes(">0<"));
+  assert.ok(!loaded.includes("Cargando"));
+  const pending = renderToStaticMarkup(h.render(Count, { count: null }));
+  assert.match(pending, /Cargando catálogo…/);
+  assert.match(pending, /aria-busy="true"/);
+  assert.ok(!pending.includes(">0<"));
+  const empty = renderToStaticMarkup(h.render(Count, { count: 0 }));
+  assert.match(empty, />0<\/span>/);
+  assert.match(empty, /aria-busy="false"/);
+  const home = readFileSync(resolve(root, "components/site/HomePage.tsx"), "utf8");
+  assert.match(home, /<CatalogPlanCount/);
+  assert.ok(!home.includes("AnimatedNumber"), "availability must not count up from an invented zero");
+});
