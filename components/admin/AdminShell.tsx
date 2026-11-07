@@ -1,10 +1,37 @@
 "use client";
 
+import {
+  LayoutDashboard,
+  Palette,
+  FileText,
+  Users,
+  Server,
+  ShoppingBag,
+  Receipt,
+  Package,
+  LifeBuoy,
+  Settings,
+  ExternalLink,
+  Menu,
+  LogOut,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-type NavItem = { label: string; href: string };
+const NAV_ICONS = {
+  "/admin": LayoutDashboard,
+  "/admin/site": Palette,
+  "/admin/pages": FileText,
+  "/admin/clients": Users,
+  "/admin/services": Server,
+  "/admin/orders": ShoppingBag,
+  "/admin/invoices": Receipt,
+  "/admin/products": Package,
+  "/admin/tickets": LifeBuoy,
+  "/admin/settings": Settings,
+};
+type NavItem = { label: string; href: keyof typeof NAV_ICONS };
 type NavGroup = { title: string; items: NavItem[] };
 
 const GROUPS: NavGroup[] = [
@@ -15,7 +42,7 @@ const GROUPS: NavGroup[] = [
   {
     title: "Sitio",
     items: [
-      { label: "Estudio PRO", href: "/admin/site" },
+      { label: "Marca y sitio", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
     ],
   },
@@ -51,6 +78,18 @@ export default function AdminShell({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const titleId = useId();
+  const asideRef = useRef<HTMLElement>(null);
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1024px)");
+    const update = () => {
+      setMobile(media.matches);
+      if (!media.matches) setOpen(false);
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -58,14 +97,34 @@ export default function AdminShell({
 
   useEffect(() => {
     if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      asideRef.current?.querySelectorAll<HTMLElement>(
+        "a[href],button:not([disabled])",
+      );
+    focusable()?.[0]?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (!items?.length) return;
+      const first = items[0],
+        last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = overflow;
+      previous?.focus();
     };
   }, [open]);
 
@@ -75,8 +134,16 @@ export default function AdminShell({
 
   const nav = (
     <>
-      <Link className="admin-brand" href="/admin" onClick={() => setOpen(false)}>
+      <Link
+        className="admin-brand"
+        href="/admin"
+        onClick={() => setOpen(false)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/assets/monograma-cs.svg" width="36" height="36" alt="" />
+        <span>
         CALU<span className="accent">SERVERS</span>
+        </span>
       </Link>
       <p className="admin-side-sub muted">Panel de administración</p>
       <nav className="admin-nav" aria-label="Admin">
@@ -88,12 +155,20 @@ export default function AdminShell({
                 key={item.href}
                 href={item.href}
                 className={
-                  isActive(pathname, item.href) ? "admin-nav-link active" : "admin-nav-link"
+                  isActive(pathname, item.href)
+                    ? "admin-nav-link active"
+                    : "admin-nav-link"
                 }
-                aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                aria-current={
+                  isActive(pathname, item.href) ? "page" : undefined
+                }
                 onClick={() => setOpen(false)}
               >
-                {item.label}
+                {(() => {
+                  const Icon = NAV_ICONS[item.href];
+                  return <Icon size={18} aria-hidden="true" />;
+                })()}
+                <span>{item.label}</span>
               </Link>
             ))}
           </div>
@@ -103,11 +178,16 @@ export default function AdminShell({
         {email ? <p className="muted admin-user">{email}</p> : null}
         <form action="/api/admin/logout" method="post">
           <button className="btn admin-logout" type="submit">
-            Salir
+            <LogOut size={16} aria-hidden="true" /> Salir
           </button>
         </form>
-        <Link className="admin-view-site" href="/" target="_blank" rel="noreferrer">
-          Ver sitio →
+        <Link
+          className="admin-view-site"
+          href="/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Ver sitio <ExternalLink size={14} aria-hidden="true" />
         </Link>
       </div>
     </>
@@ -115,6 +195,9 @@ export default function AdminShell({
 
   return (
     <div className={`admin-app${open ? " drawer-open" : ""}`}>
+      <a href="#admin-content" className="admin-skip-link">
+        Ir al contenido
+      </a>
       <header className="admin-topbar">
         <button
           type="button"
@@ -123,7 +206,7 @@ export default function AdminShell({
           aria-controls={titleId}
           onClick={() => setOpen((v) => !v)}
         >
-          ☰ Menú
+          <Menu size={18} aria-hidden="true" /> Menú
         </button>
         <div className="admin-breadcrumb">
           <span className="muted">Admin</span>
@@ -137,10 +220,25 @@ export default function AdminShell({
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
-      <aside className="admin-sidebar" id={titleId}>
+      <aside
+        ref={asideRef}
+        className="admin-sidebar"
+        id={titleId}
+        inert={mobile && !open}
+        aria-hidden={mobile && !open ? true : undefined}
+      >
+        <button
+          type="button"
+          className="admin-drawer-close"
+          onClick={() => setOpen(false)}
+        >
+          Cerrar menú ×
+        </button>
         {nav}
       </aside>
-      <main className="admin-main">{children}</main>
+      <main id="admin-content" tabIndex={-1} className="admin-main">
+        {children}
+      </main>
     </div>
   );
 }

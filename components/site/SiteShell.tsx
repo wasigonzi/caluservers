@@ -99,7 +99,7 @@ function Nav({ settings }: { settings: SiteSettings }) {
           <summary className="menu" aria-label="Abrir menú">☰</summary>
           <nav className="links open" aria-label="Principal">
             {NAV_LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""}>
+              <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""} aria-current={pathname === l.href ? "page" : undefined}>
                 {l.label}
               </Link>
             ))}
@@ -107,7 +107,7 @@ function Nav({ settings }: { settings: SiteSettings }) {
         </details>
         <nav className="links desktop-links" aria-label="Principal">
           {NAV_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""}>
+            <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""} aria-current={pathname === l.href ? "page" : undefined}>
               {l.label}
             </Link>
           ))}
