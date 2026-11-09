@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminCommerceForms } from "@/components/admin/AdminCommerceForms";
 import { billingPolicy } from "@/lib/commerce";
+import { loadOrExplain } from "@/lib/storage-status";
 import {
   EXPLICIT_TAX_ENVIRONMENT_NOTE,
   ISSUER_CONTEXT,
@@ -23,12 +24,26 @@ export const dynamic = "force-dynamic";
 export default async function CommerceAdminPage() {
   if (!(await isAdmin())) redirect("/admin/login");
   const policy = billingPolicy();
-  const [customers, invoices, services, tickets] = await Promise.all([
+  const loaded = await loadOrExplain(() => Promise.all([
     db.user.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     db.customerInvoice.findMany({ include: { payment: true, order: true }, orderBy: { createdAt: "desc" }, take: 50 }),
     db.customerService.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     db.supportTicket.findMany({ include: { messages: { orderBy: { createdAt: "asc" } }, user: true }, orderBy: { updatedAt: "desc" }, take: 50 }),
-  ]);
+  ]));
+  if (!loaded.ok) {
+    return (
+      <>
+        <header className="dashboard-heading">
+          <div>
+            <p className="studio-eyebrow">CLIENTES PROPIOS</p>
+            <h1>Pedidos y facturas</h1>
+          </div>
+        </header>
+        <p className="error" role="alert">{loaded.message}</p>
+      </>
+    );
+  }
+  const [customers, invoices, services, tickets] = loaded.data;
   return (
     <>
       <header className="dashboard-heading">

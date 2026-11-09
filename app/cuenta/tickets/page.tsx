@@ -3,18 +3,35 @@ import { AccountFrame } from "@/components/account/AccountFrame";
 import { TicketForm } from "@/components/account/AccountForms";
 import { db } from "@/lib/db";
 import { customerSession } from "@/lib/customer-session";
+import { loadOrExplain } from "@/lib/storage-status";
 import { authorLabel, formatDateTime, ticketStatusLabel } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 export default async function TicketsPage() {
-  const session = await customerSession();
+  const sessionResult = await loadOrExplain(() => customerSession());
+  if (!sessionResult.ok) {
+    return (
+      <AccountFrame kicker="Soporte" title="Tickets" lead="No se pudo leer la sesión.">
+        <p className="error" role="alert">{sessionResult.message}</p>
+      </AccountFrame>
+    );
+  }
+  const session = sessionResult.data;
   if (!session?.user.emailVerified) redirect("/cuenta/entrar");
-  const tickets = await db.supportTicket.findMany({
+  const ticketsResult = await loadOrExplain(() => db.supportTicket.findMany({
     where: { userId: session.user.id },
     include: { messages: { orderBy: { createdAt: "asc" } } },
     orderBy: { updatedAt: "desc" },
-  });
+  }));
+  if (!ticketsResult.ok) {
+    return (
+      <AccountFrame kicker="Soporte" title="Tickets" lead="La sesión existe, pero los tickets no se pudieron leer.">
+        <p className="error" role="alert">{ticketsResult.message}</p>
+      </AccountFrame>
+    );
+  }
+  const tickets = ticketsResult.data;
   return (
     <AccountFrame
       kicker="Soporte"

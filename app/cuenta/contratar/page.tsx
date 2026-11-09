@@ -7,12 +7,14 @@ import { getCatalogPayload } from "@/lib/catalog-db";
 import { formatMinorAmount } from "@/lib/money";
 import { isOrderablePlan } from "@/lib/orderable";
 import { customerSession } from "@/lib/customer-session";
+import { loadOrExplain } from "@/lib/storage-status";
 
 export const dynamic = "force-dynamic";
 
 export default async function HirePage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
   const { plan: planId = "" } = await searchParams;
-  const session = await customerSession();
+  const sessionResult = await loadOrExplain(() => customerSession());
+  const session = sessionResult.ok ? sessionResult.data : null;
   const catalog = await getCatalogPayload();
   const plan = [...catalog.webHosting, ...catalog.vps, ...catalog.dedicated].find((item) => item.id === planId);
   const cents = plan ? parsePublicPriceToCents(plan.price) : null;

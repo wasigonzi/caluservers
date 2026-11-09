@@ -5,6 +5,7 @@ import { SignOutButton } from "@/components/account/AccountForms";
 import { FiscalNotice } from "@/components/account/FiscalNotice";
 import { db } from "@/lib/db";
 import { customerSession } from "@/lib/customer-session";
+import { loadOrExplain } from "@/lib/storage-status";
 import {
   formatDateTime,
   formatMinorAmount,
@@ -20,9 +21,17 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AccountHome() {
-  const session = await customerSession();
+  const sessionResult = await loadOrExplain(() => customerSession());
+  if (!sessionResult.ok) {
+    return (
+      <AccountFrame kicker="Cuenta CaluServers" title="Tu cuenta" lead="No se pudo leer la sesión.">
+        <p className="error" role="alert">{sessionResult.message}</p>
+      </AccountFrame>
+    );
+  }
+  const session = sessionResult.data;
   if (!session?.user.emailVerified) redirect("/cuenta/entrar");
-  const [orders, invoices, services, tickets] = await Promise.all([
+  const lists = await loadOrExplain(() => Promise.all([
     db.customerOrder.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: "desc" } }),
     db.customerInvoice.findMany({
       where: { userId: session.user.id },
@@ -31,7 +40,16 @@ export default async function AccountHome() {
     }),
     db.customerService.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: "desc" } }),
     db.supportTicket.findMany({ where: { userId: session.user.id }, orderBy: { updatedAt: "desc" } }),
-  ]);
+  ]));
+  if (!lists.ok) {
+    return (
+      <AccountFrame kicker="Cuenta CaluServers" title="Tu cuenta" lead="La sesión existe, pero las listas no se pudieron leer.">
+        <p className="muted">{session.user.email}</p>
+        <p className="error" role="alert">{lists.message}</p>
+      </AccountFrame>
+    );
+  }
+  const [orders, invoices, services, tickets] = lists.data;
   return (
     <AccountFrame
       kicker="Cuenta CaluServers"
