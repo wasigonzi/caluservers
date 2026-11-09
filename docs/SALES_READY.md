@@ -47,4 +47,4 @@ Migraciones: `SiteSetting`, `CatalogConfig`.
 
 - SLA contractual, uptime legal, impuestos, chargebacks.
 - Envío de leads por formulario propio (contacto abre ticket WHMCS).
-- MFA admin / rate-limit distribuido (recomendado antes de producción).
+- MFA admin sigue siendo opcional (`ADMIN_TOTP_SECRET`). El límite de login ya está en Postgres y se comparte entre instancias.

@@ -7,29 +7,31 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: calu
-          POSTGRES_PASSWORD: calu_ci_only
-          POSTGRES_DB: caluservers
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U calu -d caluservers"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://calu:calu_ci_only@localhost:5432/caluservers?schema=public
-      CI: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Postgres efímero
+        run: |
+          set -euo pipefail
+          pw="$(openssl rand -hex 32)"
+          echo "::add-mask::$pw"
+          printf 'DATABASE_URL=%s\n' "postgresql://calu:${pw}@127.0.0.1:5432/caluservers?schema=public" >> "$GITHUB_ENV"
+          docker run -d --name ci-pg \
+            -e POSTGRES_USER=calu \
+            -e POSTGRES_PASSWORD="$pw" \
+            -e POSTGRES_DB=caluservers \
+            -p 127.0.0.1:5432:5432 \
+            postgres:16
+          for _ in $(seq 1 40); do
+            if docker exec ci-pg pg_isready -U calu -d caluservers; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
       - run: npm ci
       - run: npx prisma migrate deploy
       - run: npm run lint

@@ -66,7 +66,7 @@ test("instalación vacía y actualización de las 3 migraciones crean auditoría
   try {
     migrate(freshUrl);
     const freshTables = await tables(freshUrl);
-    for (const name of ["AdminAudit", "IntegrationConfig", "SiteSetting", "CatalogConfig", "PageContent"]) {
+    for (const name of ["AdminAudit", "IntegrationConfig", "SiteSetting", "CatalogConfig", "PageContent", "LoginThrottle"]) {
       assert.ok(freshTables.includes(name), name);
     }
 
@@ -105,6 +105,7 @@ test("instalación vacía y actualización de las 3 migraciones crean auditoría
     const after = await tables(upgradeUrl);
     assert.ok(after.includes("AdminAudit"));
     assert.ok(after.includes("IntegrationConfig"));
+    assert.ok(after.includes("LoginThrottle"));
   } finally {
     await recreate(freshName).catch(() => {});
     await recreate(upgradeName).catch(() => {});

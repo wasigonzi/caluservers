@@ -11,6 +11,7 @@ Migraciones:
 2. `20261106140000_catalog_config`
 3. `20261106210000_page_content`
 4. `20261109120000_integration_audit` (`IntegrationConfig`, `AdminAudit`)
+5. `20261109133000_login_throttle` (`LoginThrottle`)
 
 Aplicar **manualmente** en tu entorno: `npx prisma migrate deploy` (o `db push` en desarrollo). No se ejecutan contra producción desde este PR.
 

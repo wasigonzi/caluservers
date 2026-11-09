@@ -64,6 +64,7 @@ export async function cmsStorageReady(): Promise<{
     await db.pageContent.findFirst({ select: { path: true } });
     await db.adminAudit.findFirst({ select: { id: true } });
     await db.integrationConfig.findFirst({ select: { id: true } });
+    await db.loginThrottle.findFirst({ select: { id: true } });
     return { ok: true, missingMigration: false, message: "Almacenamiento listo" };
   } catch (error) {
     const { missingMigration } = reportDbError(error, process.env.DATABASE_URL);

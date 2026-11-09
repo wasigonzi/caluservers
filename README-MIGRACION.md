@@ -21,11 +21,13 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-`prisma migrate deploy` en una base vacía aplica cuatro migraciones: ajustes, catálogo, textos y, al final, `IntegrationConfig` + `AdminAudit`. Una base que ya aplicó las tres primeras recibe solo esa cuarta migración. No edites los SQL antiguos: Prisma guarda su checksum.
+`prisma migrate deploy` en una base vacía aplica las migraciones de ajustes, catálogo, textos, `IntegrationConfig` + `AdminAudit` y `LoginThrottle`. Una base que ya aplicó migraciones anteriores recibe solo las que le faltan. No edites los SQL antiguos: Prisma guarda su checksum.
 
 Sin `AdminAudit`, un guardado no debe publicarse. Contenido y auditoría van en la misma transacción.
 
-MFA es opcional. `npm run admin:totp` imprime un secreto; defínelo como `ADMIN_TOTP_SECRET` para exigir el código. Si la variable no existe, el login sigue siendo email y contraseña. El límite de intentos vive en la memoria del proceso, no en Redis.
+MFA es opcional. `npm run admin:totp` imprime un secreto; defínelo como `ADMIN_TOTP_SECRET` para exigir el código. Si la variable no existe, el login sigue siendo email y contraseña.
+
+El límite de intentos está en la tabla `LoginThrottle` y lo comparten todas las instancias. La clave guardada es un HMAC, no la IP. Si esa tabla o la base no responden, el login se rechaza (503): no hay un modo que deje pasar intentos ilimitados. Hace falta `npx prisma migrate deploy` antes de entrar al panel.
 
 ## Rutas
 

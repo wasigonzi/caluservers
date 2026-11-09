@@ -100,6 +100,7 @@ function cmsModule(error) {
     pageContent: { findMany: fail, findUnique: fail, findFirst: fail, upsert: fail },
     adminAudit: { findFirst: fail, create: fail },
     integrationConfig: { findFirst: fail },
+    loginThrottle: { findFirst: fail },
   };
   const module = { exports: {} };
   const source = readFileSync(new URL("../lib/page-content-db.ts", import.meta.url), "utf8");
