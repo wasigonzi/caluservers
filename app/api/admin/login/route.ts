@@ -1,57 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkPassword, createSession, sessionCookie } from "@/lib/auth";
+import { evaluateAdminLogin } from "@/lib/admin-login";
+import { accessGapNames, adminLoginMessage, isLoginCode } from "@/lib/admin-login-messages";
+import { createSession, sessionCookie } from "@/lib/auth";
 import { clientRateKey } from "@/lib/login-rate-limit";
 import { clearLoginThrottle, consumeLoginAttempt } from "@/lib/login-throttle-store";
 import { trustedWrite } from "@/lib/request";
-import { totpConfig, verifyTotp } from "@/lib/totp";
 
 export const runtime = "nodejs";
 
-const LIMIT_ERROR = "No se pudo comprobar el límite de acceso. El ingreso queda cerrado.";
+function bodyOf(decision: { code: string; missing?: string[]; retryAfterSec?: number }) {
+  const code = isLoginCode(decision.code) ? decision.code : "unexpected";
+  return {
+    code,
+    missing: decision.missing ?? [],
+    error: adminLoginMessage(code, accessGapNames(decision.missing)),
+  };
+}
 
 export async function POST(req: NextRequest) {
-  if (!trustedWrite(req)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const trusted = trustedWrite(req);
+  let email = "";
+  let password = "";
+  let code = "";
+  if (trusted) {
+    try {
+      const body = await req.json();
+      email = typeof body?.email === "string" ? body.email : "";
+      password = typeof body?.password === "string" ? body.password : "";
+      code = typeof body?.code === "string" ? body.code : "";
+    } catch {
+      return NextResponse.json(bodyOf({ code: "unexpected" }), { status: 500 });
+    }
   }
   const key = clientRateKey(req.headers);
-  let decision: { allowed: boolean; retryAfterSec: number };
+  let decision;
   try {
-    decision = await consumeLoginAttempt(key);
-  } catch {
-    return NextResponse.json({ error: LIMIT_ERROR }, { status: 503 });
-  }
-  if (!decision.allowed) {
-    return NextResponse.json(
-      { error: "Demasiados intentos. Espera unos minutos." },
-      { status: 429, headers: { "Retry-After": String(decision.retryAfterSec) } },
+    decision = await evaluateAdminLogin(
+      { trusted, email, password, code },
+      {
+        consume: () => consumeLoginAttempt(key),
+        clear: () => clearLoginThrottle(key),
+      },
     );
+  } catch {
+    return NextResponse.json(bodyOf({ code: "unexpected" }), { status: 500 });
+  }
+  if (decision.code !== "ok") {
+    const headers = decision.retryAfterSec ? { "Retry-After": String(decision.retryAfterSec) } : undefined;
+    return NextResponse.json(bodyOf(decision), { status: decision.status, headers });
   }
   try {
-    const body = await req.json();
-    const email = typeof body?.email === "string" ? body.email : "";
-    const password = typeof body?.password === "string" ? body.password : "";
-    const code = typeof body?.code === "string" ? body.code : "";
-    if (!checkPassword(email, password)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const mfa = totpConfig(process.env.ADMIN_TOTP_SECRET);
-    if (mfa === "invalid") {
-      return NextResponse.json(
-        { error: "MFA está definido pero no es un secreto TOTP válido." },
-        { status: 500 },
-      );
-    }
-    if (mfa === "ready" && !verifyTotp(process.env.ADMIN_TOTP_SECRET || "", code)) {
-      return NextResponse.json(
-        { error: "Unauthorized", mfaRequired: true },
-        { status: 401 },
-      );
-    }
-    try {
-      await clearLoginThrottle(key);
-    } catch {
-      return NextResponse.json({ error: LIMIT_ERROR }, { status: 503 });
-    }
     const res = NextResponse.json({ ok: true });
     res.cookies.set(sessionCookie, createSession(), {
       httpOnly: true,
@@ -62,6 +60,6 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch {
-    return NextResponse.json({ error: "Login failed" }, { status: 500 });
+    return NextResponse.json(bodyOf({ code: "unexpected" }), { status: 500 });
   }
 }

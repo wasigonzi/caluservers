@@ -87,6 +87,7 @@
 }
 .admin-app .table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;margin:20px 0;border-radius:14px;border:1px solid var(--admin-line)}
 .admin-app table{border-collapse:collapse;width:100%;min-width:640px;margin:0}
+.admin-app table.commerce-table{min-width:0}
 .admin-app td,.admin-app th{padding:13px;text-align:left;border-bottom:1px solid #ffffff23}
 .admin-app th{color:var(--admin-cyan)}
 .admin-app .error,.login .error,.error{color:#ff9494}

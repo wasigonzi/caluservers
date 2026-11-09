@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { customerAuthClient } from "@/lib/customer-auth-client";
+import { formatMinorAmount } from "@/lib/money";
 
 export function RegisterForm() {
   const [name, setName] = useState("");
@@ -12,6 +13,7 @@ export function RegisterForm() {
   const [error, setError] = useState("");
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
@@ -23,9 +25,9 @@ export function RegisterForm() {
         setMessage("Cuenta creada. Revisa el correo de verificación. El enlace no se muestra aquí.");
       }}
     >
-      <label className="field">Nombre<input value={name} required onChange={(event) => setName(event.target.value)} /></label>
-      <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="field">Contraseña<input type="password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="field">Nombre<input autoComplete="name" value={name} required onChange={(event) => setName(event.target.value)} /></label>
+      <label className="field">Correo electrónico<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="field">Contraseña<input type="password" autoComplete="new-password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
       {message ? <p className="notice" role="status">{message}</p> : null}
       <button className="btn primary" type="submit">Crear cuenta</button>
@@ -40,6 +42,7 @@ export function LoginForm() {
   const [error, setError] = useState("");
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
@@ -52,8 +55,8 @@ export function LoginForm() {
         router.refresh();
       }}
     >
-      <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="field">Contraseña<input type="password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="field">Correo electrónico<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="field">Contraseña<input type="password" autoComplete="current-password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
       <button className="btn primary" type="submit">Entrar</button>
     </form>
@@ -68,6 +71,7 @@ export function ResetForm({ token }: { token: string }) {
   if (!token) return <p className="error">El enlace no incluye un token válido.</p>;
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
@@ -80,7 +84,7 @@ export function ResetForm({ token }: { token: string }) {
         router.push("/cuenta/entrar");
       }}
     >
-      <label className="field">Nueva contraseña<input type="password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="field">Nueva contraseña<input type="password" autoComplete="new-password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
       {message ? <p className="notice" role="status">{message}</p> : null}
       <button className="btn primary" type="submit">Guardar contraseña</button>
@@ -93,13 +97,14 @@ export function RecoverForm() {
   const [message, setMessage] = useState("");
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         await customerAuthClient.requestPasswordReset({ email, redirectTo: "/cuenta/restablecer" });
         setMessage("Si la cuenta existe, enviaremos un enlace de un solo uso. No se muestra aquí.");
       }}
     >
-      <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="field">Correo electrónico<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
       {message ? <p className="notice" role="status">{message}</p> : null}
       <button className="btn primary" type="submit">Pedir enlace</button>
     </form>
@@ -107,11 +112,13 @@ export function RecoverForm() {
 }
 
 export function OrderButton({ planId }: { planId: string }) {
+  const router = useRouter();
   const [idempotencyKey] = useState(() => `ord_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
@@ -125,7 +132,15 @@ export function OrderButton({ planId }: { planId: string }) {
           setError(data.error || "No se pudo crear el pedido.");
           return;
         }
-        setMessage(`Pedido ${data.id}. Total ${data.totalCents} centavos ${data.currency}. El pago no se marca solo.`);
+        const total = typeof data.formattedTotal === "string"
+          ? data.formattedTotal
+          : formatMinorAmount(Number(data.totalCents), String(data.currency || ""));
+        setMessage(
+          data.invoiceStatus === "proforma"
+            ? `Pedido recibido por ${total}. La factura es una proforma no cobrable: falta la política fiscal y el pago no se confirma.`
+            : `Pedido recibido por ${total}. El pago no se confirma solo y el servicio no se da de alta en WHM.`,
+        );
+        router.refresh();
       }}
     >
       {error ? <p className="error" role="alert">{error}</p> : null}
@@ -136,11 +151,13 @@ export function OrderButton({ planId }: { planId: string }) {
 }
 
 export function TicketForm() {
+  const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [message, setMessage] = useState("");
   return (
     <form
+      className="account-form"
       onSubmit={async (event) => {
         event.preventDefault();
         const response = await fetch("/api/account/tickets", {
@@ -149,7 +166,8 @@ export function TicketForm() {
           body: JSON.stringify({ subject, body }),
         });
         const data = await response.json();
-        setMessage(response.ok ? `Ticket ${data.id} abierto.` : data.error || "No se pudo abrir.");
+        setMessage(response.ok ? "Ticket abierto." : data.error || "No se pudo abrir.");
+        if (response.ok) router.refresh();
       }}
     >
       <label className="field">Asunto<input value={subject} required onChange={(event) => setSubject(event.target.value)} /></label>

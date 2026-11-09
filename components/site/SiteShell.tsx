@@ -213,6 +213,7 @@ function Footer({ settings }: { settings: SiteSettings }) {
           <div>
             <h4>Explorar</h4>
             <a href={whmcs}>Área de Cliente</a>
+            <Link href="/cuenta">Cuenta en este sitio</Link>
             <a href={`${whmcs}/submitticket.php`}>Soporte</a>
             <Link href="/aup">Política de uso</Link>
             <Link href="/abuse">Abuso</Link>

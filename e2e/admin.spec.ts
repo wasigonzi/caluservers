@@ -13,7 +13,8 @@ test("cabeceras, login, logout, almacenamiento y guardado de CMS", async ({ page
   await page.locator('input[type="email"]').fill(E2E_EMAIL);
   await page.locator('input[type="password"]').fill("wrong-password-value");
   await page.locator("form button.btn").click();
-  await expect(page.locator(".error")).toContainText("Credenciales");
+  await expect(page.locator(".error")).toContainText("no coinciden");
+  await expect(page.locator(".error")).not.toContainText("configuración incompleta");
 
   await page.locator('input[type="password"]').fill(E2E_PASSWORD);
   await page.locator("form button.btn").click();
