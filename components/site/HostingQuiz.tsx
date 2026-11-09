@@ -3,7 +3,7 @@
 // Recomienda usando SOLO las diferencias reales entre los planes del
 // catálogo: nº de sitios, cuentas de correo y almacenamiento/potencia.
 // Starter = 1 sitio, 100 correos, 20 GB · Professional = sitios y correos
-// ilimitados, 50 GB · Business = lo mismo con 100 GB y más potencia.
+// ilimitados, 50 GB · Corporate = lo mismo con 100 GB y más potencia.
 import { useMemo, useState } from "react";
 import type { Plan } from "@/lib/catalog";
 import { PlanCard } from "@/components/site/SiteShell";

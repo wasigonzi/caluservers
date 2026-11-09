@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { trustedWrite } from "@/lib/request";
+import { clientSafeError } from "@/lib/client-error";
 import { getSiteSettings, saveSiteSettings } from "@/lib/site-settings-db";
 import {
   DEFAULT_SITE_SETTINGS,
@@ -57,9 +58,7 @@ export async function POST(req: NextRequest) {
     const saved = await saveSiteSettings(candidate);
     return NextResponse.json({ ok: true, settings: saved });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error" },
-      { status: 400 },
-    );
+    const safe = clientSafeError(e);
+    return NextResponse.json(safe.body, { status: safe.status });
   }
 }

@@ -9,6 +9,7 @@ import {
   type CatalogPayload,
 } from "@/lib/catalog-validate";
 import { getSiteSettings } from "@/lib/site-settings-db";
+import { commitCatalog } from "@/lib/writes";
 
 export async function getCatalogPayload(): Promise<CatalogPayload> {
   try {
@@ -37,30 +38,17 @@ export async function saveCatalogPayload(
   if (!parsed) throw new Error("Catálogo inválido");
   const err = validateCatalogPayload(parsed);
   if (err) throw new Error(err);
-  await db.catalogConfig.upsert({
-    where: { id: "default" },
-    create: { id: "default", payload: parsed as object },
-    update: { payload: parsed as object },
-  });
-  await db.adminAudit.create({
-    data: {
-      action: "catalog.updated",
-      details: `plans=${parsed.webHosting.length + parsed.vps.length + parsed.dedicated.length}`,
-    },
-  });
+  await commitCatalog(
+    parsed,
+    "catalog.updated",
+    `plans=${parsed.webHosting.length + parsed.vps.length + parsed.dedicated.length}`,
+  );
   return parsed;
 }
 
 export async function restoreCatalogPayload(): Promise<CatalogPayload> {
   const seed = seedCatalogPayload();
-  await db.catalogConfig.upsert({
-    where: { id: "default" },
-    create: { id: "default", payload: seed as object },
-    update: { payload: seed as object },
-  });
-  await db.adminAudit.create({
-    data: { action: "catalog.restored", details: "Restored SEED_CATALOG" },
-  });
+  await commitCatalog(seed, "catalog.restored", "Restored SEED_CATALOG");
   return seed;
 }
 

@@ -81,6 +81,10 @@ export default function Dedicated() {
         lead={lead}
       />
       <section className="wrap">
+        <p className="notice">
+          La tienda pública no lista servidores dedicados. Aquí no hay precio
+          confirmado ni botón de pedido. La consulta sigue en el portal externo.
+        </p>
         <div className="plan-grid five">
           {plans.map((plan, i) => (
             <PlanCard

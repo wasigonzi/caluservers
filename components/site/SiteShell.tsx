@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { HERO_BG_DATA_URI } from "@/lib/brand";
 import type { Plan } from "@/lib/catalog";
 import { isPriceToConfirm } from "@/lib/catalog";
+import { isOrderablePlan } from "@/lib/orderable";
 import type { SiteSettings } from "@/lib/site-settings";
 import { applySiteTheme, logoSrc, socialEntries } from "@/lib/site-settings";
 import { resolveHref } from "@/lib/safe-links";
@@ -67,7 +68,7 @@ function TopBar({ settings }: { settings: SiteSettings }) {
       <div className="wrap topbar-in">
         <span>⚡ {settings.branding.tagline || "Infraestructura de alojamiento premium"}</span>
         <span>
-          Estado de la red: <b className="ok">{settings.networkStatus}</b>
+          Aviso manual, no es monitorización: <b>{settings.networkStatus}</b>
         </span>
       </div>
     </div>
@@ -296,6 +297,7 @@ export function PlanCard({
   onCompareToggle?: (id: string) => void;
 }) {
   const toConfirm = isPriceToConfirm(plan.price);
+  const orderable = isOrderablePlan(plan);
   return (
     <article className={`plan-card glass${featured || plan.featured ? " featured" : ""}`}>
       <span className="tag">{tag ?? plan.badge ?? "CALUSERVERS"}</span>
@@ -304,8 +306,10 @@ export function PlanCard({
       <div className="price-line">
         {plan.priceWas ? <s className="price-was">{plan.priceWas}</s> : null}
         {toConfirm ? <span className="price-consultar">Consultar</span> : plan.price}
-        <span> / mes</span>
-        {toConfirm ? <em className="price-note">Precio a confirmar en el portal</em> : null}
+        {toConfirm ? null : <span> / mes</span>}
+        {toConfirm ? (
+          <em className="price-note">Precio no confirmado en la tienda pública</em>
+        ) : null}
       </div>
       <ul className="features">
         {plan.features.map((f) => (
@@ -322,9 +326,15 @@ export function PlanCard({
           Comparar
         </label>
       ) : null}
-      <a className="btn primary" href={plan.purchaseUrl} target="_blank" rel="noreferrer">
-        Ordenar →
-      </a>
+      {orderable ? (
+        <a className="btn primary" href={plan.purchaseUrl} target="_blank" rel="noreferrer">
+          Ordenar en el portal →
+        </a>
+      ) : (
+        <Link className="btn secondary" href="/contact">
+          Consultar disponibilidad
+        </Link>
+      )}
     </article>
   );
 }

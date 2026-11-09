@@ -1,5 +1,5 @@
-import type { Catalog, Plan, PlanCategory, VpsLocation } from "@/lib/catalog";
-import { SEED_CATALOG } from "@/lib/catalog";
+import type { Catalog, Plan, PlanCategory, VpsLocation } from "./catalog";
+import { SEED_CATALOG } from "./catalog";
 import { isHttpsUrl, isPlainText } from "@/lib/safe-links";
 
 export type CatalogPayload = Omit<Catalog, "settings">;
@@ -22,9 +22,10 @@ function parsePlan(raw: unknown, fallbackCategory: PlanCategory): Plan | null {
     o.category === "web" || o.category === "vps" || o.category === "dedicated"
       ? o.category
       : fallbackCategory;
-  if (!id || !name || !price) return null;
+  if (!id || !name) return null;
   if (!isPlainText(name, 80) || !isPlainText(description, 400)) return null;
-  if (!isHttpsUrl(purchaseUrl, { allowEmpty: false })) return null;
+  if (price && !isPlainText(price, 24)) return null;
+  if (!isHttpsUrl(purchaseUrl, { allowEmpty: true })) return null;
   const features = Array.isArray(o.features)
     ? o.features
         .filter((f): f is string => typeof f === "string")
@@ -107,7 +108,7 @@ export function validateCatalogPayload(payload: CatalogPayload): string | null {
   for (const plan of all) {
     if (ids.has(plan.id)) return `ID de plan duplicado: ${plan.id}`;
     ids.add(plan.id);
-    if (!isHttpsUrl(plan.purchaseUrl, { allowEmpty: false })) {
+    if (plan.purchaseUrl && !isHttpsUrl(plan.purchaseUrl, { allowEmpty: false })) {
       return `URL de compra inválida en ${plan.name}`;
     }
   }

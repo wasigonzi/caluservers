@@ -1,56 +1,47 @@
-# CaluServers · Next.js 15 + Prisma + WHMCS
+# CaluServers · Next.js 15 + Prisma + WHM de sólo lectura
 
-`main` ya está migrado a Next.js 15 (App Router), TypeScript, Tailwind, Prisma/PostgreSQL y dashboard WHMCS con credenciales cifradas (AES-256-GCM). La web pública premium y los ajustes de sitio (CMS ligero) viven en la rama de producto; no se usa Vite ni Supabase en esta arquitectura.
+Aplicación pública de marketing y panel admin. El pedido y el pago ocurren en el portal WHMCS externo. Este panel no restaura la API WHMCS: esas rutas responden 410. La operación de servidor es WHM / cPanel en sólo lectura (`listaccts`, `listpkgs`).
+
+Los tests de WHM y de Blob usan dobles o el estado «no configurado». **No demuestran conexión real** con un servidor WHM ni con un Blob store.
 
 ## Requisitos
 
-- Node.js 20.9+
-- PostgreSQL (local o gestionado)
-- Variables de entorno (ver `.env.example`)
+- Node.js 22 (o 20.9+)
+- PostgreSQL 16
+- Variables de `.env.example`
 
-## Configuración de base de datos (manual)
-
-1. Copiar `.env.example` → `.env.local` y rellenar:
-   - `DATABASE_URL`
-   - `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` (`npm run admin:hash`)
-   - `AUTH_SECRET` (≥32 caracteres aleatorios)
-   - `SETTINGS_ENCRYPTION_KEY` (64 hex)
-   - `WHMCS_ALLOWED_HOST` (hostname HTTPS permitido para la API)
-   - `BLOB_READ_WRITE_TOKEN` (opcional; subida de branding — ver `docs/SITE_SETTINGS.md`)
-2. Aplicar esquema/migraciones **en tu entorno** (no se ejecutan desde este repositorio hacia producción remota):
-   - Desarrollo: `npx prisma migrate dev` o `npx prisma db push`
-   - Producción: `npx prisma migrate deploy`
-3. Migraciones: `20261106120000_site_settings` (`SiteSetting`) y `20261106140000_catalog_config` (`CatalogConfig`) (ajustes públicos). Sin ella, la web usa defaults de `lib/site-settings.ts` / `SEED_CATALOG`.
-
-## Arranque
+## Instalación limpia
 
 ```bash
-npm install
-npx prisma generate
+npm ci
+cp .env.example .env.local
+# Rellena DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD_HASH (`npm run admin:hash`),
+# AUTH_SECRET (>=32) y SETTINGS_ENCRYPTION_KEY (64 hex).
+npx prisma migrate deploy
 npm run dev
 ```
 
-- Web pública: `/`, `/web-hosting`, `/vps`, `/dedicated`, `/domains`, `/about`, `/contact`, legales, `/abuse`, `/client`
-- Admin: `/admin/login` → dashboard WHMCS, `/admin/settings` (API cifrada), `/admin/site` (Estudio PRO: branding, secciones, catálogo, SEO, nav)
+`prisma migrate deploy` en una base vacía aplica cuatro migraciones: ajustes, catálogo, textos y, al final, `IntegrationConfig` + `AdminAudit`. Una base que ya aplicó las tres primeras recibe solo esa cuarta migración. No edites los SQL antiguos: Prisma guarda su checksum.
 
-## Seguridad
+Sin `AdminAudit`, un guardado no debe publicarse. Contenido y auditoría van en la misma transacción.
 
-- Auth admin por cookie HMAC + scrypt; writes con comprobación de origen (`trustedWrite`).
-- Secretos WHMCS solo en servidor, cifrados en PostgreSQL. Nunca en cliente ni en Git.
-- Acciones WHMCS limitadas a lecturas (`GetClients`, `GetOrders`, `GetInvoices`, `GetProducts`, `GetTickets`, `GetClientsProducts`).
-- Endpoints de ajustes del sitio requieren admin autenticado.
-- No hay service-role ni claves en el navegador.
+MFA es opcional. `npm run admin:totp` imprime un secreto; defínelo como `ADMIN_TOTP_SECRET` para exigir el código. Si la variable no existe, el login sigue siendo email y contraseña. El límite de intentos vive en la memoria del proceso, no en Redis.
 
-## Catálogo
+## Rutas
 
-Planes semilla en `lib/catalog.ts` (referencia pública). La gestión completa de catálogo en panel queda fuera de alcance seguro de este PR; se pueden ampliar modelos Prisma más adelante.
+- Público: `/`, `/web-hosting`, `/vps`, `/dedicated`, `/domains`, `/about`, `/contact`, legales, `/abuse`, `/client`
+- Admin: `/admin/login`, `/admin`, `/admin/site`, `/admin/pages`, `/admin/settings` (WHM)
 
-## Limitaciones
+El aviso de la cabecera es texto manual. No consulta la red. Contacto, abuso y dominios abren el portal externo; esta web no envía tickets ni registra dominios. Los dedicados no tienen producto en la tienda pública, así que no muestran «Ordenar».
 
-- No se modifican pedidos ni se cobran desde esta app.
-- MFA y rate-limit distribuido recomendados antes de producción.
-- Aplicar migraciones y secrets solo en infra controlada.
+## Comprobaciones
 
-## Listo para vender
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:e2e
+```
 
-Ver checklist operativo en `docs/SALES_READY.md` (env, migraciones, WHMCS, Blob). Esta app no cobra: el checkout es WHMCS.
+`npm test` incluye la regresión de migraciones y de rollback cuando `DATABASE_URL` apunta a Postgres. `test:e2e` crea la base `caluservers_e2e` en ese mismo servidor.

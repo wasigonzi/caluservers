@@ -86,11 +86,21 @@ describe("bounded safe DB diagnostics", () => {
 function cmsModule(error) {
   const logs = [];
   const original = { unchanged: "fallback" };
-  const db = { pageContent: {
-    findMany: async () => { throw error; },
-    findUnique: async () => { throw error; },
-    upsert: async () => { throw error; },
-  } };
+  const fail = async () => { throw error; };
+  const db = {
+    $transaction: async (ops) => {
+      if (Array.isArray(ops)) {
+        for (const op of ops) await op;
+        return;
+      }
+      return ops(db);
+    },
+    siteSetting: { findFirst: fail },
+    catalogConfig: { findFirst: fail },
+    pageContent: { findMany: fail, findUnique: fail, findFirst: fail, upsert: fail },
+    adminAudit: { findFirst: fail, create: fail },
+    integrationConfig: { findFirst: fail },
+  };
   const module = { exports: {} };
   const source = readFileSync(new URL("../lib/page-content-db.ts", import.meta.url), "utf8");
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -101,6 +111,7 @@ function cmsModule(error) {
       if (name === "@/lib/db") return { db };
       if (name === "@/lib/db-errors") return { reportDbError: (e, value) => reportDbError(e, value, (...args) => logs.push(args)) };
       if (name === "@/lib/page-content") return { PAGE_PATHS: ["/"], PAGE_DEFS: [], defaultPayload: () => original, mergePagePayload: (_, payload) => payload ?? original, validatePagePayload: () => null };
+      if (name === "@/lib/writes") return { commitPageContent: async () => { throw error; } };
       throw new Error("Unexpected test import");
     },
   });

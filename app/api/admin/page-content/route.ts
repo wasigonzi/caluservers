@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { clientSafeError } from "@/lib/client-error";
 import { trustedWrite } from "@/lib/request";
 import {
   PAGE_DEFS,
@@ -88,17 +89,7 @@ export async function POST(req: NextRequest) {
     const saved = await savePageContent(path, payload);
     return NextResponse.json({ ok: true, path, payload: saved });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Error";
-    const dbFail =
-      /P1001|P1017|P2021|Can't reach database|ECONNREFUSED|timeout/i.test(msg);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: dbFail
-          ? `BD no disponible — guardado rechazado (no es éxito): ${msg.slice(0, 160)}`
-          : msg,
-      },
-      { status: dbFail ? 503 : 400 },
-    );
+    const safe = clientSafeError(e);
+    return NextResponse.json(safe.body, { status: safe.status });
   }
 }

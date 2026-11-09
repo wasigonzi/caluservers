@@ -164,11 +164,17 @@ export default function AdminShell({
       </nav>
       <div className="admin-side-foot">
         {email ? <p className="muted admin-user">{email}</p> : null}
-        <form action="/api/admin/logout" method="post">
-          <button className="btn admin-logout" type="submit">
-            <LogOut size={16} aria-hidden="true" /> Salir
-          </button>
-        </form>
+        <button
+          className="btn admin-logout"
+          type="button"
+          onClick={() => {
+            void fetch("/api/admin/logout", { method: "POST" }).finally(() => {
+              window.location.assign("/admin/login");
+            });
+          }}
+        >
+          <LogOut size={16} aria-hidden="true" /> Salir
+        </button>
         <Link
           className="admin-view-site"
           href="/"

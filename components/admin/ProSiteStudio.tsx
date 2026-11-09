@@ -64,10 +64,12 @@ export default function ProSiteStudio({
   initialSettings,
   initialCatalog,
   blobConfigured = false,
+  storageReady = true,
 }: {
   initialSettings: SiteSettings;
   initialCatalog: CatalogPayload;
   blobConfigured?: boolean;
+  storageReady?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("branding");
   const [compareSaved, setCompareSaved] = useState(false);
@@ -121,7 +123,7 @@ export default function ProSiteStudio({
   }
 
   async function publish() {
-    if (busy) return;
+    if (busy || !storageReady) return;
     setStatus("saving");
     setMessage("");
     try {
@@ -156,6 +158,7 @@ export default function ProSiteStudio({
   }
 
   async function restoreAll() {
+    if (!storageReady) return;
     if (
       !window.confirm(
         "¿Restaurar ajustes y catálogo a los valores por defecto del código? Se sobrescribirán los datos guardados.",
@@ -246,6 +249,12 @@ export default function ProSiteStudio({
           {blobConfigured ? "Subidas disponibles" : "Imágenes por URL"}
         </span>
       </div>
+      {storageReady ? null : (
+        <p className="error" role="status">
+          El almacenamiento no está listo. No se publicará nada hasta que las
+          migraciones creen las tablas de contenido y de auditoría.
+        </p>
+      )}
       <div className="pro-toolbar">
         <label className="pro-search">
           <span className="sr-only">Buscar ajustes</span>
@@ -270,7 +279,7 @@ export default function ProSiteStudio({
           <button
             type="button"
             className="btn secondary"
-            disabled={busy}
+            disabled={busy || !storageReady}
             onClick={restoreAll}
           >
             Restaurar defaults
@@ -278,7 +287,7 @@ export default function ProSiteStudio({
           <button
             type="button"
             className="btn"
-            disabled={busy || !dirty}
+            disabled={busy || !dirty || !storageReady}
             onClick={publish}
           >
             {status === "saving" ? "Publicando…" : "Guardar y publicar"}
@@ -665,11 +674,15 @@ export default function ProSiteStudio({
             />
           </label>
           <label className="field">
-            Estado de la red
+            Aviso manual (no es monitorización)
             <input
               value={settings.networkStatus}
               onChange={(e) => patchSettings("networkStatus", e.target.value)}
             />
+            <small>
+              Texto informativo. Esta aplicación no consulta servidores ni el
+              portal para saber si la red está operativa.
+            </small>
           </label>
           <label className="field">
             Email
@@ -1199,7 +1212,7 @@ export default function ProSiteStudio({
         <button
           type="button"
           className="btn"
-          disabled={busy || !dirty}
+          disabled={busy || !dirty || !storageReady}
           onClick={publish}
         >
           {status === "saving" ? "Publicando…" : "Guardar y publicar"}

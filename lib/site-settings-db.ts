@@ -4,10 +4,10 @@ import { reportDbError } from "@/lib/db-errors";
 import {
   DEFAULT_SITE_SETTINGS,
   parseSiteSettings,
-  settingsToRows,
   validateSiteSettings,
   type SiteSettings,
 } from "@/lib/site-settings";
+import { commitSiteSettings } from "@/lib/writes";
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   try {
@@ -26,21 +26,6 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 export async function saveSiteSettings(settings: SiteSettings): Promise<SiteSettings> {
   const error = validateSiteSettings(settings);
   if (error) throw new Error(error);
-  const rows = settingsToRows(settings);
-  await db.$transaction(
-    rows.map((row) =>
-      db.siteSetting.upsert({
-        where: { key: row.key },
-        create: { key: row.key, value: row.value as object },
-        update: { value: row.value as object },
-      }),
-    ),
-  );
-  await db.adminAudit.create({
-    data: {
-      action: "site.settings.updated",
-      details: "Site settings updated (no secrets)",
-    },
-  });
+  await commitSiteSettings(settings);
   return settings;
 }

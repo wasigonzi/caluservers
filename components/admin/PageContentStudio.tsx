@@ -104,7 +104,7 @@ export default function PageContentStudio({
       setSaved((p) => ({ ...p, [path]: data.payload }));
       setStatus("saved");
       setMessage("Guardado en base de datos");
-      setDb({ ok: true, missingMigration: false, message: "PageContent listo" });
+      setDb({ ok: true, missingMigration: false, message: "Almacenamiento listo" });
     } catch {
       setStatus("error");
       setMessage("Error de red");
@@ -150,16 +150,16 @@ export default function PageContentStudio({
         <div className="pro-actions">
           {dirty ? <span className="pill warn">Cambios sin guardar</span> : null}
           <span className={`pill ${db.ok ? "ok" : "warn"}`}>
-            {db.ok ? "DB lista" : "BD no usable — sin guardado"}
+            {db.ok ? "Almacenamiento listo" : "BD no usable — sin guardado"}
           </span>
         </div>
       </div>
 
       {!db.ok ? (
         <p className="error" role="status">
-          {db.message} Los cambios en pantalla NO se persisten. Requiere Postgres
-          alcanzable + <code>npx prisma migrate deploy</code> (PageContent). La
-          configuración Supabase/Vercel actual no es funcional hasta corregir URL/credenciales.
+          {db.message} Los cambios en pantalla no se publican. Hace falta
+          Postgres alcanzable y <code>npx prisma migrate deploy</code>, incluidas
+          las tablas de auditoría.
         </p>
       ) : null}
 

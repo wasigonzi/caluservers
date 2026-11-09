@@ -14,7 +14,7 @@ Usa `IntegrationConfig.id=whm` explícito: URL canónica y credenciales cifradas
 
 Red: todos los DNS A/AAAA deben ser públicos; conexión fijada a una dirección validada, identidad TLS/Host original, sin redirecciones. DNS 3s, petición 10s, cuerpo máximo 2MiB, hasta 100 filas mostradas con total de la respuesta completa y aviso de truncamiento. Payload admin máximo 8KiB. Las llamadas sólo salen del POST protegido por sesión admin y Origin mismo sitio. Datos públicos/CMS/Blob/catálogo y enlaces de compra existentes permanecen intactos; WHM no representa pedidos, cobros o facturas.
 
-Sin credenciales reales sólo se ejecutan tests locales con mocks; desplegar no demuestra conectividad WHM desde Vercel. Deben completarse los datos y probar ambas lecturas desde el admin.
+Sin credenciales reales sólo se ejecutan tests locales con mocks. Esos dobles y un despliegue no demuestran conectividad WHM. Hay que guardar la URL, el usuario y el token, y pulsar Probar conexión desde el admin.
 
 Fuentes oficiales:
 - https://api.docs.cpanel.net/whm/tokens

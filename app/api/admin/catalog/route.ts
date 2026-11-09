@@ -6,6 +6,7 @@ import {
   restoreCatalogPayload,
   saveCatalogPayload,
 } from "@/lib/catalog-db";
+import { clientSafeError } from "@/lib/client-error";
 import { seedCatalogPayload } from "@/lib/catalog-validate";
 
 export const runtime = "nodejs";
@@ -42,9 +43,7 @@ export async function POST(req: NextRequest) {
     const catalog = await saveCatalogPayload(body?.catalog ?? body);
     return NextResponse.json({ ok: true, catalog });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error" },
-      { status: 400 },
-    );
+    const safe = clientSafeError(e);
+    return NextResponse.json(safe.body, { status: safe.status });
   }
 }

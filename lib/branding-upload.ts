@@ -33,10 +33,11 @@ function startsWith(bytes: Uint8Array, sig: number[]): boolean {
 export function detectImageMagic(bytes: Uint8Array): DetectedImage | null {
   if (!bytes.length) return null;
   // SVG / HTML / XML activos
-  const head = new TextDecoder("utf-8", { fatal: false })
-    .decode(bytes.slice(0, 256))
-    .trimStart()
-    .toLowerCase();
+  let head = "";
+  for (let i = 0; i < Math.min(bytes.length, 256); i += 1) {
+    head += String.fromCharCode(bytes[i]);
+  }
+  head = head.trimStart().toLowerCase();
   if (
     head.startsWith("<svg") ||
     head.startsWith("<?xml") ||
@@ -155,7 +156,28 @@ export function randomBrandingPathname(
   return `branding/${slot}/${randomPart}.${safeExt}`;
 }
 
-/** ¿La URL pertenece a un blob público típico de Vercel Blob? */
+/**
+ * Checks bytes for every upload path, including the client-upload callback.
+ * Invalid bytes are deleted. A passing double is not a live Blob connection.
+ */
+export async function reviewUploadedBranding(input: {
+  slot: string;
+  bytes: Uint8Array;
+  url: string;
+  remove: (url: string) => Promise<void>;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isBrandingSlot(input.slot)) {
+    await input.remove(input.url);
+    return { ok: false, error: "Slot de branding inválido." };
+  }
+  const checked = validateBrandingBytes(input.slot, input.bytes);
+  if (!checked.ok) {
+    await input.remove(input.url);
+    return checked;
+  }
+  return { ok: true };
+}
+
 export function isVercelBlobUrl(url: string): boolean {
   try {
     const u = new URL(url);
