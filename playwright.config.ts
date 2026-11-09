@@ -35,7 +35,7 @@ export default defineConfig({
       BETTER_AUTH_SECRET: E2E_AUTH_SECRET,
       BETTER_AUTH_URL: baseURL,
       BILLING_CURRENCY: "USD",
-      TAX_MODE: "none",
+      TAX_MODE: "",
       MAIL_SINK_DIR: "/tmp/calu-mail-e2e",
       MAIL_FROM: "no-reply@example.com",
     },
