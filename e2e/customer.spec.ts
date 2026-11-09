@@ -56,6 +56,14 @@ test("registro, proforma en USD y ticket", async ({ page }) => {
   await expect(page.getByText("399 USD", { exact: true })).toHaveCount(0);
   await page.getByRole("heading", { name: "Facturas", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/opt/cursor/artifacts/e2e-account.png" });
+  await page.getByRole("button", { name: "Pagar en PayPal (pruebas)" }).click();
+  await expect(page.getByRole("heading", { name: "Simulador de PayPal" })).toBeVisible();
+  await expect(page.getByText("sin dinero real").first()).toBeVisible();
+  await page.getByRole("button", { name: "Aprobar en el simulador" }).click();
+  await expect(page.getByTestId("paypal-server-status")).toContainText("3,99 USD");
+  await expect(page.getByTestId("paypal-server-status")).toContainText("PRUEBAS");
+  await expect(page.getByTestId("paypal-server-status")).toContainText("proforma");
+  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-paypal-sandbox.png" });
   await page.goto("/admin/login");
   await page.locator('input[type="email"]').fill(E2E_EMAIL);
   await page.locator('input[type="password"]').fill(E2E_PASSWORD);
@@ -67,7 +75,9 @@ test("registro, proforma en USD y ticket", async ({ page }) => {
   await expect(page.getByText("Pago bloqueado").first()).toBeVisible();
   await expect(page.getByText("Puerto Rico").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirmar pago manual" })).toHaveCount(0);
-  await expect(page.getByText("No hay servicios")).toBeVisible();
+  await expect(page.getByText("PRUEBAS · pago de prueba capturado, sin dinero real").first()).toBeVisible();
+  await expect(page.getByText("Pendiente de alta manual en este panel")).toBeVisible();
+  await expect(page.getByText("Marcado activo solo en este panel")).toHaveCount(0);
   await expect(page.getByText("399 USD", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/11[,.]5|IVU/i)).toHaveCount(0);
   await page.getByRole("heading", { name: "Facturas", exact: true }).scrollIntoViewIfNeeded();

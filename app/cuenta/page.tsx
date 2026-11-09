@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AccountFrame } from "@/components/account/AccountFrame";
 import { SignOutButton } from "@/components/account/AccountForms";
 import { FiscalNotice } from "@/components/account/FiscalNotice";
+import { PaypalSandboxButton } from "@/components/account/PaypalSandboxActions";
 import { db } from "@/lib/db";
 import { customerSession } from "@/lib/customer-session";
 import {
@@ -12,21 +13,26 @@ import {
   orderStatusLabel,
   paymentStatusLabel,
   serviceStatusLabel,
+  sandboxCheckoutLabel,
   taxModeLabel,
   ticketStatusLabel,
   WHM_ACTIVATION_NOTE,
 } from "@/lib/money";
+import { billingPolicy } from "@/lib/commerce";
+import { paypalRuntime } from "@/lib/paypal-sandbox";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountHome() {
   const session = await customerSession();
   if (!session?.user.emailVerified) redirect("/cuenta/entrar");
+  const paypal = paypalRuntime();
+  const fiscalTest = paypal.ok && (paypal.testFiscal || billingPolicy().ok);
   const [orders, invoices, services, tickets] = await Promise.all([
     db.customerOrder.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: "desc" } }),
     db.customerInvoice.findMany({
       where: { userId: session.user.id },
-      include: { payment: true },
+      include: { payment: true, paypalCheckouts: { orderBy: { createdAt: "desc" }, take: 1 } },
       orderBy: { createdAt: "desc" },
     }),
     db.customerService.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: "desc" } }),
@@ -83,19 +89,25 @@ export default async function AccountHome() {
                   <th scope="col">Impuesto</th>
                   <th scope="col">Pago</th>
                   <th scope="col">Fecha</th>
+                  <th scope="col">Sandbox</th>
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice) => (
+                {invoices.map((invoice) => {
+                  const sandbox = invoice.paypalCheckouts[0];
+                  const canTry = fiscalTest && !invoice.payment && sandbox?.status !== "captured" && invoice.status !== "void";
+                  return (
                   <tr key={invoice.id}>
                     <td data-label="Número">{invoice.number}</td>
                     <td data-label="Importe" className="account-price">{formatMinorAmount(invoice.totalCents, invoice.currency)}</td>
                     <td data-label="Estado">{invoiceStatusLabel(invoice.status, invoice.payment?.status === "confirmed")}</td>
                     <td data-label="Impuesto">{taxModeLabel(invoice.taxMode)}</td>
-                    <td data-label="Pago">{paymentStatusLabel(invoice.payment?.status)}</td>
+                    <td data-label="Pago">{sandbox ? sandboxCheckoutLabel(sandbox.status) : paymentStatusLabel(invoice.payment?.status)}</td>
                     <td data-label="Fecha"><time dateTime={invoice.createdAt.toISOString()}>{formatDateTime(invoice.createdAt)}</time></td>
+                    <td data-label="Sandbox">{canTry ? <PaypalSandboxButton invoiceId={invoice.id} /> : sandbox ? "PRUEBAS · sin dinero real" : null}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

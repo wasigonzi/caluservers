@@ -13,6 +13,7 @@ import {
   formatMinorAmount,
   invoiceStatusLabel,
   paymentStatusLabel,
+  sandboxCheckoutLabel,
   serviceStatusLabel,
   taxModeLabel,
   ticketStatusLabel,
@@ -25,7 +26,7 @@ export default async function CommerceAdminPage() {
   const policy = billingPolicy();
   const [customers, invoices, services, tickets] = await Promise.all([
     db.user.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
-    db.customerInvoice.findMany({ include: { payment: true, order: true }, orderBy: { createdAt: "desc" }, take: 50 }),
+    db.customerInvoice.findMany({ include: { payment: true, order: true, paypalCheckouts: { orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { createdAt: "desc" }, take: 50 }),
     db.customerService.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     db.supportTicket.findMany({ include: { messages: { orderBy: { createdAt: "asc" } }, user: true }, orderBy: { updatedAt: "desc" }, take: 50 }),
   ]);
@@ -96,7 +97,7 @@ export default async function CommerceAdminPage() {
                       <td data-label="Importe" className="account-price">{formatMinorAmount(invoice.totalCents, invoice.currency)}</td>
                       <td data-label="Estado">{invoiceStatusLabel(invoice.status, paid)}</td>
                       <td data-label="Impuesto">{taxModeLabel(invoice.taxMode)}</td>
-                      <td data-label="Pago">{paymentStatusLabel(invoice.payment?.status)}</td>
+                      <td data-label="Pago">{invoice.paypalCheckouts[0] ? sandboxCheckoutLabel(invoice.paypalCheckouts[0].status) : paymentStatusLabel(invoice.payment?.status)}</td>
                       <td data-label="Fecha"><time dateTime={invoice.createdAt.toISOString()}>{formatDateTime(invoice.createdAt)}</time></td>
                       <td data-label="Acción">
                         {invoice.taxMode === "none" && !invoice.payment ? <AdminCommerceForms invoiceId={invoice.id} /> : null}

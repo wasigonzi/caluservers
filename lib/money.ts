@@ -97,6 +97,17 @@ export function taxModeLabel(mode: string): string {
   return "Política fiscal no reconocida";
 }
 
+export function sandboxCheckoutLabel(status: string | null | undefined): string {
+  if (status === "captured") return "PRUEBAS · pago de prueba capturado, sin dinero real";
+  if (status === "capture_pending") return "PRUEBAS · captura pendiente";
+  if (status === "approved") return "PRUEBAS · aprobado, sin confirmación del servidor";
+  if (status === "created") return "PRUEBAS · checkout creado";
+  if (status === "denied") return "PRUEBAS · pago denegado";
+  if (status === "cancelled") return "PRUEBAS · pago cancelado";
+  if (status === "failed") return "PRUEBAS · pago fallido";
+  return "PRUEBAS · estado no reconocido";
+}
+
 export function paymentStatusLabel(status: string | null | undefined): string {
   if (!status) return "Sin pago";
   if (status === "confirmed") return "Pago manual confirmado";

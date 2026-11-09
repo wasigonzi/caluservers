@@ -166,6 +166,7 @@ model CustomerInvoice {
   createdAt  DateTime @default(now())
   lines      InvoiceLine[]
   payment    ManualPayment?
+  paypalCheckouts PaypalCheckout[]
 }
 
 model InvoiceLine {
@@ -225,6 +226,44 @@ model TicketMessage {
   author    String
   body      String
   createdAt DateTime      @default(now())
+}
+
+/// Intento de checkout en PayPal sandbox. No representa un cobro live.
+model PaypalCheckout {
+  id              String          @id @default(cuid())
+  invoiceId       String
+  invoice         CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  userId          String
+  idempotencyKey  String
+  paypalOrderId   String
+  currency        String
+  amountCents     Int
+  status          String
+  approveUrl      String
+  captureId       String?
+  testFiscal      Boolean         @default(false)
+  buyerApproved   Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([idempotencyKey])
+  @@unique([paypalOrderId])
+  @@unique([captureId])
+  @@index([invoiceId])
+  @@index([userId])
+}
+
+/// Evento de webhook ya visto. La unicidad corta reintentos y repeticiones.
+model PaypalEvent {
+  id             String   @id @default(cuid())
+  eventId        String
+  transmissionId String
+  eventType      String
+  outcome        String
+  createdAt      DateTime @default(now())
+
+  @@unique([eventId])
+  @@unique([transmissionId])
 }
 
 model CommerceEvent {
