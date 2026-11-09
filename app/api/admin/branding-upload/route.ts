@@ -13,6 +13,7 @@ import {
   isVercelBlobUrl,
   maxBytesForSlot,
   randomBrandingPathname,
+  reviewUploadedBranding,
   validateBrandingBytes,
   type BrandingSlot,
 } from "@/lib/branding-upload";
@@ -126,8 +127,30 @@ export async function POST(req: NextRequest) {
             tokenPayload: JSON.stringify({ slot }),
           };
         },
-        onUploadCompleted: async () => {
-          // La publicación en SiteSetting la hace el admin con «Guardar y publicar».
+        onUploadCompleted: async ({ blob, tokenPayload }) => {
+          let slot: BrandingSlot = "logoUrl";
+          try {
+            const parsed = tokenPayload
+              ? (JSON.parse(tokenPayload) as { slot?: string })
+              : {};
+            if (parsed.slot && isBrandingSlot(parsed.slot)) slot = parsed.slot;
+          } catch {
+            await del(blob.url);
+            throw new Error("tokenPayload inválido");
+          }
+          const response = await fetch(blob.url);
+          if (!response.ok) {
+            await del(blob.url);
+            throw new Error("No se pudo leer el archivo subido.");
+          }
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          const reviewed = await reviewUploadedBranding({
+            slot,
+            bytes,
+            url: blob.url,
+            remove: (url) => del(url),
+          });
+          if (!reviewed.ok) throw new Error(reviewed.error);
         },
       });
       return NextResponse.json(jsonResponse);

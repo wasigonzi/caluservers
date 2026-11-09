@@ -203,8 +203,9 @@ test("upload uses existing authenticated endpoint, preserves slot and reports tr
   };
   const render = () => h.render(Field, props);
   const file = nodes(render(), (n) => n.props?.type === "file")[0];
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   await file.props.onChange({
-    target: { files: [new File(["png"], "probe.png", { type: "image/png" })] },
+    target: { files: [new File([png], "probe.png", { type: "image/png" })] },
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "/api/admin/branding-upload");
@@ -284,9 +285,17 @@ test("large file uses existing Blob client and real progress callback; failure p
   )[0].props.onChange({
     target: {
       files: [
-        new File([new Uint8Array(4 * 1024 * 1024 + 1)], "large.png", {
-          type: "image/png",
-        }),
+        new File(
+          [
+            (() => {
+              const bytes = new Uint8Array(4 * 1024 * 1024 + 1);
+              bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+              return bytes;
+            })(),
+          ],
+          "large.png",
+          { type: "image/png" },
+        ),
       ],
     },
   });

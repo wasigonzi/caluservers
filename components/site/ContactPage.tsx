@@ -14,10 +14,10 @@ export default function Contact() {
   const kicker = useCopy("kicker", "Contacto");
   const title = useCopy("title", "Hablemos.");
   const lead = useCopy("lead", catalog.settings.content.contactLead);
-  const submitLabel = useCopy("submitLabel", "Enviar mensaje");
+  const submitLabel = useCopy("submitLabel", "Continuar en el portal");
   const formNote = useCopy(
     "formNote",
-    "Tu mensaje abre un ticket en nuestro portal de cliente, donde el equipo te responde.",
+    "No se envía correo desde esta web. El botón abre el portal externo con el texto para que crees el ticket allí.",
   );
   const labelName = useCopy("labelName", "Nombre");
   const labelEmail = useCopy("labelEmail", "Email");
@@ -108,6 +108,10 @@ export default function Contact() {
             {submitLabel}
           </button>
           <p className="muted">{formNote}</p>
+          <p className="notice">
+            Este sitio no envía correos ni tickets. El botón abre el portal de
+            cliente en otra pestaña.
+          </p>
         </form>
       </section>
     </>

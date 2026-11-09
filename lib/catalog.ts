@@ -2,8 +2,10 @@
 // (api.php?action=public-config, 2026-11-05). NO editar a mano: regenerar.
 // Dedicados: el catálogo en vivo trae 0 planes; estos 5 son los defaults del
 // código original (app.js). Confirmar con el dueño si siguen vigentes.
-// Precio "$0.00" (VPS New York / Normal) es un error de datos en vivo: se
-// conserva tal cual y la UI lo muestra como "Consultar" (ver isPriceToConfirm).
+// Precios de hosting y VPS contrastados el 2026-11-09 con las páginas públicas
+// de grupo de la tienda (no con el checkout). New York / Normal figura como
+// «Desde $12.99/mes». Los dedicados no aparecen: dedicated y dedicated-servers
+// redirigen a web hosting, así que no llevan precio ni botón de pedido.
 
 export type PlanCategory = "web" | "vps" | "dedicated";
 
@@ -238,7 +240,7 @@ export const SEED_CATALOG: Catalog = {
     {
       id: "wh2",
       category: "web",
-      name: "Calu Business",
+      name: "Calu Corporate",
       price: "$9.99",
       description: "Más velocidad y potencia de procesamiento.",
       features: ["100 GB NVMe SSD", "Unlimited Websites", "Unlimited Email Accounts", "Free SSL", "cPanel", "Softaculous Premium — 250+ Scripts"],
@@ -363,7 +365,7 @@ export const SEED_CATALOG: Catalog = {
       id: "plan-1793755011801",
       category: "vps",
       name: "Normal",
-      price: "$0.00",
+      price: "$12.99",
       description: "4 vCores · AMD Ryzen 9 · 8GB DDR5",
       features: ["4 vCores", "AMD Ryzen 9", "8GB DDR5", "100 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
@@ -545,11 +547,11 @@ export const SEED_CATALOG: Catalog = {
       id: "ded0",
       category: "dedicated",
       name: "Dedicated Entry",
-      price: "$79.99",
-      description: "Intel Xeon · 8 Cores · 32 GB RAM · 2× 1 TB SSD",
+      price: "",
+      description: "Referencia no publicada en la tienda. Intel Xeon · 8 Cores · 32 GB RAM · 2× 1 TB SSD",
       features: ["Hardware físico dedicado", "Opciones de gestión remota", "Red configurable", "Opciones de protección DDoS", "Selección de sistema operativo"],
       locationId: "",
-      purchaseUrl: "https://client.caluservers.com/cart.php",
+      purchaseUrl: "",
       sortOrder: 0,
       active: true,
     },
@@ -557,11 +559,11 @@ export const SEED_CATALOG: Catalog = {
       id: "ded1",
       category: "dedicated",
       name: "Dedicated Performance",
-      price: "$109.99",
-      description: "AMD Ryzen · 8 Cores · 64 GB RAM · 2× 1 TB NVMe",
+      price: "",
+      description: "Referencia no publicada en la tienda. AMD Ryzen · 8 Cores · 64 GB RAM · 2× 1 TB NVMe",
       features: ["Hardware físico dedicado", "Opciones de gestión remota", "Red configurable", "Opciones de protección DDoS", "Selección de sistema operativo"],
       locationId: "",
-      purchaseUrl: "https://client.caluservers.com/cart.php",
+      purchaseUrl: "",
       sortOrder: 1,
       active: true,
     },
@@ -569,11 +571,11 @@ export const SEED_CATALOG: Catalog = {
       id: "ded2",
       category: "dedicated",
       name: "Dedicated Professional",
-      price: "$149.99",
-      description: "AMD Ryzen · 12 Cores · 64 GB RAM · 2× 2 TB NVMe",
+      price: "",
+      description: "Referencia no publicada en la tienda. AMD Ryzen · 12 Cores · 64 GB RAM · 2× 2 TB NVMe",
       features: ["Hardware físico dedicado", "Opciones de gestión remota", "Red configurable", "Opciones de protección DDoS", "Selección de sistema operativo"],
       locationId: "",
-      purchaseUrl: "https://client.caluservers.com/cart.php",
+      purchaseUrl: "",
       sortOrder: 2,
       active: true,
     },
@@ -581,11 +583,11 @@ export const SEED_CATALOG: Catalog = {
       id: "ded3",
       category: "dedicated",
       name: "Dedicated Enterprise",
-      price: "$219.99",
-      description: "AMD EPYC · 16 Cores · 128 GB RAM · 2× 2 TB NVMe",
+      price: "",
+      description: "Referencia no publicada en la tienda. AMD EPYC · 16 Cores · 128 GB RAM · 2× 2 TB NVMe",
       features: ["Hardware físico dedicado", "Opciones de gestión remota", "Red configurable", "Opciones de protección DDoS", "Selección de sistema operativo"],
       locationId: "",
-      purchaseUrl: "https://client.caluservers.com/cart.php",
+      purchaseUrl: "",
       sortOrder: 3,
       active: true,
     },
@@ -593,11 +595,11 @@ export const SEED_CATALOG: Catalog = {
       id: "ded4",
       category: "dedicated",
       name: "Dedicated Ultimate",
-      price: "$329.99",
-      description: "AMD EPYC · 24 Cores · 256 GB RAM · 4× 2 TB NVMe",
+      price: "",
+      description: "Referencia no publicada en la tienda. AMD EPYC · 24 Cores · 256 GB RAM · 4× 2 TB NVMe",
       features: ["Hardware físico dedicado", "Opciones de gestión remota", "Red configurable", "Opciones de protección DDoS", "Selección de sistema operativo"],
       locationId: "",
-      purchaseUrl: "https://client.caluservers.com/cart.php",
+      purchaseUrl: "",
       sortOrder: 4,
       active: true,
     }
@@ -686,7 +688,7 @@ export const SEED_CATALOG: Catalog = {
       text: "#F4F4F4",
       gradient: "linear-gradient(105deg,#00E5FF 0%,#00B8D9 55%,#0099c9 100%)",
     },
-    networkStatus: "Todos los sistemas están operativos",
+    networkStatus: "Sin monitorización automática en este sitio.",
     contact: {
       email: "soporte@caluservers.com",
       phone: "",
@@ -704,7 +706,7 @@ export const SEED_CATALOG: Catalog = {
       heroCtaPrimaryHref: "/web-hosting",
       heroCtaSecondaryHref: "/vps",
       contactLead:
-        "Nuestro equipo está listo para ayudarte con ventas, soporte técnico y preguntas de cuenta.",
+        "El formulario no envía el mensaje. Abre el portal de cliente para crear el ticket allí.",
       footerBlurb: "Soporte 24/7 por ticket, en inglés y español.",
       servicesKicker: "Nuestros servicios",
       servicesTitle: "Infraestructura que te impulsa hacia adelante.",

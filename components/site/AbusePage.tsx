@@ -20,10 +20,10 @@ export default function Abuse() {
     "lead",
     "Reporta spam, phishing, malware, infracción de copyright o abuso de red.",
   );
-  const submitLabel = useCopy("submitLabel", "Enviar reporte");
+  const submitLabel = useCopy("submitLabel", "Continuar en el portal");
   const formNote = useCopy(
     "formNote",
-    "Los reportes se canalizan a nuestro buzón de abuso monitoreado.",
+    "Este formulario no envía el reporte. Abre el portal de cliente para registrar el ticket de abuso allí.",
   );
   const labelName = useCopy("labelName", "Tu nombre");
   const labelEmail = useCopy("labelEmail", "Email");
@@ -111,6 +111,9 @@ export default function Abuse() {
             {submitLabel}
           </button>
           <p className="muted">{formNote}</p>
+          <p className="notice">
+            Este sitio no envía el reporte. El botón abre el portal externo.
+          </p>
         </form>
       </section>
     </>

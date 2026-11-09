@@ -27,8 +27,9 @@ Migraciones: `SiteSetting`, `CatalogConfig`.
 ## 3. WHMCS
 
 - Credenciales API de **solo lectura** en `/admin/settings` (cifradas).
-- Productos/enlaces `purchaseUrl` del catálogo deben coincidir con el store WHMCS.
-- Dominios: el buscador redirige a `cart.php?a=add&domain=register` — verificar en el portal.
+- Los enlaces `purchaseUrl` de hosting y VPS deben seguir siendo productos concretos de la tienda. Un `cart.php` sin producto no muestra «Ordenar».
+- Dedicados: la tienda pública no los lista. La web muestra consulta, no un pedido.
+- Dominios: el buscador abre `cart.php?a=add&domain=register` en el portal. Esta web no comprueba disponibilidad.
 - No uses este panel para cobrar; el cobro es WHMCS.
 
 ## 4. Vercel / Blob
@@ -38,7 +39,7 @@ Migraciones: `SiteSetting`, `CatalogConfig`.
 
 ## 5. Contenido comercial
 
-- Revisar precios `$0.00` (= «Consultar») en VPS NY si aplica.
+- El precio público de VPS New York / Normal es «Desde $12.99/mes» (listado de tienda, 2026-11-09). No publiques `$0.00`.
 - Publicar branding/SEO desde `/admin/site`.
 - Probar en móvil la bottom nav y un flujo hasta el carrito WHMCS **sin pagar**.
 
@@ -46,4 +47,4 @@ Migraciones: `SiteSetting`, `CatalogConfig`.
 
 - SLA contractual, uptime legal, impuestos, chargebacks.
 - Envío de leads por formulario propio (contacto abre ticket WHMCS).
-- MFA admin / rate-limit distribuido (recomendado antes de producción).
+- MFA admin sigue siendo opcional (`ADMIN_TOTP_SECRET`). El límite de login ya está en Postgres y se comparte entre instancias.

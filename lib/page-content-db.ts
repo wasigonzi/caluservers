@@ -8,6 +8,7 @@ import {
   mergePagePayload,
   validatePagePayload,
 } from "@/lib/page-content";
+import { commitPageContent } from "@/lib/writes";
 
 export type PageContentMap = Record<string, Record<string, string>>;
 
@@ -44,20 +45,7 @@ export async function savePageContent(
 ): Promise<Record<string, string>> {
   const err = validatePagePayload(path, payload);
   if (err) throw new Error(err);
-  const merged = mergePagePayload(path, payload);
-  await db.pageContent.upsert({
-    where: { path },
-    create: { path, payload: merged },
-    update: { payload: merged },
-  });
-  await db.adminAudit.create({
-    data: {
-      action: "page.content.updated",
-      entityId: path,
-      details: `Page content updated for ${path}`,
-    },
-  });
-  return merged;
+  return commitPageContent(path, payload);
 }
 
 export async function restorePageContent(path: string): Promise<Record<string, string>> {
@@ -65,24 +53,33 @@ export async function restorePageContent(path: string): Promise<Record<string, s
   return savePageContent(path, defaults);
 }
 
-export async function pageContentDbReady(): Promise<{
+export async function cmsStorageReady(): Promise<{
   ok: boolean;
   missingMigration: boolean;
   message: string;
 }> {
   try {
-    await db.pageContent.findMany({ take: 1 });
-    return { ok: true, missingMigration: false, message: "PageContent listo" };
+    await db.siteSetting.findFirst({ select: { key: true } });
+    await db.catalogConfig.findFirst({ select: { id: true } });
+    await db.pageContent.findFirst({ select: { path: true } });
+    await db.adminAudit.findFirst({ select: { id: true } });
+    await db.integrationConfig.findFirst({ select: { id: true } });
+    await db.loginThrottle.findFirst({ select: { id: true } });
+    return { ok: true, missingMigration: false, message: "Almacenamiento listo" };
   } catch (error) {
     const { missingMigration } = reportDbError(error, process.env.DATABASE_URL);
     return {
       ok: false,
       missingMigration,
       message: missingMigration
-        ? "Falta una tabla requerida del CMS. El guardado no está disponible; revisar migraciones."
-        : "BD no usable. El guardado no está disponible. Consultar los registros del servidor.",
+        ? "Faltan tablas de contenido o de auditoría. Ejecuta prisma migrate deploy. El guardado está desactivado."
+        : "Base de datos no usable. El guardado está desactivado.",
     };
   }
+}
+
+export async function pageContentDbReady() {
+  return cmsStorageReady();
 }
 
 export function pageCatalogMeta() {

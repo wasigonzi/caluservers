@@ -8,6 +8,7 @@ import {
   acceptAttrForSlot,
   maxBytesForSlot,
   randomBrandingPathname,
+  validateBrandingBytes,
   type BrandingSlot,
 } from "@/lib/branding-upload";
 
@@ -52,6 +53,12 @@ export default function BrandingAssetField({
     }
     if (file.size > max) {
       setError(`Máximo ${Math.round(max / (1024 * 1024))} MB para este campo.`);
+      return;
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const checked = validateBrandingBytes(slot, bytes);
+    if (!checked.ok) {
+      setError(checked.error);
       return;
     }
     // Rechazo SVG por extensión/tipo declarado (el servidor valida magic bytes)

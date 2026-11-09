@@ -13,7 +13,7 @@ export default function Domains() {
   const inputRef = useRef<HTMLInputElement>(null);
   const searchHint = useCopy(
     "searchHint",
-    "La disponibilidad se verifica en el portal de cliente (WHMCS), con tu registrador de dominios.",
+    "No se consulta la disponibilidad aquí. El botón abre el portal de cliente para verificar y registrar el dominio.",
   );
   const [message, setMessage] = useState(searchHint);
 
@@ -22,19 +22,19 @@ export default function Domains() {
   const titleAccent = useCopy("titleAccent", "tu lugar en línea.");
   const lead = useCopy(
     "lead",
-    "Busca tu dominio y gestiona registros y transferencias desde un solo lugar.",
+    "Esta página no registra dominios. La búsqueda abre el portal externo para comprobar disponibilidad y completar el registro allí.",
   );
   const searchPlaceholder = useCopy(
     "searchPlaceholder",
     "Escribe tu dominio perfecto",
   );
-  const searchButton = useCopy("searchButton", "Buscar dominio →");
+  const searchButton = useCopy("searchButton", "Abrir portal →");
   const stepsKicker = useCopy("stepsKicker", "Cómo funciona");
   const stepsTitle = useCopy("stepsTitle", "Tu dominio,");
   const stepsTitleAccent = useCopy("stepsTitleAccent", "en tres pasos.");
   const stepsLead = useCopy(
     "stepsLead",
-    "La búsqueda y la verificación de disponibilidad se hacen en el portal de cliente, con tu registrador de dominios.",
+    "La comprobación y el registro ocurren en el portal externo, no en esta web.",
   );
   const stepItems = [
     {
@@ -138,6 +138,10 @@ export default function Domains() {
         </div>
         <p className="notice" id="domain-result">
           {message}
+        </p>
+        <p className="notice">
+          La disponibilidad no se consulta en este sitio. Buscar abre el portal
+          externo y no completa un registro aquí.
         </p>
         <section className="section">
           <SectionHead
