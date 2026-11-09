@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Palette,
   FileText,
+  Users,
   Server,
   Package,
   Settings,
@@ -19,6 +20,7 @@ const NAV_ICONS = {
   "/admin": LayoutDashboard,
   "/admin/site": Palette,
   "/admin/pages": FileText,
+  "/admin/comercio": Users,
   "/admin/accounts": Server,
   "/admin/packages": Package,
   "/admin/settings": Settings,
@@ -36,6 +38,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "Marca y sitio", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
+      { label: "Clientes propios", href: "/admin/comercio" },
     ],
   },
   {

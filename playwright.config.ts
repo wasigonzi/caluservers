@@ -32,6 +32,12 @@ export default defineConfig({
       NEXT_PUBLIC_SITE_URL: baseURL,
       BLOB_READ_WRITE_TOKEN: "",
       ADMIN_TOTP_SECRET: "",
+      BETTER_AUTH_SECRET: E2E_AUTH_SECRET,
+      BETTER_AUTH_URL: baseURL,
+      BILLING_CURRENCY: "USD",
+      TAX_MODE: "none",
+      MAIL_SINK_DIR: "/tmp/calu-mail-e2e",
+      MAIL_FROM: "no-reply@example.com",
     },
   },
 });
