@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { E2E_EMAIL, E2E_PASSWORD } from "./fixtures";
@@ -15,7 +16,7 @@ async function latestLink() {
 test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await rm(sink, { recursive: true, force: true });
   const email = `cliente-${Date.now()}@example.com`;
-  const password = "clave-segura-12";
+  const password = `Pw-${randomBytes(9).toString("hex")}`;
   await page.goto("/cuenta/registro");
   await page.getByLabel("Nombre").fill("Cliente Prueba");
   await page.getByLabel("Email").fill(email);
