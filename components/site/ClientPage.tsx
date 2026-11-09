@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCatalog } from "@/lib/catalog-context";
 import { PageHero } from "@/components/site/SiteShell";
 import { useCopy } from "@/lib/page-content-context";
@@ -10,12 +11,12 @@ export default function Client() {
   const titleAccent = useCopy("titleAccent", "Un solo lugar.");
   const lead = useCopy(
     "lead",
-    "Accede a facturación, servicios, dominios y soporte a través del portal de cliente de CaluServers.",
+    "Puedes usar la cuenta propia de CaluServers. El portal anterior sigue disponible y no se ha migrado.",
   );
   const ctaTitle = useCopy("ctaTitle", "Bienvenido al Área de Cliente");
   const ctaLead = useCopy(
     "ctaLead",
-    "Inicia sesión o crea una cuenta en nuestro portal de cliente (WHMCS).",
+    "La cuenta propia vive en esta web. El portal anterior no se desactiva.",
   );
   const ctaLabel = useCopy("ctaLabel", "Abrir Área de Cliente ↗");
 
@@ -36,7 +37,10 @@ export default function Client() {
             <h2>{ctaTitle}</h2>
             <p className="muted">{ctaLead}</p>
           </div>
-          <a className="btn primary" href={catalog.settings.whmcs}>
+          <Link className="btn primary" href="/cuenta/registro">
+            Crear cuenta propia
+          </Link>
+          <a className="btn secondary" href={catalog.settings.whmcs}>
             {ctaLabel}
           </a>
         </div>
