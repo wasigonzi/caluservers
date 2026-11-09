@@ -29,8 +29,8 @@ test("el aviso de red no se presenta como monitorización", async ({ page }) => 
 test("hosting confirmado enlaza al producto y dedicados no piden pedido", async ({ page }) => {
   await page.goto("/web-hosting");
   await expect(page.getByText("Calu Corporate").first()).toBeVisible();
-  const order = page.locator('a.btn.primary[href*="/store/web-hosting/calu-starter"]');
-  await expect(order.first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Contratar aquí" }).first()).toBeVisible();
+  await expect(page.locator('a[href*="/store/web-hosting/calu-starter"]').first()).toBeVisible();
   await page.goto("/dedicated");
   await expect(page.getByText("La tienda pública no lista servidores dedicados")).toBeVisible();
   await expect(page.locator('a[href*="cart.php"]')).toHaveCount(0);

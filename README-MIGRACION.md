@@ -36,6 +36,10 @@ El límite de intentos está en la tabla `LoginThrottle` y lo comparten todas la
 
 El aviso de la cabecera es texto manual. No consulta la red. Contacto, abuso y dominios abren el portal externo; esta web no envía tickets ni registra dominios. Los dedicados no tienen producto en la tienda pública, así que no muestran «Ordenar».
 
+## Cuenta propia
+
+El alta de clientes, pedidos, facturas, servicios y tickets propios está en `docs/CLIENTE_PROPIO.md`. No reemplaza todavía el portal remoto ni una contabilidad legal. La pasarela de pago no está elegida.
+
 ## Comprobaciones
 
 ```bash

@@ -56,3 +56,183 @@ model PageContent {
   updatedAt DateTime @updatedAt
 }
 
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  orders        CustomerOrder[]
+  tickets       SupportTicket[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model CustomerOrder {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  idempotencyKey  String
+  planId          String
+  planName        String
+  currency        String
+  totalCents      Int
+  status          String
+  createdAt       DateTime @default(now())
+  lines           OrderLine[]
+  invoice         CustomerInvoice?
+  service         CustomerService?
+
+  @@unique([idempotencyKey])
+  @@index([userId])
+}
+
+model OrderLine {
+  id          String        @id @default(cuid())
+  orderId     String
+  order       CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  planId      String
+  description String
+  quantity    Int
+  unitCents   Int
+  totalCents  Int
+}
+
+model CustomerInvoice {
+  id         String   @id @default(cuid())
+  userId     String
+  orderId    String   @unique
+  order      CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  number     String   @unique
+  currency   String
+  subtotalCents Int
+  taxMode    String
+  taxCents   Int?
+  totalCents Int
+  status     String
+  createdAt  DateTime @default(now())
+  lines      InvoiceLine[]
+  payment    ManualPayment?
+}
+
+model InvoiceLine {
+  id          String          @id @default(cuid())
+  invoiceId   String
+  invoice     CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int
+  unitCents   Int
+  totalCents  Int
+}
+
+model ManualPayment {
+  id          String          @id @default(cuid())
+  invoiceId   String          @unique
+  invoice     CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  currency    String
+  amountCents Int
+  status      String
+  note        String
+  actor       String
+  createdAt   DateTime        @default(now())
+}
+
+model CustomerService {
+  id        String        @id @default(cuid())
+  userId    String
+  orderId   String        @unique
+  order     CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  planId    String
+  planName  String
+  status    String
+  note      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subject   String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  TicketMessage[]
+
+  @@index([userId])
+}
+
+model TicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    String
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+model CommerceEvent {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  entityId  String?
+  details   String
+  createdAt DateTime @default(now())
+}
+
