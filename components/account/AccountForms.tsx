@@ -60,6 +60,34 @@ export function LoginForm() {
   );
 }
 
+export function ResetForm({ token }: { token: string }) {
+  const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  if (!token) return <p className="error">El enlace no incluye un token válido.</p>;
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setError("");
+        const result = await customerAuthClient.resetPassword({ newPassword: password, token });
+        if (result.error) {
+          setError("El enlace caducó o ya se usó.");
+          return;
+        }
+        setMessage("Contraseña actualizada.");
+        router.push("/cuenta/entrar");
+      }}
+    >
+      <label className="field">Nueva contraseña<input type="password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      {message ? <p className="notice" role="status">{message}</p> : null}
+      <button className="btn primary" type="submit">Guardar contraseña</button>
+    </form>
+  );
+}
+
 export function RecoverForm() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
