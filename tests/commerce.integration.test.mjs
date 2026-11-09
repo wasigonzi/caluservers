@@ -28,6 +28,7 @@ test("pedidos, aislamiento, importes y transiciones", {
   process.env.DATABASE_URL = url.toString();
   process.env.BILLING_CURRENCY = "USD";
   delete process.env.TAX_MODE;
+  const { formatMinorAmount } = await import("../lib/money.ts");
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient({ datasources: { db: { url: url.toString() } } });
   const commerce = await import("../lib/commerce.ts");
@@ -37,16 +38,43 @@ test("pedidos, aislamiento, importes y transiciones", {
     await client.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES
       ('user-a', 'Ana', 'ana@example.com', true, NOW(), NOW()),
       ('user-b', 'Bea', 'bea@example.com', true, NOW(), NOW())`);
+    process.env.BILLING_CURRENCY = "";
+    await assert.rejects(
+      () => commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-cur-00001" }),
+      (error) => error.status === 409 && !/3,99|\b399\b/.test(error.message),
+    );
+    process.env.BILLING_CURRENCY = "EUR";
+    await assert.rejects(
+      () => commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-cur-00002" }),
+      (error) => error.status === 409 && !/3,99 EUR|399 EUR/.test(error.message),
+    );
+    process.env.BILLING_CURRENCY = "USD";
     const blocked = await commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-tax-0001" });
     assert.equal(blocked.invoice.taxMode, "unconfigured");
+    assert.equal(blocked.invoice.status, "proforma");
+    assert.match(blocked.invoice.number, /^PF-/);
+    assert.equal(blocked.totalCents, 399);
+    assert.equal(formatMinorAmount(blocked.totalCents, blocked.currency), "3,99 USD");
+    await assert.rejects(
+      () => commerce.confirmManualPayment({ actor: "admin@example.com", invoiceId: blocked.invoice.id, note: "cobro manual de prueba" }),
+      (error) => error.status === 409 && /Puerto Rico/.test(error.message) && /proforma/i.test(error.message) && !/11[,.]5|IVU/i.test(error.message),
+    );
+    // Simula una declaración futura en el proceso de prueba. No es la política fiscal del propietario.
+    process.env.TAX_MODE = "none";
     await assert.rejects(
       () => commerce.confirmManualPayment({ actor: "admin@example.com", invoiceId: blocked.invoice.id, note: "cobro manual de prueba" }),
       (error) => error.status === 409,
     );
-    process.env.TAX_MODE = "none";
+    const stillProforma = await prisma.customerInvoice.findUnique({ where: { id: blocked.invoice.id } });
+    assert.equal(stillProforma.status, "proforma");
+    assert.equal(stillProforma.taxCents, null);
     const order = await commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-pay-0001" });
     assert.equal(order.totalCents, 399);
     assert.equal(order.currency, "USD");
+    assert.equal(order.invoice.status, "issued");
+    assert.match(order.invoice.number, /^FA-/);
+    assert.equal(formatMinorAmount(order.totalCents, order.currency), "3,99 USD");
+    assert.notEqual(`${order.totalCents} ${order.currency}`, formatMinorAmount(order.totalCents, order.currency));
     const again = await commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-pay-0001" });
     assert.equal(again.id, order.id);
     await assert.rejects(

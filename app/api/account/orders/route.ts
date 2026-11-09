@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CommerceError, createCustomerOrder } from "@/lib/commerce";
 import { customerSession } from "@/lib/customer-session";
+import { formatMinorAmount } from "@/lib/money";
 import { trustedWrite } from "@/lib/request";
 
 export const runtime = "nodejs";
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
       id: order.id,
       totalCents: order.totalCents,
       currency: order.currency,
+      formattedTotal: formatMinorAmount(order.totalCents, order.currency),
+      invoiceStatus: order.invoice?.status ?? null,
       invoiceId: order.invoice?.id ?? null,
     });
   } catch (error) {

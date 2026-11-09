@@ -31,6 +31,7 @@ export function AdminCommerceForms({
     <div>
       {invoiceId ? (
         <form
+          className="commerce-action"
           onSubmit={async (event) => {
             event.preventDefault();
             setError("");
@@ -43,12 +44,14 @@ export function AdminCommerceForms({
             }
           }}
         >
+          <p className="muted">No hay pasarela. Anotar el cobro no da de alta el servicio.</p>
           <label className="field">Nota del cobro manual<input value={note} onChange={(event) => setNote(event.target.value)} required minLength={8} /></label>
           <button className="btn" type="submit">Confirmar pago manual</button>
         </form>
       ) : null}
       {serviceId ? (
         <form
+          className="commerce-action"
           onSubmit={async (event) => {
             event.preventDefault();
             setError("");
@@ -60,12 +63,14 @@ export function AdminCommerceForms({
             }
           }}
         >
-          <label className="field">Nota de alta manual<input value={note} onChange={(event) => setNote(event.target.value)} required minLength={8} /></label>
-          <button className="btn" type="submit">Marcar alta manual</button>
+          <p className="muted">Registrar la activación no llama a WHM ni crea una cuenta de cPanel.</p>
+          <label className="field">Nota de activación manual<input value={note} onChange={(event) => setNote(event.target.value)} required minLength={8} /></label>
+          <button className="btn" type="submit">Registrar activación manual</button>
         </form>
       ) : null}
       {ticketId ? (
         <form
+          className="commerce-action"
           onSubmit={async (event) => {
             event.preventDefault();
             setError("");

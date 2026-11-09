@@ -1,6 +1,12 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  accessGapNames,
+  adminLoginMessage,
+  isLoginCode,
+  loginCodeFromStatus,
+} from "@/lib/admin-login-messages";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -20,16 +26,15 @@ export default function LoginForm() {
             body: JSON.stringify({ email, password, code }),
           });
           if (!response.ok) {
-            throw Error(
-              response.status === 429
-                ? "Demasiados intentos. Espera unos minutos."
-                : "Credenciales incorrectas o configuración incompleta",
-            );
+            const data = await response.json().catch(() => ({}));
+            const code = isLoginCode(data?.code) ? data.code : loginCodeFromStatus(response.status);
+            setError(adminLoginMessage(code, accessGapNames(data?.missing)));
+            return;
           }
           router.push("/admin");
           router.refresh();
-        } catch (err) {
-          setError(String(err));
+        } catch {
+          setError(adminLoginMessage("unexpected"));
         }
       }}
     >
@@ -67,7 +72,7 @@ export default function LoginForm() {
         El segundo factor es opcional. Si el entorno no define un secreto TOTP,
         deja este campo vacío.
       </p>
-      <p className="error">{error}</p>
+      {error ? <p className="error" role="alert">{error}</p> : null}
       <button className="btn">Iniciar sesión</button>
     </form>
   );

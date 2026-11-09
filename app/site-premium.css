@@ -512,6 +512,34 @@ html[data-font="exo-sora"] body{font-family:'Sora',system-ui,sans-serif}
 .tld-chip.selected{box-shadow:0 0 0 1px var(--calu-cyan)}
 .tld-card{text-align:left;cursor:pointer;width:100%;color:inherit;font:inherit}
 .notice{color:var(--muted);margin:8px 0 24px}
+
+.account-wrap{padding-bottom:48px}
+.account-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+.account-nav a{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;border-radius:999px;text-decoration:none;color:#d7eef8;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);font:600 14px/1 'Sora',sans-serif}
+.account-nav a[aria-current="page"]{color:#fff;border-color:rgba(0,229,255,.55);background:rgba(0,229,255,.14)}
+.account-card{padding:22px;margin:0 0 18px}
+.account-card h2{font-size:28px}
+.account-form{max-width:520px}
+.account-note{margin:0 0 12px}
+.account-list{padding-left:18px}
+.account-list li{margin:0 0 12px}
+.account-table-wrap,.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.account-table{width:100%;border-collapse:collapse}
+.account-table caption{caption-side:top;text-align:left;font:700 15px/1.4 'Sora',sans-serif;color:#fff;margin:0 0 10px}
+.account-table th,.account-table td{text-align:left;padding:12px 10px;border-bottom:1px solid rgba(255,255,255,.12);vertical-align:top}
+.account-table th{color:var(--calu-cyan);font:600 13px 'Sora',sans-serif}
+.account-price{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.fiscal-callout{margin:0 0 18px;padding:16px 18px;border-radius:16px;border:1px solid rgba(255,176,32,.45);background:rgba(255,176,32,.08);color:#ffe7c2}
+.fiscal-callout p{margin:0 0 8px}
+.fiscal-callout p:last-child{margin-bottom:0}
+.commerce-action{max-width:420px}
+@media(max-width:720px){
+  .account-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .account-table tr{display:block;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.16)}
+  .account-table td{display:grid;grid-template-columns:minmax(7.5rem,42%) minmax(0,1fr);gap:8px;align-items:start;border:0;padding:7px 0}
+  .account-table td::before{content:attr(data-label);color:var(--calu-cyan);font:600 12px/1.3 'Sora',sans-serif}
+  .account-card .btn,.commerce-action .btn{width:100%}
+}
 .wide-cta{display:flex;justify-content:space-between;gap:24px;align-items:center;flex-wrap:wrap}
 @media(max-width:900px){
   .domain-search{flex-direction:column;align-items:stretch}

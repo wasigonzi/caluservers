@@ -1,5 +1,6 @@
 import { parseCatalogPayload, seedCatalogPayload } from "./catalog-validate";
 import { db } from "./db";
+import { MISSING_TAX_POLICY_ERROR, resolveBillingCurrency } from "./money";
 import { isOrderablePlan } from "./orderable";
 
 export class CommerceError extends Error {
@@ -31,20 +32,18 @@ export function parsePublicPriceToCents(price: string): number | null {
 }
 
 export function billingPolicy() {
-  const currency = (process.env.BILLING_CURRENCY || "").trim();
+  const currency = resolveBillingCurrency(process.env.BILLING_CURRENCY);
+  if (!currency.ok) return currency;
   const taxMode = (process.env.TAX_MODE || "").trim();
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    return { ok: false as const, error: "La moneda no está configurada. El propietario debe definir BILLING_CURRENCY." };
-  }
   if (taxMode !== "none") {
     return {
       ok: false as const,
-      error: "La política de impuestos no está decidida. Define TAX_MODE=none solo si no hay impuesto, o deja el pedido como proforma no cobrable.",
-      currency,
-      taxMode: taxMode || "unconfigured",
+      error: MISSING_TAX_POLICY_ERROR,
+      currency: currency.currency,
+      taxMode: "unconfigured" as const,
     };
   }
-  return { ok: true as const, currency, taxMode: "none" as const };
+  return { ok: true as const, currency: currency.currency, taxMode: "none" as const };
 }
 
 export async function createCustomerOrder(input: {
@@ -57,7 +56,7 @@ export async function createCustomerOrder(input: {
     throw new CommerceError("La clave de idempotencia no es válida.", 400);
   }
   const policy = billingPolicy();
-  if (!policy.currency) throw new CommerceError(policy.ok ? "Moneda no configurada." : policy.error, 409);
+  if (!("currency" in policy)) throw new CommerceError(policy.error, 409);
   const catalog = await sellableCatalog();
   const plan = [...catalog.webHosting, ...catalog.vps, ...catalog.dedicated].find(
     (item) => item.id === input.planId && item.active,
@@ -107,7 +106,7 @@ export async function createCustomerOrder(input: {
       data: {
         userId: input.userId,
         orderId: order.id,
-        number: `PF-${order.id.slice(-8).toUpperCase()}`,
+        number: `${payable ? "FA" : "PF"}-${order.id.slice(-8).toUpperCase()}`,
         currency,
         subtotalCents: unitCents,
         taxMode,
@@ -156,7 +155,7 @@ export async function confirmManualPayment(input: {
     if (invoice.payment?.status === "confirmed") return invoice.payment;
     if (invoice.status === "void") throw new CommerceError("La factura está anulada.", 409);
     if (invoice.taxMode !== "none" || invoice.taxCents !== 0) {
-      throw new CommerceError("No se confirma un pago mientras el impuesto no esté decidido.", 409);
+      throw new CommerceError(MISSING_TAX_POLICY_ERROR, 409);
     }
     if (invoice.currency !== policy.currency || invoice.totalCents !== invoice.subtotalCents + (invoice.taxCents ?? 0)) {
       throw new CommerceError("El total de la factura no cuadra.", 409);

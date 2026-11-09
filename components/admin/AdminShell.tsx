@@ -5,6 +5,7 @@ import {
   Palette,
   FileText,
   Users,
+  Receipt,
   Server,
   Package,
   Settings,
@@ -21,6 +22,8 @@ const NAV_ICONS = {
   "/admin/site": Palette,
   "/admin/pages": FileText,
   "/admin/comercio": Users,
+  "/admin/clientes": Users,
+  "/admin/pagos": Receipt,
   "/admin/accounts": Server,
   "/admin/packages": Package,
   "/admin/settings": Settings,
@@ -38,7 +41,14 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "Marca y sitio", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
-      { label: "Clientes propios", href: "/admin/comercio" },
+    ],
+  },
+  {
+    title: "Comercio",
+    items: [
+      { label: "Comercio", href: "/admin/comercio" },
+      { label: "Clientes", href: "/admin/clientes" },
+      { label: "Pagos", href: "/admin/pagos" },
     ],
   },
   {
