@@ -29,6 +29,13 @@ MFA es opcional. `npm run admin:totp` imprime un secreto; defínelo como `ADMIN_
 
 El límite de intentos está en la tabla `LoginThrottle` y lo comparten todas las instancias. La clave guardada es un HMAC, no la IP. Si esa tabla o la base no responden, el login se rechaza (503): no hay un modo que deje pasar intentos ilimitados. Hace falta `npx prisma migrate deploy` antes de entrar al panel.
 
+## Migraciones en producción
+
+El build ejecuta `scripts/migrate-on-deploy.mjs`. Solo con `VERCEL_ENV=production` aplica
+`prisma migrate deploy`; en vistas previas y en local no toca el esquema. Prueba con
+`DATABASE_URL` y, si falla, con `DIRECT_URL`. Si no puede migrar, el despliegue continúa y
+`/admin/configuracion` indica qué falta en la base.
+
 ## Rutas
 
 - Público: `/`, `/web-hosting`, `/vps`, `/dedicated`, `/domains`, `/about`, `/contact`, legales, `/abuse`, `/client`
