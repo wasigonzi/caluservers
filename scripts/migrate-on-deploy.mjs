@@ -53,17 +53,16 @@ function report(out) {
   for (const line of lines) console.log(`[migraciones] ${line.trim()}`);
 }
 
-const ADDITIVE = [
-  /^CREATE TABLE "/,
-  /^CREATE (UNIQUE )?INDEX "/,
-  /^ALTER TABLE "[^"]+" ADD (COLUMN|CONSTRAINT) /,
-];
+const ADDITIVE = [/^CREATE TABLE "/, /^CREATE (UNIQUE )?INDEX "/];
+const ADD_CLAUSE = /^ADD (COLUMN|CONSTRAINT) /;
 const FORBIDDEN = /\b(DROP|RENAME|DELETE|TRUNCATE|UPDATE|INSERT|GRANT|REVOKE)\b|ALTER COLUMN/;
 
 /**
- * Separa un guion de `prisma migrate diff` en lo que se puede aplicar sin riesgo.
- * Solo se acepta crear tablas, índices, columnas y restricciones. Borrar una tabla
- * que el esquema no conoce se ignora (se deja como está); cualquier otra cosa lo rechaza todo.
+ * De un guion de `prisma migrate diff` se queda solo con lo que añade: crear
+ * tablas e índices, y las cláusulas ADD COLUMN / ADD CONSTRAINT de cada ALTER TABLE.
+ * Todo lo demás (cambios de tipo, borrados, renombrados) se descarta y se cuenta:
+ * nunca se ejecuta. Una base creada a mano suele diferir en tipos de fecha; eso
+ * no impide que la aplicación funcione y no se toca.
  */
 export function additivePlan(sql) {
   const statements = sql
@@ -76,28 +75,28 @@ export function additivePlan(sql) {
   const apply = [];
   const skipped = [];
   for (const statement of statements) {
-    if (/^DROP TABLE "[^"]+"$/.test(statement)) {
-      skipped.push(statement);
+    const alter = statement.match(/^(ALTER TABLE "[^"]+") ([\s\S]+)$/);
+    if (alter) {
+      const clauses = alter[2].split(/,\s*\n/).map((clause) => clause.trim());
+      const kept = clauses.filter((clause) => ADD_CLAUSE.test(clause) && !FORBIDDEN.test(clause));
+      for (const clause of clauses) if (!kept.includes(clause)) skipped.push(`${alter[1]} ${clause}`);
+      if (kept.length) apply.push(`${alter[1]} ${kept.join(",\n")}`);
       continue;
     }
-    // Cada cláusula de un ALTER TABLE con varias debe ser un ADD.
-    const clauses = statement.startsWith("ALTER TABLE")
-      ? statement.split(/,\n/).slice(1)
-      : [];
-    const safe =
-      ADDITIVE.some((pattern) => pattern.test(statement)) &&
-      !FORBIDDEN.test(statement) &&
-      clauses.every((clause) => /^\s*ADD (COLUMN|CONSTRAINT) /.test(clause));
-    if (!safe) return { ok: false, apply: [], skipped, rejected: statement.slice(0, 70) };
-    apply.push(statement);
+    if (ADDITIVE.some((pattern) => pattern.test(statement)) && !FORBIDDEN.test(statement)) {
+      apply.push(statement);
+    } else {
+      skipped.push(statement);
+    }
   }
-  return { ok: true, apply, skipped, rejected: "" };
+  return { apply, skipped };
 }
 
 /**
  * Base con tablas pero sin historial de Prisma (P3005): se creó a mano o con `db push`.
- * Se calcula qué le falta respecto al esquema, se aplica solo si es aditivo y se
- * registra el historial para que los próximos despliegues migren con normalidad.
+ * Se calcula qué le falta respecto al esquema y se aplica solo lo que añade, sentencia
+ * a sentencia. El historial se registra únicamente si la base queda idéntica al esquema;
+ * si quedan diferencias, cada despliegue repite esta comprobación, que es inocua.
  */
 function adoptExistingDatabase(url) {
   console.log("[migraciones] la base no tiene historial de Prisma: se calcula qué le falta.");
@@ -110,25 +109,31 @@ function adoptExistingDatabase(url) {
     return false;
   }
   const plan = additivePlan(diff.out.split("\n").filter((line) => !/^npm warn|^warn /i.test(line)).join("\n"));
-  if (!plan.ok) {
-    console.log(`[migraciones] el cambio necesario no es solo añadir. No se aplica nada. Empieza por: ${plan.rejected}`);
-    return false;
+  if (plan.skipped.length) {
+    console.log(
+      `[migraciones] ${plan.skipped.length} diferencias que no son altas se dejan como están (tipos de columna, tablas ajenas).`,
+    );
   }
-  for (const statement of plan.skipped) {
-    console.log(`[migraciones] se deja intacta una tabla ajena al esquema: ${statement.replace("DROP TABLE ", "")}`);
-  }
-  if (plan.apply.length) {
-    const file = path.join(mkdtempSync(path.join(tmpdir(), "migrar-")), "faltante.sql");
-    writeFileSync(file, `BEGIN;\n${plan.apply.join(";\n")};\nCOMMIT;\n`);
+  const dir = mkdtempSync(path.join(tmpdir(), "migrar-"));
+  let failed = 0;
+  plan.apply.forEach((statement, index) => {
+    const file = path.join(dir, `${index}.sql`);
+    writeFileSync(file, `${statement};\n`);
     const applied = prisma(["db", "execute", "--url", url, "--file", file], url);
-    if (!applied.ok) {
+    const what = statement.split("\n")[0].slice(0, 80);
+    if (applied.ok) {
+      console.log(`[migraciones] aplicado: ${what}`);
+    } else {
+      failed += 1;
+      console.log(`[migraciones] NO aplicado: ${what}`);
       report(applied.out);
-      console.log("[migraciones] no se pudo aplicar lo que faltaba; la base queda como estaba.");
-      return false;
     }
-    console.log(`[migraciones] aplicadas ${plan.apply.length} sentencias (tablas, columnas e índices que faltaban).`);
-  } else {
-    console.log("[migraciones] al esquema no le falta nada.");
+  });
+  if (!plan.apply.length) console.log("[migraciones] no hay nada que añadir.");
+  if (failed) return false;
+  if (plan.skipped.length) {
+    console.log("[migraciones] lo que faltaba está añadido. No se registra historial porque la base no es idéntica al esquema.");
+    return true;
   }
   const names = readdirSync("prisma/migrations", { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
