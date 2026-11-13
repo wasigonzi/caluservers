@@ -9,6 +9,10 @@ import {
   ServerCog,
   Package,
   Inbox,
+  Receipt,
+  LifeBuoy,
+  History,
+  Boxes,
   Settings,
   ExternalLink,
   Menu,
@@ -22,40 +26,51 @@ const NAV_ICONS = {
   "/admin": LayoutDashboard,
   "/admin/site": Palette,
   "/admin/pages": FileText,
-  "/admin/comercio": Users,
+  "/admin/clientes": Users,
+  "/admin/facturas": Receipt,
+  "/admin/servicios": Boxes,
+  "/admin/tickets": LifeBuoy,
   "/admin/mensajes": Inbox,
+  "/admin/actividad": History,
   "/admin/accounts": Server,
   "/admin/packages": Package,
   "/admin/provision": ServerCog,
   "/admin/settings": Settings,
 };
-type NavItem = { label: string; href: keyof typeof NAV_ICONS };
+export type NavBadges = Partial<Record<"facturas" | "servicios" | "tickets" | "mensajes", number>>;
+type NavItem = { label: string; href: keyof typeof NAV_ICONS; badge?: keyof NavBadges };
 type NavGroup = { title: string; items: NavItem[] };
 
 const GROUPS: NavGroup[] = [
   {
     title: "Resumen",
-    items: [{ label: "Dashboard", href: "/admin" }],
+    items: [
+      { label: "Dashboard", href: "/admin" },
+      { label: "Actividad", href: "/admin/actividad" },
+    ],
+  },
+  {
+    title: "Negocio",
+    items: [
+      { label: "Clientes", href: "/admin/clientes" },
+      { label: "Pedidos y facturas", href: "/admin/facturas", badge: "facturas" },
+      { label: "Servicios", href: "/admin/servicios", badge: "servicios" },
+      { label: "Tickets", href: "/admin/tickets", badge: "tickets" },
+      { label: "Mensajes", href: "/admin/mensajes", badge: "mensajes" },
+    ],
   },
   {
     title: "Sitio",
     items: [
-      { label: "Marca y sitio", href: "/admin/site" },
+      { label: "Marca y catálogo", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
-      { label: "Clientes propios", href: "/admin/comercio" },
-      { label: "Mensajes", href: "/admin/mensajes" },
     ],
   },
   {
-    title: "WHM / cPanel",
+    title: "Servidor WHM",
     items: [
-      { label: "Cuentas", href: "/admin/accounts" },
+      { label: "Cuentas cPanel", href: "/admin/accounts" },
       { label: "Paquetes", href: "/admin/packages" },
-    ],
-  },
-  {
-    title: "Ajustes",
-    items: [
       { label: "Conexión WHM", href: "/admin/settings" },
       { label: "Alta automática", href: "/admin/provision" },
     ],
@@ -70,9 +85,12 @@ function isActive(pathname: string, href: string) {
 export default function AdminShell({
   children,
   email,
+  badges = {},
 }: {
   children: React.ReactNode;
   email?: string;
+  /** Pendientes por sección. Se omiten si la base no respondió. */
+  badges?: NavBadges;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -168,6 +186,12 @@ export default function AdminShell({
                   return <Icon size={18} aria-hidden="true" />;
                 })()}
                 <span>{item.label}</span>
+                {item.badge && badges[item.badge] ? (
+                  <span className="nav-badge">
+                    {badges[item.badge]}
+                    <span className="sr-only"> pendientes</span>
+                  </span>
+                ) : null}
               </Link>
             ))}
           </div>
@@ -176,7 +200,7 @@ export default function AdminShell({
       <div className="admin-side-foot">
         {email ? <p className="muted admin-user">{email}</p> : null}
         <button
-          className="btn admin-logout"
+          className="btn secondary admin-logout"
           type="button"
           onClick={() => {
             void fetch("/api/admin/logout", { method: "POST" }).finally(() => {

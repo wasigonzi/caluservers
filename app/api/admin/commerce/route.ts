@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { CommerceError, confirmManualPayment, replyTicket, setServiceStatus } from "@/lib/commerce";
+import {
+  CommerceError,
+  confirmManualPayment,
+  replyTicket,
+  setServiceStatus,
+  setTicketStatus,
+  voidInvoice,
+} from "@/lib/commerce";
+import { notifyCustomerOfReply } from "@/lib/ticket-notify";
 import { db } from "@/lib/db";
 import { trustedWrite } from "@/lib/request";
 import { WhmError, safeWhmError } from "@/lib/whm-security";
@@ -51,10 +59,26 @@ export async function POST(req: NextRequest) {
       const service = await setServiceStatus({
         actor: email,
         serviceId: String(body.serviceId || ""),
-        status: body.status,
+        status: body.status === "cancelled" ? "cancelled" : "active",
         note: String(body.note || ""),
       });
       return NextResponse.json({ id: service.id, status: service.status });
+    }
+    if (body?.action === "void-invoice") {
+      const invoice = await voidInvoice({
+        actor: email,
+        invoiceId: String(body.invoiceId || ""),
+        note: String(body.note || ""),
+      });
+      return NextResponse.json({ id: invoice.id, status: invoice.status });
+    }
+    if (body?.action === "ticket-status") {
+      const ticket = await setTicketStatus({
+        actor: email,
+        ticketId: String(body.ticketId || ""),
+        status: body.status === "closed" ? "closed" : "open",
+      });
+      return NextResponse.json({ id: ticket.id, status: ticket.status });
     }
     if (body?.action === "provision-service") {
       const result = await provisionService({
@@ -69,7 +93,9 @@ export async function POST(req: NextRequest) {
         author: "admin",
         body: String(body.body || ""),
       });
-      return NextResponse.json({ id: message.id });
+      // El aviso al cliente es un extra: si no sale, la respuesta ya está guardada.
+      const notified = await notifyCustomerOfReply(String(body.ticketId || ""));
+      return NextResponse.json({ id: message.id, notified });
     }
     if (body?.action === "message-status") {
       const status = String(body.status || "");
@@ -77,6 +103,8 @@ export async function POST(req: NextRequest) {
       if (!(MESSAGE_STATES as readonly string[]).includes(status) || !id) {
         return NextResponse.json({ error: "Estado no válido." }, { status: 400 });
       }
+      const found = await db.contactMessage.findUnique({ where: { id }, select: { id: true } });
+      if (!found) return NextResponse.json({ error: "Mensaje no encontrado." }, { status: 404 });
       const updated = await db.contactMessage.update({
         where: { id },
         data: { status },

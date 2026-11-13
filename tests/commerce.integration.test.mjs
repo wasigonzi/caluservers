@@ -82,6 +82,53 @@ test("pedidos, aislamiento, importes y transiciones", {
     );
     const reply = await commerce.replyTicket({ ticketId: ticket.id, author: "admin", body: "Revisado." });
     assert.ok(reply.id);
+    assert.equal((await prisma.customerOrder.findUnique({ where: { id: order.id } })).status, "paid");
+
+    // Cierre y reapertura de tickets: un ticket cerrado no admite respuestas.
+    const closed = await commerce.setTicketStatus({ actor: "admin@example.com", ticketId: ticket.id, status: "closed" });
+    assert.equal(closed.status, "closed");
+    await assert.rejects(
+      () => commerce.replyTicket({ ticketId: ticket.id, userId: "user-a", author: "customer", body: "sigo aquí" }),
+      (error) => error.status === 409,
+    );
+    const reopened = await commerce.setTicketStatus({ actor: "admin@example.com", ticketId: ticket.id, status: "open" });
+    assert.equal(reopened.status, "open");
+    await assert.rejects(
+      () => commerce.setTicketStatus({ actor: "admin@example.com", ticketId: "no-existe", status: "closed" }),
+      (error) => error.status === 404,
+    );
+
+    // Anulación: solo sin cobro, con motivo, y una factura anulada ya no se cobra.
+    await assert.rejects(
+      () => commerce.voidInvoice({ actor: "admin@example.com", invoiceId: order.invoice.id, note: "ya estaba pagada" }),
+      (error) => error.status === 409,
+    );
+    const toVoid = await commerce.createCustomerOrder({ userId: "user-b", planId: "wh0", idempotencyKey: "idem-void-0001", domain: "anulada.example" });
+    await assert.rejects(
+      () => commerce.voidInvoice({ actor: "admin@example.com", invoiceId: toVoid.invoice.id, note: "corta" }),
+      (error) => error.status === 400,
+    );
+    const voided = await commerce.voidInvoice({ actor: "admin@example.com", invoiceId: toVoid.invoice.id, note: "el cliente desistió del pedido" });
+    assert.equal(voided.status, "void");
+    assert.equal((await prisma.customerOrder.findUnique({ where: { id: toVoid.id } })).status, "cancelled");
+    await assert.rejects(
+      () => commerce.confirmManualPayment({ actor: "admin@example.com", invoiceId: toVoid.invoice.id, note: "cobro tras anular" }),
+      (error) => error.status === 409,
+    );
+    await assert.rejects(
+      () => commerce.recordGatewayPayment({ invoiceId: toVoid.invoice.id, providerRef: "CAP-VOID-1", amountCents: toVoid.totalCents, currency: "USD", source: "webhook" }),
+      (error) => error.status === 409,
+    );
+    assert.equal(await prisma.customerService.count({ where: { orderId: toVoid.id } }), 0);
+    assert.equal(await prisma.commerceEvent.count({ where: { action: "invoice.voided", entityId: toVoid.invoice.id } }), 1);
+
+    // Cancelación de un servicio activo: queda cancelado y no se cancela dos veces.
+    const cancelled = await commerce.setServiceStatus({ actor: "admin@example.com", serviceId: service.id, status: "cancelled", note: "baja pedida por el cliente" });
+    assert.equal(cancelled.status, "cancelled");
+    await assert.rejects(
+      () => commerce.setServiceStatus({ actor: "admin@example.com", serviceId: service.id, status: "cancelled", note: "baja repetida otra vez" }),
+      (error) => error.status === 409,
+    );
 
     // Cobro por pasarela: la referencia de captura es única, así que el webhook
     // repetido devuelve el mismo cobro en lugar de duplicarlo.

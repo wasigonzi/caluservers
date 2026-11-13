@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
 import { whmConfiguration } from "@/lib/whm";
 import { safeWhmError } from "@/lib/whm-security";
+import { PageHeader } from "@/components/admin/ui";
 import WhmReadPanel from "@/components/admin/WhmReadPanel";
 export const dynamic = "force-dynamic";
 export default async function SectionPage({
@@ -12,30 +12,15 @@ export default async function SectionPage({
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const { section } = await params;
-  if (
-    [
-      "clients",
-      "orders",
-      "invoices",
-      "services",
-      "products",
-      "tickets",
-    ].includes(section)
-  )
-    return (
-      <>
-        <h1>Sección anterior retirada</h1>
-        <p className="muted">
-          No se han eliminado clientes, pedidos, facturas ni otros datos
-          históricos. La integración activa ahora consulta únicamente cuentas y
-          paquetes WHM; no reemplaza facturación ni convierte productos en
-          pedidos.
-        </p>
-        <Link className="btn" href="/admin">
-          Ir al dashboard →
-        </Link>
-      </>
-    );
+  // Rutas del panel anterior: llevan a la sección que hoy hace ese trabajo.
+  const moved: Record<string, string> = {
+    clients: "/admin/clientes",
+    orders: "/admin/facturas",
+    invoices: "/admin/facturas",
+    services: "/admin/servicios",
+    products: "/admin/site",
+  };
+  if (moved[section]) redirect(moved[section]);
   if (section !== "accounts" && section !== "packages") notFound();
   let configured = false,
     error = "";
@@ -46,10 +31,10 @@ export default async function SectionPage({
   }
   return (
     <>
-      <p className="accent">WHM / SÓLO LECTURA</p>
-      <h1>
-        {section === "accounts" ? "Cuentas cPanel" : "Paquetes de hosting"}
-      </h1>
+      <PageHeader
+        eyebrow="WHM / SÓLO LECTURA"
+        title={section === "accounts" ? "Cuentas cPanel" : "Paquetes de hosting"}
+      />
       <WhmReadPanel
         mode={section === "accounts" ? "listaccts" : "listpkgs"}
         configured={configured}

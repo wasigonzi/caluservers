@@ -32,7 +32,8 @@ El límite de intentos está en la tabla `LoginThrottle` y lo comparten todas la
 ## Rutas
 
 - Público: `/`, `/web-hosting`, `/vps`, `/dedicated`, `/domains`, `/about`, `/contact`, legales, `/abuse`, `/client`
-- Admin: `/admin/login`, `/admin`, `/admin/site`, `/admin/pages`, `/admin/settings` (WHM)
+- Admin: `/admin/login`, `/admin` (resumen), `/admin/site`, `/admin/pages`, `/admin/settings` (WHM)
+- Admin · negocio: `/admin/clientes`, `/admin/facturas`, `/admin/servicios`, `/admin/tickets`, `/admin/mensajes`, `/admin/actividad`. Ver `docs/PANEL_ADMIN.md`.
 
 El aviso de la cabecera es texto manual. No consulta la red. Contacto, abuso y dominios abren el portal externo; esta web no envía tickets ni registra dominios. Los dedicados no tienen producto en la tienda pública, así que no muestran «Ordenar».
 
@@ -50,4 +51,4 @@ npm run build
 npm run test:e2e
 ```
 
-`npm test` incluye la regresión de migraciones y de rollback cuando `DATABASE_URL` apunta a Postgres. `test:e2e` crea la base `caluservers_e2e` en ese mismo servidor.
+`npm test` incluye la regresión de migraciones y de rollback cuando `DATABASE_URL` apunta a Postgres. `test:e2e` crea la base `caluservers_e2e` en ese mismo servidor. Si Playwright no encuentra su navegador, `E2E_CHROMIUM_PATH` apunta a un Chromium ya instalado.

@@ -18,6 +18,22 @@ const SERVICE_LABELS: Record<string, string> = {
   active: "activo",
   cancelled: "cancelado",
 };
+const ORDER_LABELS: Record<string, string> = {
+  submitted: "recibido",
+  paid: "pagado",
+  cancelled: "cancelado",
+};
+const INVOICE_LABELS: Record<string, string> = {
+  issued: "pendiente de pago",
+  paid: "pagada",
+  proforma: "proforma",
+  void: "anulada",
+};
+const TICKET_LABELS: Record<string, string> = {
+  open: "esperando respuesta",
+  answered: "respondido",
+  closed: "cerrado",
+};
 
 export default async function AccountHome({
   searchParams,
@@ -55,7 +71,7 @@ export default async function AccountHome({
         <ul>
           {orders.map((order) => (
             <li key={order.id}>
-              {order.planName}: {money(order.totalCents, order.currency)} · {order.status}
+              {order.planName}: {money(order.totalCents, order.currency)} · {ORDER_LABELS[order.status] ?? order.status}
               {order.domain ? ` · ${order.domain}` : ""}
             </li>
           ))}
@@ -73,7 +89,7 @@ export default async function AccountHome({
             return (
               <li key={invoice.id}>
                 {invoice.number}: {money(invoice.totalCents, invoice.currency)} ·{" "}
-                {paid ? `pagada (${invoice.payment?.provider})` : invoice.status}
+                {paid ? `pagada (${invoice.payment?.provider})` : (INVOICE_LABELS[invoice.status] ?? invoice.status)}
                 {invoice.taxMode !== "none" ? " · proforma no cobrable" : ""}
                 {payable && canPay ? (
                   <>
@@ -115,16 +131,17 @@ export default async function AccountHome({
         <ul>
           {tickets.map((ticket) => (
             <li key={ticket.id}>
-              {ticket.subject}: {ticket.status}
+              <Link href={`/cuenta/tickets/${ticket.id}`}>{ticket.subject}</Link>:{" "}
+              {TICKET_LABELS[ticket.status] ?? ticket.status}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="muted">No tienes tickets abiertos.</p>
+        <p className="muted">No tienes tickets.</p>
       )}
 
       <p>
-        <Link href="/cuenta/tickets">Abrir un ticket</Link> ·{" "}
+        <Link href="/cuenta/tickets">Tickets de soporte</Link> ·{" "}
         <Link href="/web-hosting">Ver planes</Link>
       </p>
     </main>

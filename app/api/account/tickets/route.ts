@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CommerceError, createTicket, replyTicket } from "@/lib/commerce";
 import { customerSession } from "@/lib/customer-session";
 import { trustedWrite } from "@/lib/request";
+import { notifyStaffOfTicket } from "@/lib/ticket-notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
         author: "customer",
         body: String(body.body || ""),
       });
+      await notifyStaffOfTicket(String(body.ticketId), "reply");
       return NextResponse.json({ id: message.id });
     }
     const ticket = await createTicket({
@@ -28,6 +30,7 @@ export async function POST(req: NextRequest) {
       subject: String(body?.subject || ""),
       body: String(body?.body || ""),
     });
+    await notifyStaffOfTicket(ticket.id, "new");
     return NextResponse.json({ id: ticket.id });
   } catch (error) {
     if (error instanceof CommerceError) {

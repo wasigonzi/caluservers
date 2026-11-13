@@ -297,26 +297,83 @@ export function CapturePayment({
 }
 
 export function TicketForm() {
+  const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
-        const response = await fetch("/api/account/tickets", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ subject, body }),
-        });
-        const data = await response.json();
-        setMessage(response.ok ? `Ticket ${data.id} abierto.` : data.error || "No se pudo abrir.");
+        if (busy) return;
+        setBusy(true);
+        setMessage("");
+        try {
+          const response = await fetch("/api/account/tickets", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ subject, body }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok) {
+            setSubject("");
+            setBody("");
+            setMessage("Ticket abierto. Te responderemos en esta misma conversación.");
+            router.refresh();
+          } else {
+            setMessage(data.error || "No se pudo abrir.");
+          }
+        } catch {
+          setMessage("No hubo conexión. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
-      <label className="field">Asunto<input value={subject} required onChange={(event) => setSubject(event.target.value)} /></label>
-      <label className="field">Mensaje<textarea value={body} required onChange={(event) => setBody(event.target.value)} /></label>
+      <label className="field">Asunto<input value={subject} required minLength={4} maxLength={120} onChange={(event) => setSubject(event.target.value)} /></label>
+      <label className="field">Mensaje<textarea value={body} required minLength={4} maxLength={4000} onChange={(event) => setBody(event.target.value)} /></label>
       {message ? <p className="notice" role="status">{message}</p> : null}
-      <button className="btn primary" type="submit">Abrir ticket</button>
+      <button className="btn primary" type="submit" disabled={busy}>Abrir ticket</button>
+    </form>
+  );
+}
+
+export function TicketReplyForm({ ticketId }: { ticketId: string }) {
+  const router = useRouter();
+  const [body, setBody] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setError("");
+        try {
+          const response = await fetch("/api/account/tickets", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ticketId, body }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok) {
+            setBody("");
+            router.refresh();
+          } else {
+            setError(data.error || "No se pudo enviar.");
+          }
+        } catch {
+          setError("No hubo conexión. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="field">Tu respuesta<textarea value={body} required maxLength={4000} onChange={(event) => setBody(event.target.value)} /></label>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      <button className="btn primary" type="submit" disabled={busy}>Enviar respuesta</button>
     </form>
   );
 }

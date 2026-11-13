@@ -39,18 +39,18 @@ export default function MessageActions({
   }
 
   return (
-    <span>
+    <>
       {status !== "read" ? (
-        <button className="btn" type="button" disabled={busy} onClick={() => move("read")}>
+        <button className="btn secondary small" type="button" disabled={busy} onClick={() => move("read")}>
           Marcar leído
         </button>
       ) : null}
       {status !== "archived" ? (
-        <button className="btn" type="button" disabled={busy} onClick={() => move("archived")}>
+        <button className="btn secondary small" type="button" disabled={busy} onClick={() => move("archived")}>
           Archivar
         </button>
       ) : (
-        <button className="btn" type="button" disabled={busy} onClick={() => move("new")}>
+        <button className="btn secondary small" type="button" disabled={busy} onClick={() => move("new")}>
           Devolver a nuevos
         </button>
       )}
@@ -60,6 +60,6 @@ export default function MessageActions({
           {error}
         </span>
       ) : null}
-    </span>
+    </>
   );
 }
