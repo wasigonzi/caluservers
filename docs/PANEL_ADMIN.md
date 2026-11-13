@@ -16,6 +16,12 @@ Todas las páginas exigen la sesión de administrador y todas las escrituras pas
 | `/admin/mensajes` | Bandeja de los formularios de contacto y abuso. |
 | `/admin/actividad` | Diario unificado de `CommerceEvent` y `AdminAudit`. Solo lectura. |
 
+| `/admin/site?seccion=…` | Sitio web: `branding`, `appearance`, `content`, `sections`, `catalog`, `seo`, `nav`. Cada una tiene su entrada en el menú; se publican juntas. |
+| `/admin/configuracion` | Estado real de moneda, impuestos, PayPal, correo, acceso, base de datos y WHM, y dónde se cambia cada cosa. Incluye «Enviar correo de prueba» y «Probar conexión». |
+
+Los secretos (claves, contraseñas, tokens) son variables de entorno: Configuración muestra si
+están puestos, nunca su valor.
+
 `/admin/comercio` redirige a `/admin/facturas`. Los contadores del menú son los pendientes:
 facturas emitidas, servicios pendientes de alta, tickets abiertos y mensajes nuevos.
 

@@ -76,6 +76,7 @@ const ACTIONS: Record<string, string> = {
   "payment.started": "Cobro iniciado en PayPal",
   "whm.settings.updated": "Conexión WHM guardada",
   "whm.provision.updated": "Alta automática configurada",
+  "system.test_email": "Correo de prueba enviado",
   "ticket.closed": "Ticket cerrado",
   "ticket.reopened": "Ticket reabierto",
   "site.settings.updated": "Ajustes del sitio guardados",

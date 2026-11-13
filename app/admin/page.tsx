@@ -58,7 +58,15 @@ export default async function Admin() {
     failed = loadFailure(error, "resumen");
     data = null;
   }
-  const [counts, checks] = await Promise.all([navCounts(), systemChecks()]);
+  const [partial, checks] = await Promise.all([navCounts(), systemChecks()]);
+  // La lista de pendientes solo se muestra entera: con un contador sin leer no se afirma «todo al día».
+  const counts =
+    partial.facturas !== undefined &&
+    partial.servicios !== undefined &&
+    partial.tickets !== undefined &&
+    partial.mensajes !== undefined
+      ? (partial as Required<typeof partial>)
+      : null;
   const peak = data ? Math.max(1, ...data.months.map((m) => m.cents)) : 1;
   const attention = counts
     ? [
@@ -212,7 +220,12 @@ export default async function Admin() {
         </section>
 
         <section className="panel" aria-labelledby="dash-system">
-          <h2 id="dash-system">Estado de la configuración</h2>
+          <div className="panel-head">
+            <h2 id="dash-system">Estado de la configuración</h2>
+            <Link className="panel-link" href="/admin/configuracion">
+              Configuración →
+            </Link>
+          </div>
           <ul className="check-list">
             {checks.map((check) => {
               const Icon =

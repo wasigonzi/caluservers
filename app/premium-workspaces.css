@@ -1100,3 +1100,30 @@
   .admin-app .stack .row-actions { margin-top:8px; }
   .admin-app .stack .nowrap { white-space:normal; }
 }
+
+/* Configuración general */
+.config-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
+.config-grid .panel { margin-bottom:0; }
+.config-rows, .config-links { list-style:none; margin:0; padding:0; }
+.config-rows li { display:flex; gap:12px; padding:14px 0; border-bottom:1px solid #ffffff10; }
+.config-rows li:last-child { border-bottom:0; padding-bottom:0; }
+.config-rows li:first-child { padding-top:0; }
+.config-rows svg { flex-shrink:0; margin-top:2px; }
+.config-main { flex:1; min-width:0; }
+.config-main .muted { margin:3px 0 0; font-size:13px; line-height:1.55; overflow-wrap:anywhere; }
+.config-where { display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex:0 1 190px; min-width:0; }
+.admin-app .config-where code { font-size:10.5px; color:#8fa8bb; text-align:right; overflow-wrap:anywhere; line-height:1.5; }
+.system-test { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px; }
+.config-links li { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #ffffff10; font-size:14px; flex-wrap:wrap; }
+.config-links li:last-child { border-bottom:0; }
+.admin-app .config-links a { color:#9be9ff; font-weight:600; }
+.config-links .muted { font-size:12.5px; }
+.config-note { font-size:12.5px; margin-top:18px; }
+.admin-app .admin-nav-link { min-height:34px; padding:5px 12px; }
+@media (max-width: 1100px) { .config-grid { grid-template-columns:1fr; } }
+@media (max-width: 1024px) { .admin-app .admin-nav-link { min-height:44px; } }
+@media (max-width: 640px) {
+  .config-rows li { flex-wrap:wrap; }
+  .config-where { flex-basis:100%; align-items:flex-start; padding-left:30px; }
+  .admin-app .config-where code { text-align:left; }
+}

@@ -6,6 +6,8 @@ import BrandingPreview from "@/components/admin/BrandingPreview";
 import BrandContrast from "@/components/admin/BrandContrast";
 import { changedSettingGroups } from "@/lib/branding-preview";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { STUDIO_TABS } from "@/lib/studio-tabs";
 import type { Plan, PlanCategory } from "@/lib/catalog";
 import type { CatalogPayload } from "@/lib/catalog-validate";
 import {
@@ -65,13 +67,29 @@ export default function ProSiteStudio({
   initialCatalog,
   blobConfigured = false,
   storageReady = true,
+  initialTab = "branding",
 }: {
   initialSettings: SiteSettings;
   initialCatalog: CatalogPayload;
   blobConfigured?: boolean;
   storageReady?: boolean;
+  /** Sección pedida en la URL (`?seccion=`). El menú lateral enlaza cada una. */
+  initialTab?: string;
 }) {
-  const [tab, setTab] = useState<Tab>("branding");
+  const router = useRouter();
+  const [tab, setTabState] = useState<Tab>(
+    STUDIO_TABS.includes(initialTab) ? (initialTab as Tab) : "branding",
+  );
+  // Al llegar desde el menú con otra sección, se cambia sin perder lo editado.
+  useEffect(() => {
+    if (STUDIO_TABS.includes(initialTab)) setTabState(initialTab as Tab);
+  }, [initialTab]);
+  function setTab(next: Tab) {
+    setTabState(next);
+    // La URL sigue a la pestaña: se puede compartir y el menú marca la sección activa.
+    const url = next === "branding" ? "/admin/site" : `/admin/site?seccion=${next}`;
+    router.replace(url, { scroll: false });
+  }
   const [compareSaved, setCompareSaved] = useState(false);
   const [uploading, setUploading] = useState<Set<BrandingSlot>>(
     () => new Set(),

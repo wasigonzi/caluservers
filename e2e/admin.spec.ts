@@ -34,6 +34,30 @@ test("cabeceras, login, logout, almacenamiento y guardado de CMS", async ({ page
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     await expect(page.locator(".load-error")).toHaveCount(0);
   }
+  // Cada sección del sitio tiene su entrada en el menú y marca cuál está activa.
+  const menu = page.getByRole("navigation", { name: "Admin" });
+  for (const [link, heading] of [
+    ["Apariencia", "Apariencia"],
+    ["Catálogo y precios", "Catálogo y precios"],
+    ["SEO", "SEO"],
+    ["Branding", "Branding"],
+  ]) {
+    await menu.getByRole("link", { name: link, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(menu.getByRole("link", { name: link, exact: true })).toHaveAttribute("aria-current", "page");
+  }
+  // Cambiar de pestaña dentro del estudio también mueve la URL y el menú.
+  await page.getByRole("group", { name: "Secciones del estudio" }).getByRole("button", { name: "Navegación" }).click();
+  await expect(page).toHaveURL(/seccion=nav$/);
+  await expect(menu.getByRole("link", { name: "Navegación", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await menu.getByRole("link", { name: "General", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Configuración general" })).toBeVisible();
+  await page.getByRole("button", { name: "Probar conexión" }).click();
+  await expect(page.getByText(/Responde en \d+ ms/)).toBeVisible();
+  await page.getByRole("button", { name: "Enviar correo de prueba" }).click();
+  await expect(page.getByText(/sumidero local de pruebas/)).toBeVisible();
+
   await page.goto("/admin/comercio");
   await expect(page).toHaveURL(/\/admin\/facturas$/);
 
