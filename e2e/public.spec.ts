@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { E2E_EMAIL, E2E_PASSWORD } from "./fixtures";
 
 const pages = ["/", "/web-hosting", "/vps", "/dedicated", "/domains", "/about", "/contact", "/client", "/abuse", "/terms", "/privacy", "/aup"];
 
@@ -44,41 +45,95 @@ test("VPS New York Normal muestra el precio público, no cero", async ({ page })
   await expect(page.locator("body")).not.toContainText("$0.00");
 });
 
-test("contacto y dominios explican que continúan en el portal y no salen de la app", async ({ page }) => {
+test("el formulario de contacto envía de verdad y queda registrado", async ({ page }) => {
   const external: string[] = [];
   await page.route(/client\.caluservers\.com/, async (route) => {
     external.push(route.request().url());
     await route.abort();
   });
-  await page.addInitScript(() => {
-    const target = window as unknown as { __opened: string[] };
-    target.__opened = [];
-    window.open = (url) => {
-      target.__opened.push(String(url));
-      return null;
-    };
-  });
   await page.goto("/contact");
-  await expect(page.locator("body")).toContainText("no envía");
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-contact.png" });
-  await page.locator("#c-name").fill("Auditor");
-  await page.locator("#c-email").fill("audit@example.com");
-  await page.locator("#c-msg").fill("mensaje local");
-  await page.locator("form.formbox").evaluate((form: HTMLFormElement) => form.requestSubmit());
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        () => (window as unknown as { __opened?: string[] }).__opened?.[0] || "",
-      ),
-    )
-    .toContain("submitticket.php");
+  // La página ya no dice que no envía: el buzón es propio.
+  await expect(page.locator("body")).not.toContainText("no envía");
+  await page.locator('input[name="name"]').fill("Auditor");
+  await page.locator('input[name="email"]').fill("audit@example.com");
+  await page.locator('textarea[name="body"]').fill("Mensaje de auditoría del formulario propio.");
+  await page.getByRole("button", { name: "Enviar mensaje" }).click();
+  await expect(page.getByText("Mensaje recibido")).toBeVisible();
+  // Nada salió al portal externo.
   expect(external).toEqual([]);
+  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-contact.png" });
+
+  // El panel lo muestra en la bandeja.
+  await page.goto("/admin/login");
+  await page.locator('input[type="email"]').fill(E2E_EMAIL);
+  await page.locator('input[type="password"]').fill(E2E_PASSWORD);
+  await page.locator("form button.btn").click();
+  await page.waitForURL("**/admin");
+  await page.goto("/admin/mensajes");
+  await expect(page.getByText("audit@example.com")).toBeVisible();
+  await expect(page.getByText("Mensaje de auditoría del formulario propio.")).toBeVisible();
+  await page.context().clearCookies();
+});
+
+test("el reporte de abuso exige dominio o IP y se envía", async ({ page }) => {
+  await page.goto("/abuse");
+  await page.locator('input[name="name"]').fill("Auditor");
+  await page.locator('input[name="email"]').fill("audit@example.com");
+  await page.locator('input[name="target"]').fill("malo.example.com");
+  await page
+    .locator('textarea[name="body"]')
+    .fill("Esta cuenta aloja una página falsa, aquí la evidencia.");
+  await page.getByRole("button", { name: "Enviar reporte" }).click();
+  await expect(page.getByText("Mensaje recibido")).toBeVisible();
+});
+
+test("la búsqueda de dominios muestra disponibilidad real y nunca inventa un «libre»", async ({
+  page,
+}) => {
+  const external: string[] = [];
+  await page.route(/client\.caluservers\.com/, async (route) => {
+    external.push(route.request().url());
+    await route.abort();
+  });
+  // La respuesta del registro se simula: la prueba mide la interfaz, no la red ajena.
+  let reply: Record<string, unknown> = {};
+  await page.route("**/api/domains**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(reply) });
+  });
 
   await page.goto("/domains");
-  await expect(page.locator("body")).toContainText("no se consulta");
-  await page.locator("form.domain-search input").fill("ejemplo-auditoria.com");
+  await expect(page.locator("body")).not.toContainText("no se consulta");
+
+  reply = { ok: true, domain: "libre-auditoria.com", tld: ".com", state: "available" };
+  await page.locator("form.domain-search input").fill("libre-auditoria.com");
   await page.locator("form.domain-search button").click();
-  await expect.poll(() => external.length).toBe(1);
-  expect(external[0]).toContain("cart.php?a=add&domain=register");
-  expect(external[0]).toContain("ejemplo-auditoria.com");
+  await expect(page.getByText("libre-auditoria.com está libre")).toBeVisible();
+  const register = page.getByRole("link", { name: /Registrarlo en el portal/ });
+  await expect(register).toHaveAttribute("href", /cart\.php\?a=add&domain=register/);
+  await expect(register).toHaveAttribute("href", /libre-auditoria\.com/);
+
+  reply = { ok: true, domain: "ocupada-auditoria.com", tld: ".com", state: "registered" };
+  await page.locator("form.domain-search input").fill("ocupada-auditoria.com");
+  await page.locator("form.domain-search button").click();
+  await expect(page.getByText("ocupada-auditoria.com ya está registrado")).toBeVisible();
+
+  reply = {
+    ok: true,
+    domain: "sinrespuesta-auditoria.com",
+    tld: ".com",
+    state: "unverified",
+    reason: "unreachable",
+  };
+  await page.locator("form.domain-search input").fill("sinrespuesta-auditoria.com");
+  await page.locator("form.domain-search button").click();
+  // La afirmación se mide en la región del resultado, no en toda la página: el texto
+  // de marketing de /domains contiene «si está libre» de forma permanente, así que
+  // buscarlo en el `body` daría un falso fallo aunque el resultado fuese correcto.
+  const result = page.locator("#domain-result");
+  await expect(result.getByText("No pudimos confirmar")).toBeVisible();
+  await expect(result.getByText("está libre")).toHaveCount(0);
+
+  // Buscar no navega al portal por su cuenta.
+  expect(external).toEqual([]);
+  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-domains.png" });
 });

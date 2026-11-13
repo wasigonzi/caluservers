@@ -18,15 +18,20 @@ export function AdminCommerceForms({
   invoiceId,
   serviceId,
   ticketId,
+  canProvision = false,
 }: {
   invoiceId?: string;
   serviceId?: string;
   ticketId?: string;
+  /** Solo con credenciales, paquete, correo saliente y dominio en el pedido. */
+  canProvision?: boolean;
 }) {
   const router = useRouter();
   const [note, setNote] = useState("");
   const [reply, setReply] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <div>
       {invoiceId ? (
@@ -64,6 +69,34 @@ export function AdminCommerceForms({
           <button className="btn" type="submit">Marcar alta manual</button>
         </form>
       ) : null}
+      {serviceId && canProvision ? (
+        <button
+          className="btn primary"
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            if (busy) return;
+            setBusy(true);
+            setError("");
+            setInfo("");
+            try {
+              const data = await post({ action: "provision-service", serviceId });
+              setInfo(
+                data.credentialsSent
+                  ? `Cuenta ${data.cpanelUser} creada y datos enviados al cliente.`
+                  : `Cuenta ${data.cpanelUser} creada, pero el correo con la contraseña no salió. Restablécela en WHM y entrégala tú.`,
+              );
+              router.refresh();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Error");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Creando cuenta…" : "Dar de alta en WHM ahora"}
+        </button>
+      ) : null}
       {ticketId ? (
         <form
           onSubmit={async (event) => {
@@ -83,6 +116,7 @@ export function AdminCommerceForms({
         </form>
       ) : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
+      {info ? <p className="notice" role="status">{info}</p> : null}
     </div>
   );
 }

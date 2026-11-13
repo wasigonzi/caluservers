@@ -1,18 +1,9 @@
 "use client";
-import { useState } from "react";
-import type { FormEvent } from "react";
-import { ABUSE_CATEGORIES } from "@/lib/catalog";
-import { useCatalog } from "@/lib/catalog-context";
-import { PageHero, openWhmcsTicket } from "@/components/site/SiteShell";
+import { PageHero } from "@/components/site/SiteShell";
+import IntakeForm from "@/components/site/IntakeForm";
 import { useCopy } from "@/lib/page-content-context";
 
 export default function Abuse() {
-  const { catalog } = useCatalog();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [target, setTarget] = useState("");
-  const [category, setCategory] = useState(ABUSE_CATEGORIES[0]);
-  const [description, setDescription] = useState("");
   const kicker = useCopy("kicker", "Trust & Safety");
   const title = useCopy("title", "Reportar");
   const titleAccent = useCopy("titleAccent", "abuso.");
@@ -20,10 +11,10 @@ export default function Abuse() {
     "lead",
     "Reporta spam, phishing, malware, infracción de copyright o abuso de red.",
   );
-  const submitLabel = useCopy("submitLabel", "Continuar en el portal");
+  const submitLabel = useCopy("submitLabel", "Enviar reporte");
   const formNote = useCopy(
     "formNote",
-    "Este formulario no envía el reporte. Abre el portal de cliente para registrar el ticket de abuso allí.",
+    "El reporte queda registrado con fecha y lo revisa nuestro equipo de Trust & Safety.",
   );
   const labelName = useCopy("labelName", "Tu nombre");
   const labelEmail = useCopy("labelEmail", "Email");
@@ -33,17 +24,6 @@ export default function Abuse() {
     "labelDescription",
     "Descripción detallada y enlaces de evidencia",
   );
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    openWhmcsTicket(catalog.settings.whmcs, [
-      { label: labelName, value: name },
-      { label: labelEmail, value: email },
-      { label: labelTarget, value: target },
-      { label: labelCategory, value: category },
-      { label: labelDescription, value: description },
-    ]);
-  }
 
   return (
     <>
@@ -57,64 +37,18 @@ export default function Abuse() {
         lead={lead}
       />
       <section className="wrap">
-        <form className="formbox glass" onSubmit={onSubmit}>
-          <div className="field">
-            <label htmlFor="a-name">{labelName}</label>
-            <input
-              id="a-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="a-email">{labelEmail}</label>
-            <input
-              id="a-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="a-target">{labelTarget}</label>
-            <input
-              id="a-target"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="a-cat">{labelCategory}</label>
-            <select
-              id="a-cat"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {ABUSE_CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="a-desc">{labelDescription}</label>
-            <textarea
-              id="a-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-            />
-          </div>
-          <button className="btn primary" type="submit">
-            {submitLabel}
-          </button>
-          <p className="muted">{formNote}</p>
-          <p className="notice">
-            Este sitio no envía el reporte. El botón abre el portal externo.
-          </p>
-        </form>
+        <IntakeForm
+          kind="abuse"
+          note={formNote}
+          labels={{
+            name: labelName,
+            email: labelEmail,
+            topic: labelCategory,
+            target: labelTarget,
+            message: labelDescription,
+            submit: submitLabel,
+          }}
+        />
       </section>
     </>
   );

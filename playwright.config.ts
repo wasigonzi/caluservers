@@ -38,6 +38,7 @@ export default defineConfig({
       TAX_MODE: "none",
       MAIL_SINK_DIR: "/tmp/calu-mail-e2e",
       MAIL_FROM: "no-reply@example.com",
+      CONTACT_INBOX: "ventas@example.com",
     },
   },
 });

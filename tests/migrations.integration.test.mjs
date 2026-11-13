@@ -44,6 +44,18 @@ function migrate(url) {
   });
 }
 
+/** Comprueba que una tabla tiene las columnas esperadas tras migrar. */
+async function columns(url, table, expected) {
+  const client = new pg.Client({ connectionString: url });
+  await client.connect();
+  const result = await client.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = ANY($2) ORDER BY column_name",
+    [table, expected],
+  );
+  await client.end();
+  return result.rows.map((row) => row.column_name);
+}
+
 async function tables(url) {
   const client = new pg.Client({ connectionString: url });
   await client.connect();
@@ -66,9 +78,34 @@ test("instalación vacía y actualización de las 3 migraciones crean auditoría
   try {
     migrate(freshUrl);
     const freshTables = await tables(freshUrl);
-    for (const name of ["AdminAudit", "IntegrationConfig", "SiteSetting", "CatalogConfig", "PageContent", "LoginThrottle"]) {
+    for (const name of [
+      "AdminAudit",
+      "IntegrationConfig",
+      "SiteSetting",
+      "CatalogConfig",
+      "PageContent",
+      "LoginThrottle",
+      "RequestThrottle",
+      "ContactMessage",
+      "ProvisionSetting",
+    ]) {
       assert.ok(freshTables.includes(name), name);
     }
+    // Las columnas añadidas a tablas que ya existían.
+    assert.deepEqual(await columns(freshUrl, "ManualPayment", ["provider", "providerRef"]), [
+      "provider",
+      "providerRef",
+    ]);
+    assert.deepEqual(await columns(freshUrl, "CustomerOrder", ["domain"]), ["domain"]);
+    assert.deepEqual(
+      await columns(freshUrl, "CustomerService", [
+        "cpanelUser",
+        "provisionAttempts",
+        "provisionError",
+        "provisionedAt",
+      ]),
+      ["cpanelUser", "provisionAttempts", "provisionError", "provisionedAt"],
+    );
 
     const upgrade = new pg.Client({ connectionString: upgradeUrl });
     await upgrade.connect();

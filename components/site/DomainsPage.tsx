@@ -7,34 +7,47 @@ import { PageHero } from "@/components/site/SiteShell";
 import { SectionHead, Steps } from "@/components/site/Sections";
 import { useCopy } from "@/lib/page-content-context";
 
+type Lookup =
+  | { state: "idle" }
+  | { state: "checking"; domain: string }
+  | { state: "available"; domain: string }
+  | { state: "registered"; domain: string }
+  | { state: "unverified"; domain: string; reason?: string }
+  | { state: "error"; message: string };
+
+const UNVERIFIED_REASONS: Record<string, string> = {
+  "no-bootstrap": "No se pudo contactar el directorio de registros.",
+  "no-server": "Esa extensión no publica un servidor de consulta.",
+  "rate-limited": "El registro limitó las consultas por ahora.",
+  unreachable: "El registro no respondió a tiempo.",
+  "bad-response": "El registro devolvió una respuesta que no se pudo leer.",
+};
+
 export default function Domains() {
   const { catalog } = useCatalog();
   const [name, setName] = useState("");
+  const [lookup, setLookup] = useState<Lookup>({ state: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
   const searchHint = useCopy(
     "searchHint",
-    "No se consulta la disponibilidad aquí. El botón abre el portal de cliente para verificar y registrar el dominio.",
+    "Comprobamos la disponibilidad en el registro oficial de la extensión. El registro se completa en el portal de cliente.",
   );
-  const [message, setMessage] = useState(searchHint);
 
   const kicker = useCopy("kicker", "Domain Registration");
   const title = useCopy("title", "Encuentra");
   const titleAccent = useCopy("titleAccent", "tu lugar en línea.");
   const lead = useCopy(
     "lead",
-    "Esta página no registra dominios. La búsqueda abre el portal externo para comprobar disponibilidad y completar el registro allí.",
+    "Escribe el dominio que quieres y te decimos si está libre. El registro y la renovación se gestionan en tu panel de cliente.",
   );
-  const searchPlaceholder = useCopy(
-    "searchPlaceholder",
-    "Escribe tu dominio perfecto",
-  );
-  const searchButton = useCopy("searchButton", "Abrir portal →");
+  const searchPlaceholder = useCopy("searchPlaceholder", "Escribe tu dominio perfecto");
+  const searchButton = useCopy("searchButton", "Comprobar");
   const stepsKicker = useCopy("stepsKicker", "Cómo funciona");
   const stepsTitle = useCopy("stepsTitle", "Tu dominio,");
   const stepsTitleAccent = useCopy("stepsTitleAccent", "en tres pasos.");
   const stepsLead = useCopy(
     "stepsLead",
-    "La comprobación y el registro ocurren en el portal externo, no en esta web.",
+    "La comprobación ocurre aquí; el pago y el registro, en el portal de cliente.",
   );
   const stepItems = [
     {
@@ -48,7 +61,7 @@ export default function Domains() {
       title: useCopy("step2Title", "Verifica la disponibilidad"),
       text: useCopy(
         "step2Text",
-        "La disponibilidad se comprueba en el portal de cliente (WHMCS). Si está libre, lo añades al carrito y completas el registro.",
+        "Consultamos el registro oficial de la extensión y te decimos si está libre, ocupado o si el registro no respondió.",
       ),
     },
     {
@@ -86,13 +99,35 @@ export default function Domains() {
     inputRef.current?.focus();
   }
 
-  function onSearch(e: FormEvent) {
-    e.preventDefault();
-    const domain = name.trim();
-    if (!domain) return;
-    setMessage(`Comprobando ${domain} en el portal de cliente…`);
-    window.location.href = `${catalog.settings.whmcs}/cart.php?a=add&domain=register&query=${encodeURIComponent(domain)}`;
+  async function onSearch(event: FormEvent) {
+    event.preventDefault();
+    const query = name.trim();
+    if (!query || lookup.state === "checking") return;
+    setLookup({ state: "checking", domain: query });
+    try {
+      const response = await fetch(`/api/domains?name=${encodeURIComponent(query)}`);
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; domain?: string; state?: string; reason?: string }
+        | null;
+      if (!response.ok || !payload?.ok || !payload.domain) {
+        setLookup({
+          state: "error",
+          message: payload?.error || "No se pudo comprobar el dominio.",
+        });
+        return;
+      }
+      if (payload.state === "available" || payload.state === "registered") {
+        setLookup({ state: payload.state, domain: payload.domain });
+        return;
+      }
+      setLookup({ state: "unverified", domain: payload.domain, reason: payload.reason });
+    } catch {
+      setLookup({ state: "error", message: "No hubo conexión al comprobar el dominio." });
+    }
   }
+
+  const registerUrl = (domain: string) =>
+    `${catalog.settings.whmcs}/cart.php?a=add&domain=register&query=${encodeURIComponent(domain)}`;
 
   return (
     <>
@@ -110,19 +145,19 @@ export default function Domains() {
           <input
             ref={inputRef}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (lookup.state !== "idle") setLookup({ state: "idle" });
+            }}
             placeholder={searchPlaceholder}
+            maxLength={255}
             required
           />
-          <button className="btn primary" type="submit">
-            {searchButton}
+          <button className="btn primary" type="submit" disabled={lookup.state === "checking"}>
+            {lookup.state === "checking" ? "Comprobando…" : searchButton}
           </button>
         </form>
-        <div
-          className="tld-chips"
-          role="group"
-          aria-label="Extensiones de dominio"
-        >
+        <div className="tld-chips" role="group" aria-label="Extensiones de dominio">
           <span className="muted">Extensión:</span>
           {TLDS.map((tld) => (
             <button
@@ -136,20 +171,40 @@ export default function Domains() {
             </button>
           ))}
         </div>
-        <p className="notice" id="domain-result">
-          {message}
-        </p>
-        <p className="notice">
-          La disponibilidad no se consulta en este sitio. Buscar abre el portal
-          externo y no completa un registro aquí.
-        </p>
+        <div className="notice" id="domain-result" role="status" aria-live="polite">
+          {lookup.state === "idle" ? <p>{searchHint}</p> : null}
+          {lookup.state === "checking" ? <p>Comprobando {lookup.domain}…</p> : null}
+          {lookup.state === "available" ? (
+            <p>
+              <strong>{lookup.domain} está libre.</strong>{" "}
+              <a className="btn primary" href={registerUrl(lookup.domain)} rel="noopener">
+                Registrarlo en el portal ↗
+              </a>
+            </p>
+          ) : null}
+          {lookup.state === "registered" ? (
+            <p>
+              <strong>{lookup.domain} ya está registrado.</strong> Prueba otra extensión o otro
+              nombre.
+            </p>
+          ) : null}
+          {lookup.state === "unverified" ? (
+            <p>
+              No pudimos confirmar {lookup.domain}.{" "}
+              {UNVERIFIED_REASONS[lookup.reason ?? ""] || "El registro no respondió."}{" "}
+              <a href={registerUrl(lookup.domain)} rel="noopener">
+                Comprobarlo en el portal ↗
+              </a>
+            </p>
+          ) : null}
+          {lookup.state === "error" ? <p>{lookup.message}</p> : null}
+        </div>
         <section className="section">
           <SectionHead
             kicker={stepsKicker}
             title={
               <>
-                {stepsTitle}{" "}
-                <span className="neon-text">{stepsTitleAccent}</span>
+                {stepsTitle} <span className="neon-text">{stepsTitleAccent}</span>
               </>
             }
             lead={stepsLead}

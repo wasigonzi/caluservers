@@ -343,12 +343,3 @@ export function PlanCard({
     </article>
   );
 }
-
-export function openWhmcsTicket(
-  whmcs: string,
-  fields: { label: string; value: string }[],
-) {
-  const text = fields.map((f) => `${f.label}: ${f.value}`).join("\n");
-  const url = `${whmcs}/submitticket.php?message=${encodeURIComponent(text)}`;
-  window.open(url, "_blank");
-}

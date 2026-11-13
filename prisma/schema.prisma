@@ -30,6 +30,49 @@ model LoginThrottle {
   updatedAt   DateTime @updatedAt
 }
 
+/// Límite de peticiones públicas (contacto, consulta de dominios) compartido por todas
+/// las instancias. La clave es un HMAC de ámbito + IP, nunca la IP en claro.
+/// Si la tabla no existe, la ruta pública se rechaza: no hay modo sin límite.
+model RequestThrottle {
+  id          String   @id
+  hits        Int
+  windowStart DateTime
+  updatedAt   DateTime @updatedAt
+}
+
+/// Mensajes recibidos por los formularios propios (contacto y abuso).
+/// `delivered` dice si el correo de aviso salió; un falso no invalida el mensaje guardado.
+model ContactMessage {
+  id        String   @id @default(cuid())
+  kind      String
+  name      String
+  email     String
+  topic     String
+  target    String?
+  body      String   @db.Text
+  status    String
+  delivered Boolean  @default(false)
+  clientKey String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([kind, createdAt])
+}
+
+/// Alta automática en WHM. Desactivada por defecto: sin `enabled` y sin paquete
+/// no se llama a WHM. Las credenciales de escritura viven aparte, cifradas,
+/// en IntegrationConfig("whm-provision").
+model ProvisionSetting {
+  id          String   @id @default("whm")
+  enabled     Boolean  @default(false)
+  /// Paquete WHM por defecto para los planes de hosting.
+  packageName String   @default("")
+  /// Paquete por plan: { planId: "paquete" }. Si falta uno, se usa packageName.
+  packageByPlan Json?
+  updatedAt   DateTime @updatedAt
+}
+
 /// Ajustes públicos del sitio (contacto, redes, contenido, visibilidad, apariencia).
 /// Claves esperadas: whmcs, theme, network_status, contact, social, content, visibility, appearance.
 /// Aplicar con: npx prisma migrate deploy (o db push en desarrollo). No ejecutar en remoto desde CI de este PR.
@@ -128,6 +171,9 @@ model CustomerOrder {
   idempotencyKey  String
   planId          String
   planName        String
+  /// Dominio que el cliente declara para el servicio. Obligatorio para el alta
+  /// automática de hosting; nulo en pedidos anteriores y en planes sin cPanel.
+  domain          String?
   currency        String
   totalCents      Int
   status          String
@@ -165,7 +211,7 @@ model CustomerInvoice {
   status     String
   createdAt  DateTime @default(now())
   lines      InvoiceLine[]
-  payment    ManualPayment?
+  payment    Payment?
 }
 
 model InvoiceLine {
@@ -178,7 +224,11 @@ model InvoiceLine {
   totalCents  Int
 }
 
-model ManualPayment {
+/// Un cobro por factura, sea manual o de una pasarela. La tabla conserva el nombre
+/// `ManualPayment` para no romper las migraciones ya aplicadas.
+/// `provider` = "manual" | "paypal". `providerRef` es el identificador de captura
+/// de la pasarela y es único: es lo que hace idempotente el webhook.
+model Payment {
   id          String          @id @default(cuid())
   invoiceId   String          @unique
   invoice     CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
@@ -187,20 +237,32 @@ model ManualPayment {
   status      String
   note        String
   actor       String
+  provider    String          @default("manual")
+  providerRef String?         @unique
   createdAt   DateTime        @default(now())
+
+  @@map("ManualPayment")
 }
 
+/// `status`: pending_provision | provisioning | active | cancelled.
+/// `provisioning` es un cerrojo: lo toma una sola llamada y evita dos altas en WHM.
 model CustomerService {
-  id        String        @id @default(cuid())
-  userId    String
-  orderId   String        @unique
-  order     CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  planId    String
-  planName  String
-  status    String
-  note      String
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  userId            String
+  orderId           String        @unique
+  order             CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  planId            String
+  planName          String
+  status            String
+  note              String
+  /// Usuario cPanel creado en WHM. Si existe, el alta ya ocurrió y no se repite.
+  cpanelUser        String?       @unique
+  provisionedAt     DateTime?
+  provisionAttempts Int           @default(0)
+  /// Último motivo de fallo, ya saneado. Nunca contraseñas ni tokens.
+  provisionError    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   @@index([userId])
 }

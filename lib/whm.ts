@@ -1,8 +1,11 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
+import { openSecret, sealSecret, SecretBoxError } from "@/lib/secret-box";
 import { whmBase, validateIdentity, WhmError } from "@/lib/whm-security";
 import { readWhm, type WhmCredentials } from "@/lib/whm-transport";
+
+/** AAD propio de las credenciales de SOLO LECTURA. */
+const WHM_AAD = "caluservers:whm:v1";
 
 export type WhmPublicConfig = {
   url: string;
@@ -11,50 +14,22 @@ export type WhmPublicConfig = {
   configured: boolean;
   state: "pending" | "unverified";
 };
+/** Falla cerrado si la clave maestra existente no está disponible. */
 function key() {
   const value = process.env.SETTINGS_ENCRYPTION_KEY || "";
   if (!/^[a-f0-9]{64}$/i.test(value)) throw new WhmError("key");
   return Buffer.from(value, "hex");
 }
 export function encryptWhm(credentials: WhmCredentials) {
-  const iv = randomBytes(12),
-    cipher = createCipheriv("aes-256-gcm", key(), iv);
-  cipher.setAAD(Buffer.from("caluservers:whm:v1"));
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(credentials)),
-    cipher.final(),
-  ]);
-  return [
-    "v1",
-    iv.toString("hex"),
-    cipher.getAuthTag().toString("hex"),
-    encrypted.toString("hex"),
-  ].join(":");
+  try {
+    return sealSecret(WHM_AAD, JSON.stringify(credentials));
+  } catch (error) {
+    throw error instanceof SecretBoxError ? new WhmError("key") : error;
+  }
 }
 export function decryptWhm(value: string): WhmCredentials {
   try {
-    const [version, iv, tag, body, ...rest] = value.split(":");
-    if (
-      version !== "v1" ||
-      rest.length ||
-      !/^[a-f0-9]{24}$/.test(iv) ||
-      !/^[a-f0-9]{32}$/.test(tag) ||
-      !/^(?:[a-f0-9]{2})+$/.test(body)
-    )
-      throw new WhmError("storage");
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      key(),
-      Buffer.from(iv, "hex"),
-    );
-    decipher.setAAD(Buffer.from("caluservers:whm:v1"));
-    decipher.setAuthTag(Buffer.from(tag, "hex"));
-    const credentials = JSON.parse(
-      Buffer.concat([
-        decipher.update(Buffer.from(body, "hex")),
-        decipher.final(),
-      ]).toString(),
-    );
+    const credentials = JSON.parse(openSecret(WHM_AAD, value));
     if (
       typeof credentials.username !== "string" ||
       typeof credentials.token !== "string"
@@ -63,7 +38,10 @@ export function decryptWhm(value: string): WhmCredentials {
     validateIdentity(credentials.username, credentials.token);
     return credentials;
   } catch (error) {
-    throw error instanceof WhmError ? error : new WhmError("storage");
+    if (error instanceof WhmError) throw error;
+    throw new WhmError(
+      error instanceof SecretBoxError && error.code === "key" ? "key" : "storage",
+    );
   }
 }
 export function publicWhmConfig(
