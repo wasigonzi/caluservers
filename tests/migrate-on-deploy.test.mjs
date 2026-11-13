@@ -17,3 +17,46 @@ test("otras URL no se reescriben", () => {
   assert.equal(sessionPoolerUrl("no es una url"), null);
   assert.equal(sessionPoolerUrl(""), null);
 });
+
+const { additivePlan } = await import("../scripts/migrate-on-deploy.mjs");
+
+test("un guion que solo añade se acepta entero", () => {
+  const plan = additivePlan(`-- CreateTable
+CREATE TABLE "ContactMessage" (
+    "id" TEXT NOT NULL,
+    CONSTRAINT "ContactMessage_pkey" PRIMARY KEY ("id")
+);
+
+-- AlterTable
+ALTER TABLE "CustomerService" ADD COLUMN     "cpanelUser" TEXT,
+ADD COLUMN     "provisionAttempts" INTEGER NOT NULL DEFAULT 0;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CustomerService_cpanelUser_key" ON "CustomerService"("cpanelUser");
+`);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.apply.length, 3);
+});
+
+test("borrar una tabla ajena se ignora, no se ejecuta", () => {
+  const plan = additivePlan(`DROP TABLE "otra_app";\n\nCREATE TABLE "X" ("id" TEXT NOT NULL);\n`);
+  assert.equal(plan.ok, true);
+  assert.deepEqual(plan.skipped, ['DROP TABLE "otra_app"']);
+  assert.equal(plan.apply.length, 1);
+});
+
+test("cualquier cambio que no sea añadir lo rechaza todo", () => {
+  for (const sql of [
+    'ALTER TABLE "user" DROP COLUMN "email";',
+    'ALTER TABLE "user" ALTER COLUMN "name" SET NOT NULL;',
+    'ALTER TABLE "user" ADD COLUMN "a" TEXT,\nDROP COLUMN "b";',
+    'DROP INDEX "user_email_key";',
+    'ALTER TABLE "a" RENAME TO "b";',
+    'CREATE TABLE "X" ("id" TEXT);\nDELETE FROM "user";',
+    'UPDATE "user" SET "name" = \'x\';',
+  ]) {
+    const plan = additivePlan(sql);
+    assert.equal(plan.ok, false, sql);
+    assert.equal(plan.apply.length, 0);
+  }
+});
