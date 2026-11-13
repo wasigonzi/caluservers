@@ -3,6 +3,12 @@
 import {
   LayoutDashboard,
   Palette,
+  Brush,
+  PenLine,
+  LayoutList,
+  Tags,
+  SearchCheck,
+  Navigation,
   FileText,
   Users,
   Server,
@@ -14,72 +20,84 @@ import {
   History,
   Boxes,
   Settings,
+  SlidersHorizontal,
   ExternalLink,
   Menu,
   LogOut,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-const NAV_ICONS = {
-  "/admin": LayoutDashboard,
-  "/admin/site": Palette,
-  "/admin/pages": FileText,
-  "/admin/clientes": Users,
-  "/admin/facturas": Receipt,
-  "/admin/servicios": Boxes,
-  "/admin/tickets": LifeBuoy,
-  "/admin/mensajes": Inbox,
-  "/admin/actividad": History,
-  "/admin/accounts": Server,
-  "/admin/packages": Package,
-  "/admin/provision": ServerCog,
-  "/admin/settings": Settings,
-};
 export type NavBadges = Partial<Record<"facturas" | "servicios" | "tickets" | "mensajes", number>>;
-type NavItem = { label: string; href: keyof typeof NAV_ICONS; badge?: keyof NavBadges };
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: keyof NavBadges;
+  /** Sección del estudio del sitio (`/admin/site?seccion=`). */
+  section?: string;
+};
 type NavGroup = { title: string; items: NavItem[] };
+
+const site = (label: string, section: string, icon: LucideIcon): NavItem => ({
+  label,
+  icon,
+  section,
+  href: section === "branding" ? "/admin/site" : `/admin/site?seccion=${section}`,
+});
 
 const GROUPS: NavGroup[] = [
   {
     title: "Resumen",
     items: [
-      { label: "Dashboard", href: "/admin" },
-      { label: "Actividad", href: "/admin/actividad" },
+      { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+      { label: "Actividad", href: "/admin/actividad", icon: History },
     ],
   },
   {
     title: "Negocio",
     items: [
-      { label: "Clientes", href: "/admin/clientes" },
-      { label: "Pedidos y facturas", href: "/admin/facturas", badge: "facturas" },
-      { label: "Servicios", href: "/admin/servicios", badge: "servicios" },
-      { label: "Tickets", href: "/admin/tickets", badge: "tickets" },
-      { label: "Mensajes", href: "/admin/mensajes", badge: "mensajes" },
+      { label: "Clientes", href: "/admin/clientes", icon: Users },
+      { label: "Pedidos y facturas", href: "/admin/facturas", icon: Receipt, badge: "facturas" },
+      { label: "Servicios", href: "/admin/servicios", icon: Boxes, badge: "servicios" },
+      { label: "Tickets", href: "/admin/tickets", icon: LifeBuoy, badge: "tickets" },
+      { label: "Mensajes", href: "/admin/mensajes", icon: Inbox, badge: "mensajes" },
     ],
   },
   {
-    title: "Sitio",
+    title: "Sitio web",
     items: [
-      { label: "Marca y catálogo", href: "/admin/site" },
-      { label: "Páginas / contenido", href: "/admin/pages" },
+      site("Branding", "branding", Palette),
+      site("Apariencia", "appearance", Brush),
+      site("Contenido y contacto", "content", PenLine),
+      site("Secciones del inicio", "sections", LayoutList),
+      site("Catálogo y precios", "catalog", Tags),
+      site("SEO", "seo", SearchCheck),
+      site("Navegación", "nav", Navigation),
+      { label: "Textos de páginas", href: "/admin/pages", icon: FileText },
     ],
   },
   {
     title: "Servidor WHM",
     items: [
-      { label: "Cuentas cPanel", href: "/admin/accounts" },
-      { label: "Paquetes", href: "/admin/packages" },
-      { label: "Conexión WHM", href: "/admin/settings" },
-      { label: "Alta automática", href: "/admin/provision" },
+      { label: "Cuentas cPanel", href: "/admin/accounts", icon: Server },
+      { label: "Paquetes", href: "/admin/packages", icon: Package },
+      { label: "Conexión WHM", href: "/admin/settings", icon: Settings },
+      { label: "Alta automática", href: "/admin/provision", icon: ServerCog },
     ],
+  },
+  {
+    title: "Configuración",
+    items: [{ label: "General", href: "/admin/configuracion", icon: SlidersHorizontal }],
   },
 ];
 
-function isActive(pathname: string, href: string) {
-  if (href === "/admin") return pathname === "/admin";
-  return pathname === href || pathname.startsWith(href + "/");
+function isActive(pathname: string, section: string, item: NavItem) {
+  if (item.section) return pathname === "/admin/site" && section === item.section;
+  if (item.href === "/admin") return pathname === "/admin";
+  return pathname === item.href || pathname.startsWith(item.href + "/");
 }
 
 export default function AdminShell({
@@ -93,6 +111,10 @@ export default function AdminShell({
   badges?: NavBadges;
 }) {
   const pathname = usePathname();
+  const params = useSearchParams();
+  // La vista previa es parte del estudio, no una sección del menú: resalta Branding.
+  const requested = params.get("seccion") || "branding";
+  const section = requested === "preview" ? "branding" : requested;
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const asideRef = useRef<HTMLElement>(null);
@@ -110,7 +132,7 @@ export default function AdminShell({
 
   useEffect(() => {
     setOpen(false);
-  }, [pathname]);
+  }, [pathname, section]);
 
   useEffect(() => {
     if (!open) return;
@@ -146,7 +168,7 @@ export default function AdminShell({
   }, [open]);
 
   const crumb =
-    GROUPS.flatMap((g) => g.items).find((i) => isActive(pathname, i.href))
+    GROUPS.flatMap((g) => g.items).find((i) => isActive(pathname, section, i))
       ?.label || "Admin";
 
   const nav = (
@@ -172,19 +194,16 @@ export default function AdminShell({
                 key={item.href}
                 href={item.href}
                 className={
-                  isActive(pathname, item.href)
+                  isActive(pathname, section, item)
                     ? "admin-nav-link active"
                     : "admin-nav-link"
                 }
                 aria-current={
-                  isActive(pathname, item.href) ? "page" : undefined
+                  isActive(pathname, section, item) ? "page" : undefined
                 }
                 onClick={() => setOpen(false)}
               >
-                {(() => {
-                  const Icon = NAV_ICONS[item.href];
-                  return <Icon size={18} aria-hidden="true" />;
-                })()}
+                <item.icon size={18} aria-hidden="true" />
                 <span>{item.label}</span>
                 {item.badge && badges[item.badge] ? (
                   <span className="nav-badge">

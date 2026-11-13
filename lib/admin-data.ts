@@ -50,20 +50,53 @@ export type NavCounts = {
   mensajes: number;
 };
 
-/** Pendientes que se muestran como contador en el menú. Sin base, no hay contadores. */
-export async function navCounts(): Promise<NavCounts | null> {
-  try {
-    const [facturas, servicios, tickets, mensajes] = await Promise.all([
-      db.customerInvoice.count({ where: { status: "issued" } }),
-      db.customerService.count({ where: { status: "pending_provision" } }),
-      db.supportTicket.count({ where: { status: "open" } }),
-      db.contactMessage.count({ where: { status: "new" } }),
-    ]);
-    return { facturas, servicios, tickets, mensajes };
-  } catch (error) {
-    loadFailure(error, "menu");
-    return null;
+/**
+ * Pendientes que se muestran como contador en el menú. Cada contador se lee por
+ * separado: si falta una tabla, los demás siguen saliendo.
+ */
+export async function navCounts(): Promise<Partial<NavCounts>> {
+  const read = async (key: keyof NavCounts, query: () => Promise<number>) => {
+    try {
+      return [key, await query()] as const;
+    } catch (error) {
+      loadFailure(error, `menu.${key}`);
+      return null;
+    }
+  };
+  const results = await Promise.all([
+    read("facturas", () => db.customerInvoice.count({ where: { status: "issued" } })),
+    read("servicios", () => db.customerService.count({ where: { status: "pending_provision" } })),
+    read("tickets", () => db.supportTicket.count({ where: { status: "open" } })),
+    read("mensajes", () => db.contactMessage.count({ where: { status: "new" } })),
+  ]);
+  return Object.fromEntries(results.filter((r) => r !== null));
+}
+
+/**
+ * Comprueba que el esquema tiene lo que añadió la última migración.
+ * Devuelve lo que falta, con nombres de tabla o columna y nada más.
+ */
+export async function schemaGaps(): Promise<string[]> {
+  const probes: [string, () => Promise<unknown>][] = [
+    ["la tabla ContactMessage", () => db.contactMessage.findFirst({ select: { id: true } })],
+    ["la tabla RequestThrottle", () => db.requestThrottle.findFirst({ select: { id: true } })],
+    ["la tabla ProvisionSetting", () => db.provisionSetting.findFirst({ select: { id: true } })],
+    [
+      "columnas de alta en CustomerService",
+      () => db.customerService.findFirst({ select: { cpanelUser: true, provisionError: true } }),
+    ],
+    ["columnas de pasarela en los pagos", () => db.payment.findFirst({ select: { provider: true } })],
+    ["el dominio en CustomerOrder", () => db.customerOrder.findFirst({ select: { domain: true } })],
+  ];
+  const gaps: string[] = [];
+  for (const [name, probe] of probes) {
+    try {
+      await probe();
+    } catch (error) {
+      if (loadFailure(error, "schema") === "migration") gaps.push(name);
+    }
   }
+  return gaps;
 }
 
 export type ActivityEntry = {
@@ -166,7 +199,7 @@ export async function systemChecks(): Promise<SystemCheck[]> {
           ? `Avisos internos hacia ${inbox}`
           : "Activo, pero sin dirección para avisos internos."
         : "Sin SMTP_URL no salen verificaciones, avisos ni credenciales.",
-      href: "/admin/site",
+      href: "/admin/configuracion",
     },
     {
       label: "Cobro con PayPal",

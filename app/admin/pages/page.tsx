@@ -5,6 +5,7 @@ import {
   getAllPageContent,
   pageContentDbReady,
 } from "@/lib/page-content-db";
+import { PageHeader } from "@/components/admin/ui";
 import PageContentStudio from "@/components/admin/PageContentStudio";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +25,11 @@ export default async function AdminPagesPage() {
   }));
   return (
     <>
-      <p className="accent">CONTENIDO · CMS</p>
-      <h1>Textos de páginas</h1>
-      <p className="muted">
-        Edita títulos, leads, FAQ y copy de cada página pública sin tocar código.
-        Texto plano (sin HTML). Requiere migración <code>PageContent</code>.
-      </p>
+      <PageHeader
+        eyebrow="SITIO WEB"
+        title="Textos de páginas"
+        description="Edita títulos, entradillas, preguntas frecuentes y textos de cada página pública sin tocar código. Texto plano, sin HTML."
+      />
       <PageContentStudio
         initialCatalog={catalog}
         initialPages={pages}

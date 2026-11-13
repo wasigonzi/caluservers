@@ -15,7 +15,7 @@ export default async function AdminLayout({
 }) {
   if (!(await isAdmin())) return children;
   const email = process.env.ADMIN_EMAIL || undefined;
-  const badges = (await navCounts()) ?? {};
+  const badges = await navCounts();
   return (
     <AdminShell email={email} badges={badges}>
       {children}
