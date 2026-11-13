@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth";
-import { PAGE_SIZE } from "@/lib/admin-data";
+import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateTime, pageNumber, searchTerm, ticketStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import {
@@ -45,7 +45,7 @@ export default async function TicketsPage({
   const where: Prisma.SupportTicketWhereInput =
     filter === "all" ? search : { ...search, status: filter };
 
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -66,8 +66,8 @@ export default async function TicketsPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });
-  } catch {
-    failed = true;
+  } catch (error) {
+    failed = loadFailure(error, "tickets");
   }
   const all = [...counts.values()].reduce((sum, n) => sum + n, 0);
   const tab = (label: string, key: Filter, count: number) => ({
@@ -101,7 +101,7 @@ export default async function TicketsPage({
           hidden={{ estado: filter === "open" ? "" : filter }}
         />
       </div>
-      {failed ? <LoadError what="los tickets" /> : null}
+      {failed ? <LoadError what="los tickets" reason={failed} /> : null}
       {!failed && !tickets.length ? (
         <EmptyState title={q ? "Ningún ticket coincide con la búsqueda." : "No hay tickets en este estado."} />
       ) : null}

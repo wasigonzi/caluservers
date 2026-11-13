@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth";
-import { PAGE_SIZE } from "@/lib/admin-data";
+import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, money, pageNumber, searchTerm } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import {
@@ -34,7 +34,7 @@ export default async function CustomersPage({
       }
     : {};
 
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -80,8 +80,8 @@ export default async function CustomersPage({
         paid,
       };
     });
-  } catch {
-    failed = true;
+  } catch (error) {
+    failed = loadFailure(error, "clientes");
   }
 
   return (
@@ -94,7 +94,7 @@ export default async function CustomersPage({
       <div className="toolbar">
         <SearchForm action="/admin/clientes" value={q} placeholder="Buscar por nombre o correo" />
       </div>
-      {failed ? <LoadError what="los clientes" /> : null}
+      {failed ? <LoadError what="los clientes" reason={failed} /> : null}
       {!failed && !rows.length ? (
         <EmptyState title={q ? "Ningún cliente coincide con la búsqueda." : "Todavía no hay clientes."}>
           {q ? null : "Aparecerán aquí cuando alguien se registre en /cuenta/registro."}

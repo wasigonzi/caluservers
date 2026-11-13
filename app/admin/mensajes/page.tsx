@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { ContactMessage } from "@prisma/client";
 import MessageActions from "@/components/admin/MessageActions";
 import { isAdmin } from "@/lib/auth";
-import { PAGE_SIZE } from "@/lib/admin-data";
+import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateTime, pageNumber } from "@/lib/admin-format";
 import { noticeRecipient } from "@/lib/contact-intake";
 import { db } from "@/lib/db";
@@ -34,7 +34,7 @@ export default async function MessagesAdminPage({
   const status = params.estado === "read" || params.estado === "archived" ? params.estado : "new";
 
   let messages: ContactMessage[] = [];
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -51,9 +51,9 @@ export default async function MessagesAdminPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });
-  } catch {
+  } catch (error) {
     // Falta la migración o la base no responde: se dice, no se finge una bandeja vacía.
-    failed = true;
+    failed = loadFailure(error, "mensajes");
   }
   const inbox = await noticeRecipient();
   const tab = (label: string, key: string) => ({
@@ -85,7 +85,7 @@ export default async function MessagesAdminPage({
           items={[tab("Nuevos", "new"), tab("Leídos", "read"), tab("Archivados", "archived")]}
         />
       </div>
-      {failed ? <LoadError what="la bandeja" /> : null}
+      {failed ? <LoadError what="la bandeja" reason={failed} /> : null}
       {!failed && !messages.length ? <EmptyState title="No hay mensajes en esta bandeja." /> : null}
       <ul className="message-list">
         {messages.map((message) => (

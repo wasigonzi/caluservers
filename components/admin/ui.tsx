@@ -128,11 +128,25 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   );
 }
 
-export function LoadError({ what }: { what: string }) {
+const LOAD_HELP = {
+  migration:
+    "A la base de datos de este entorno le faltan tablas o columnas. Aplica las migraciones pendientes con «npx prisma migrate deploy» usando su DATABASE_URL.",
+  connection:
+    "La base de datos no respondió o rechazó la conexión. Revisa DATABASE_URL y que el servidor esté disponible.",
+  unknown:
+    "La consulta falló por una causa no clasificada. El registro del servidor guarda el código del error.",
+} as const;
+
+export function LoadError({
+  what,
+  reason = "unknown",
+}: {
+  what: string;
+  reason?: keyof typeof LOAD_HELP;
+}) {
   return (
     <p className="error load-error" role="alert">
-      No se pudo leer {what}. Aplica las migraciones (npx prisma migrate deploy) y revisa la
-      conexión con la base de datos.
+      No se pudo leer {what}. {LOAD_HELP[reason]}
     </p>
   );
 }

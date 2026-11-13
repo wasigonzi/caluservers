@@ -2,6 +2,7 @@ import "server-only";
 import { billingPolicy } from "@/lib/commerce";
 import { noticeRecipient } from "@/lib/contact-intake";
 import { db } from "@/lib/db";
+import { reportDbError } from "@/lib/db-errors";
 import { mailerConfigured } from "@/lib/mailer";
 import { monthLabel, monthStart } from "@/lib/admin-format";
 import { paypalEnv, paypalReady, paypalWebhookReady } from "@/lib/paypal";
@@ -9,6 +10,38 @@ import { whmConfiguration } from "@/lib/whm";
 import { provisionConfiguration } from "@/lib/whm-provision";
 
 export const PAGE_SIZE = 25;
+
+export type LoadFailure = "migration" | "connection" | "unknown";
+
+function safeName(value: unknown): string | null {
+  return typeof value === "string" && /^[\w."]{1,80}$/.test(value) ? value : null;
+}
+
+/**
+ * Registra por qué falló una lectura del panel y devuelve la causa para mostrarla.
+ * Al registro solo van códigos y nombres de tabla o columna: nunca el mensaje del
+ * error ni datos de conexión.
+ */
+export function loadFailure(error: unknown, section: string): LoadFailure {
+  const summary = reportDbError(error, process.env.DATABASE_URL);
+  const meta =
+    typeof error === "object" && error !== null
+      ? (Object.getOwnPropertyDescriptor(error, "meta")?.value as Record<string, unknown> | undefined)
+      : undefined;
+  console.error("admin_load_failure", {
+    section,
+    category: summary.category,
+    codes: summary.codes,
+    model: safeName(meta?.modelName),
+    table: safeName(meta?.table),
+    column: safeName(meta?.column),
+  });
+  if (summary.category === "missing_table" || summary.category === "missing_column") return "migration";
+  if (summary.category === "unknown" || summary.category === "query" || summary.category === "constraint") {
+    return "unknown";
+  }
+  return "connection";
+}
 
 export type NavCounts = {
   facturas: number;
@@ -27,7 +60,8 @@ export async function navCounts(): Promise<NavCounts | null> {
       db.contactMessage.count({ where: { status: "new" } }),
     ]);
     return { facturas, servicios, tickets, mensajes };
-  } catch {
+  } catch (error) {
+    loadFailure(error, "menu");
     return null;
   }
 }
