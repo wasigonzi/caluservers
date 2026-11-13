@@ -52,6 +52,17 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.locator("form button.btn").click();
   await page.waitForURL("**/admin");
   await expect(page.getByRole("link", { name: /1\s*factura por cobrar/ })).toBeVisible();
+  // El admin define cómo pagar a mano; el cliente lo ve en su factura pendiente.
+  const instructions = await page.request.post("/api/admin/system", {
+    headers: { origin: "http://127.0.0.1:3011" },
+    data: { action: "save-payment-instructions", text: "ATH Móvil de prueba al 787-555-0100" },
+  });
+  expect(instructions.status()).toBe(200);
+  await page.goto("/cuenta");
+  await expect(page.getByRole("heading", { level: 1, name: "Hola, Cliente" })).toBeVisible();
+  await page.getByRole("link", { name: /Pagar la factura PF-/ }).click();
+  await expect(page.getByText("ATH Móvil de prueba al 787-555-0100")).toBeVisible();
+  await expect(page.locator(".invoice-doc .badge", { hasText: "Por pagar" })).toBeVisible();
   await page.goto("/admin/facturas");
   await page.getByRole("button", { name: "Confirmar pago" }).click();
   await page.getByLabel("Nota del cobro").fill("transferencia revisada en el panel");
@@ -78,8 +89,20 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/cuenta$/);
+  await expect(page.getByText("Todo al día")).toBeVisible();
+  await page.getByRole("navigation", { name: "Mi cuenta" }).getByRole("link", { name: "Mis servicios" }).click();
   await expect(page.getByText("cliente-prueba.example")).toBeVisible();
-  await expect(page.getByText(/pagada \(manual\)/)).toBeVisible();
+  await expect(page.locator(".service-tile .badge", { hasText: "Activo" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Mi cuenta" }).getByRole("link", { name: "Facturas" }).click();
+  await page.locator("td a.row-link").first().click();
+  await expect(page.getByText(/Pagada el/)).toBeVisible();
+  // Una factura pagada ya no enseña cómo pagar.
+  await expect(page.getByText("ATH Móvil de prueba")).toHaveCount(0);
+  // Perfil: el nombre se puede cambiar.
+  await page.goto("/cuenta/perfil");
+  await page.getByLabel("Nombre").fill("Cliente Renombrado");
+  await page.getByRole("button", { name: "Guardar nombre" }).click();
+  await expect(page.getByText("Nombre guardado.")).toBeVisible();
   await page.goto("/cuenta/tickets");
   await page.getByLabel("Asunto").fill("Duda de alta");
   await page.getByLabel("Mensaje").fill("¿Cuándo queda activo?");

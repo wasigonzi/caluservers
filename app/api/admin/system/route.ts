@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { BillingSettingsError, savePaymentInstructions } from "@/lib/billing-settings";
 import { db } from "@/lib/db";
 import { deliverNotice, mailerConfigured } from "@/lib/mailer";
 import { trustedWrite } from "@/lib/request";
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** Comprobaciones activas del panel de configuración. No cambian ningún ajuste. */
+/** Comprobaciones activas del panel de configuración y el texto de pago manual. */
 export async function POST(req: NextRequest) {
   if (!trustedWrite(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
@@ -56,6 +57,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ms: Date.now() - started });
     } catch {
       return NextResponse.json({ error: "La base de datos no respondió." }, { status: 503 });
+    }
+  }
+
+  if (body?.action === "save-payment-instructions") {
+    try {
+      const text = await savePaymentInstructions(body.text);
+      return NextResponse.json({ ok: true, text });
+    } catch (error) {
+      if (error instanceof BillingSettingsError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ error: "No se pudo guardar." }, { status: 503 });
     }
   }
 

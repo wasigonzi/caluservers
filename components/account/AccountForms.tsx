@@ -131,11 +131,17 @@ export function OrderButton({
         <p className="notice" role="status">{created.summary}</p>
         {created.invoiceId && paymentReady ? (
           <PayInvoiceButton invoiceId={created.invoiceId} />
-        ) : (
-          <p className="muted">
-            El cobro no está activo en esta web. Un administrador confirmará el pago.
+        ) : null}
+        {created.invoiceId ? (
+          <p>
+            <Link href={`/cuenta/facturas/${created.invoiceId}`}>
+              {paymentReady ? "Ver la factura y otras formas de pago" : "Ver la factura y cómo pagarla"}
+            </Link>
           </p>
-        )}
+        ) : null}
+        <p>
+          <Link href="/cuenta">Ir a mi cuenta</Link>
+        </p>
       </div>
     );
   }
@@ -392,5 +398,90 @@ export function SignOutButton() {
     >
       Cerrar sesión
     </button>
+  );
+}
+
+export function PrintButton() {
+  return (
+    <button className="btn secondary small no-print" type="button" onClick={() => window.print()}>
+      Imprimir o guardar PDF
+    </button>
+  );
+}
+
+export function ProfileForm({ name: initial, email }: { name: string; email: string }) {
+  const router = useRouter();
+  const [name, setName] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setMessage(null);
+        try {
+          const result = await customerAuthClient.updateUser({ name: name.trim() });
+          if (result.error) {
+            setMessage({ ok: false, text: "No se pudo guardar el nombre." });
+          } else {
+            setMessage({ ok: true, text: "Nombre guardado." });
+            router.refresh();
+          }
+        } catch {
+          setMessage({ ok: false, text: "No hubo conexión. Inténtalo de nuevo." });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="field">Nombre<input value={name} required minLength={2} maxLength={80} onChange={(event) => setName(event.target.value)} /></label>
+      <label className="field">Correo<input value={email} readOnly disabled /></label>
+      <p className="muted form-hint">El correo identifica tu cuenta. Para cambiarlo, abre un ticket.</p>
+      {message ? <p className={message.ok ? "ok" : "error"} role={message.ok ? "status" : "alert"}>{message.text}</p> : null}
+      <button className="btn" type="submit" disabled={busy || name.trim() === initial}>Guardar nombre</button>
+    </form>
+  );
+}
+
+export function ChangePasswordForm() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setMessage(null);
+        try {
+          const result = await customerAuthClient.changePassword({
+            currentPassword: current,
+            newPassword: next,
+            revokeOtherSessions: true,
+          });
+          if (result.error) {
+            setMessage({ ok: false, text: "No se pudo cambiar. Revisa la contraseña actual." });
+          } else {
+            setCurrent("");
+            setNext("");
+            setMessage({ ok: true, text: "Contraseña cambiada. Las demás sesiones se cerraron." });
+          }
+        } catch {
+          setMessage({ ok: false, text: "No hubo conexión. Inténtalo de nuevo." });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="field">Contraseña actual<input type="password" autoComplete="current-password" value={current} required onChange={(event) => setCurrent(event.target.value)} /></label>
+      <label className="field">Contraseña nueva<input type="password" autoComplete="new-password" value={next} required minLength={12} maxLength={128} onChange={(event) => setNext(event.target.value)} /></label>
+      <p className="muted form-hint">Mínimo 12 caracteres.</p>
+      {message ? <p className={message.ok ? "ok" : "error"} role={message.ok ? "status" : "alert"}>{message.text}</p> : null}
+      <button className="btn" type="submit" disabled={busy}>Cambiar contraseña</button>
+    </form>
   );
 }
