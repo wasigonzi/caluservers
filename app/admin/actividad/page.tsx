@@ -4,6 +4,8 @@ import {
   activityLog,
   activityTotal,
   actorNames,
+  loadFailure,
+  type LoadFailure,
   type ActivityEntry,
 } from "@/lib/admin-data";
 import { actionLabel, dateTime, pageNumber } from "@/lib/admin-format";
@@ -20,7 +22,7 @@ export default async function ActivityPage({
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const params = await searchParams;
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -32,8 +34,8 @@ export default async function ActivityPage({
     page = pageNumber(params.p, pages);
     entries = await activityLog(SIZE, (page - 1) * SIZE);
     names = await actorNames(entries);
-  } catch {
-    failed = true;
+  } catch (error) {
+    failed = loadFailure(error, "actividad");
   }
 
   return (
@@ -43,7 +45,7 @@ export default async function ActivityPage({
         title="Actividad"
         description="Diario de lo que ocurre en la tienda y en el panel: pedidos, cobros, altas y cambios de configuración. No se puede editar."
       />
-      {failed ? <LoadError what="el diario" /> : null}
+      {failed ? <LoadError what="el diario" reason={failed} /> : null}
       {!failed && !entries.length ? <EmptyState title="Todavía no hay actividad registrada." /> : null}
       {entries.length ? (
         <div className="table-wrap stack">

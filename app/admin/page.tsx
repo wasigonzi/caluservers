@@ -17,10 +17,12 @@ import {
   activityLog,
   actorNames,
   dashboardData,
+  loadFailure,
   navCounts,
   systemChecks,
   type ActivityEntry,
   type DashboardData,
+  type LoadFailure,
 } from "@/lib/admin-data";
 import { actionLabel, dateTime, money } from "@/lib/admin-format";
 import { whmConfiguration } from "@/lib/whm";
@@ -45,13 +47,15 @@ export default async function Admin() {
   } catch (error) {
     storageError = safeWhmError(error).message;
   }
+  let failed: LoadFailure | null = null;
   let data: DashboardData | null = null;
   let recent: ActivityEntry[] = [];
   let names = new Map<string, string>();
   try {
     [data, recent] = await Promise.all([dashboardData(), activityLog(8)]);
     names = await actorNames(recent);
-  } catch {
+  } catch (error) {
+    failed = loadFailure(error, "resumen");
     data = null;
   }
   const [counts, checks] = await Promise.all([navCounts(), systemChecks()]);
@@ -104,7 +108,7 @@ export default async function Admin() {
         </div>
       </header>
 
-      {!data ? <LoadError what="el resumen" /> : null}
+      {failed ? <LoadError what="el resumen" reason={failed} /> : null}
 
       {data ? (
         <section className="kpi-grid" aria-label="Indicadores">

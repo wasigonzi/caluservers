@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth";
-import { PAGE_SIZE } from "@/lib/admin-data";
+import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, invoiceStatus, money, pageNumber, searchTerm } from "@/lib/admin-format";
 import { billingPolicy } from "@/lib/commerce";
 import { db } from "@/lib/db";
@@ -50,7 +50,7 @@ export default async function InvoicesPage({
     filter === "all" ? search : { ...search, status: filter };
   const policy = billingPolicy();
 
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -71,8 +71,8 @@ export default async function InvoicesPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });
-  } catch {
-    failed = true;
+  } catch (error) {
+    failed = loadFailure(error, "facturas");
   }
   const all = [...counts.values()].reduce((sum, n) => sum + n, 0);
   const tab = (label: string, key: Filter, count: number) => ({
@@ -112,7 +112,7 @@ export default async function InvoicesPage({
           hidden={{ estado: filter === "issued" ? "" : filter }}
         />
       </div>
-      {failed ? <LoadError what="las facturas" /> : null}
+      {failed ? <LoadError what="las facturas" reason={failed} /> : null}
       {!failed && !invoices.length ? (
         <EmptyState title={q ? "Ninguna factura coincide con la búsqueda." : "No hay facturas en este estado."} />
       ) : null}

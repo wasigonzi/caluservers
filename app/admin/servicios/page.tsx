@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth";
-import { PAGE_SIZE } from "@/lib/admin-data";
+import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, pageNumber, searchTerm, serviceStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import { provisionConfiguration } from "@/lib/whm-provision";
@@ -53,7 +53,7 @@ export default async function ServicesPage({
         : { ...search, status: filter };
   const provision = await provisionConfiguration().catch(() => null);
 
-  let failed = false;
+  let failed: LoadFailure | null = null;
   let total = 0;
   let page = 1;
   let pages = 1;
@@ -74,8 +74,8 @@ export default async function ServicesPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });
-  } catch {
-    failed = true;
+  } catch (error) {
+    failed = loadFailure(error, "servicios");
   }
   const all = [...counts.values()].reduce((sum, n) => sum + n, 0);
   const tab = (label: string, key: Filter, count: number) => ({
@@ -122,7 +122,7 @@ export default async function ServicesPage({
           hidden={{ estado: filter === "all" ? "" : filter }}
         />
       </div>
-      {failed ? <LoadError what="los servicios" /> : null}
+      {failed ? <LoadError what="los servicios" reason={failed} /> : null}
       {!failed && !services.length ? (
         <EmptyState title={q ? "Ningún servicio coincide con la búsqueda." : "No hay servicios en este estado."} />
       ) : null}
