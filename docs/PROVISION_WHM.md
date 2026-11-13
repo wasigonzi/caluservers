@@ -42,7 +42,7 @@ Todos, o no se llama a WHM:
 
 El servicio vuelve a `pending_provision` con `provisionError`, un motivo saneado
 (código, nunca el texto del servidor ni el token). El cobro **no se deshace**. En
-`/admin/comercio` aparece el botón «Dar de alta en WHM ahora» para reintentar.
+`/admin/servicios` aparece el botón «Dar de alta en WHM ahora» para reintentar.
 
 Si la cuenta se crea pero el correo con la contraseña no sale, el servicio queda
 activo y `provisionError` lo dice: restablece la contraseña en WHM y entrégala tú.

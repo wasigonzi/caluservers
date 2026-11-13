@@ -15,7 +15,18 @@ export default defineConfig({
   workers: 1,
   timeout: 90_000,
   use: { baseURL, locale: "es-ES" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Opcional: un Chromium ya instalado, cuando no coincide con el que descarga Playwright.
+        launchOptions: process.env.E2E_CHROMIUM_PATH
+          ? { executablePath: process.env.E2E_CHROMIUM_PATH }
+          : {},
+      },
+    },
+  ],
   webServer: {
     command: "npx next dev --hostname 127.0.0.1 --port 3011",
     url: `${baseURL}/admin/login`,

@@ -18,8 +18,24 @@ test("cabeceras, login, logout, almacenamiento y guardado de CMS", async ({ page
   await page.locator('input[type="password"]').fill(E2E_PASSWORD);
   await page.locator("form button.btn").click();
   await page.waitForURL("**/admin");
-  await expect(page.getByRole("heading", { name: "Tu sitio. Tu marca." })).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-admin.png" });
+  await expect(page.getByRole("heading", { name: "Resumen del negocio" })).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/e2e-admin.png" });
+
+  // Las secciones de negocio cargan vacías sin fingir datos, y el menú las enlaza.
+  for (const [link, heading] of [
+    ["Clientes", "Clientes"],
+    ["Pedidos y facturas", "Pedidos y facturas"],
+    ["Servicios", "Servicios"],
+    ["Tickets", "Tickets"],
+    ["Mensajes", "Mensajes recibidos"],
+    ["Actividad", "Actividad"],
+  ]) {
+    await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: link, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page.locator(".load-error")).toHaveCount(0);
+  }
+  await page.goto("/admin/comercio");
+  await expect(page).toHaveURL(/\/admin\/facturas$/);
 
   await page.goto("/admin/settings");
   await expect(page.getByRole("heading", { name: "Conexión WHM / cPanel" })).toBeVisible();

@@ -25,7 +25,8 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
-  await expect(page.getByText("Cuenta creada")).toBeVisible();
+  // La primera llamada compila la ruta de autenticación en frío: puede tardar más de 5 s.
+  await expect(page.getByText("Cuenta creada")).toBeVisible({ timeout: 30_000 });
   const verify = await latestLink();
   expect(verify).not.toContain(email + password);
   await page.goto(verify);
@@ -41,7 +42,7 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Dominio para este plan").fill("cliente-prueba.example");
   await page.getByRole("button", { name: "Crear pedido" }).click();
   await expect(page.getByText("Total 3.99 USD")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-order.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-order.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "Contratar" })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -50,16 +51,27 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.locator('input[type="password"]').fill(E2E_PASSWORD);
   await page.locator("form button.btn").click();
   await page.waitForURL("**/admin");
-  await page.goto("/admin/comercio");
-  await page.getByLabel("Nota del cobro manual").fill("transferencia revisada en el panel");
+  await expect(page.getByRole("link", { name: /1\s*factura por cobrar/ })).toBeVisible();
+  await page.goto("/admin/facturas");
+  await page.getByRole("button", { name: "Confirmar pago" }).click();
+  await page.getByLabel("Nota del cobro").fill("transferencia revisada en el panel");
   await page.getByRole("button", { name: "Confirmar pago manual" }).click();
-  await expect(page.getByText("pendiente de alta")).toBeVisible();
+  await expect(page.getByText("No hay facturas en este estado.")).toBeVisible();
+  await page.goto("/admin/servicios");
+  await expect(page.locator("td .badge", { hasText: "Pendiente de alta" })).toBeVisible();
   // El alta automática está desactivada: no debe aparecer el botón que llama a WHM.
   await expect(page.getByRole("button", { name: "Dar de alta en WHM ahora" })).toHaveCount(0);
-  await page.getByLabel("Nota de alta manual").fill("alta manual sin llamar a WHM");
   await page.getByRole("button", { name: "Marcar alta manual" }).click();
-  await expect(page.getByText("activo")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-admin-commerce.png" });
+  await page.getByLabel("Nota de alta manual").fill("alta manual sin llamar a WHM");
+  await page.getByRole("button", { name: "Marcar como activo" }).click();
+  await expect(page.locator("td .badge", { hasText: "Activo" })).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/e2e-admin-commerce.png" });
+  await page.goto("/admin/clientes");
+  await page.getByRole("link", { name: "Cliente Prueba" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Cliente Prueba" })).toBeVisible();
+  await expect(page.getByText("cliente-prueba.example").first()).toBeVisible();
+  await page.goto("/admin/actividad");
+  await expect(page.getByText("Pago confirmado")).toBeVisible();
   await page.context().clearCookies();
   await page.goto("/cuenta/entrar");
   await page.getByLabel("Email").fill(email);
@@ -72,5 +84,31 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Asunto").fill("Duda de alta");
   await page.getByLabel("Mensaje").fill("¿Cuándo queda activo?");
   await page.getByRole("button", { name: "Abrir ticket" }).click();
-  await expect(page.getByText("abierto")).toBeVisible();
+  await expect(page.getByText("Ticket abierto")).toBeVisible();
+
+  // El admin responde y cierra; el cliente lee la respuesta en su hilo.
+  await page.goto("/admin/login");
+  await page.locator('input[type="email"]').fill(E2E_EMAIL);
+  await page.locator('input[type="password"]').fill(E2E_PASSWORD);
+  await page.locator("form button.btn").click();
+  await page.waitForURL("**/admin");
+  await page.goto("/admin/tickets");
+  await page.getByRole("link", { name: "Duda de alta" }).click();
+  await expect(page.getByText("¿Cuándo queda activo?")).toBeVisible();
+  await page.getByLabel("Respuesta").fill("Ya está activo desde hoy.");
+  await page.getByRole("button", { name: "Responder" }).click();
+  await expect(page.locator(".thread-admin")).toContainText("Ya está activo desde hoy.");
+  await page.goto("/cuenta/tickets");
+  await page.getByRole("link", { name: "Duda de alta" }).click();
+  await expect(page.getByText("Ya está activo desde hoy.")).toBeVisible();
+  await page.getByLabel("Tu respuesta").fill("Gracias, confirmado.");
+  await page.getByRole("button", { name: "Enviar respuesta" }).click();
+  await expect(page.getByText("Gracias, confirmado.")).toBeVisible();
+  await page.goto("/admin/tickets");
+  await page.getByRole("link", { name: "Duda de alta" }).click();
+  await page.getByRole("button", { name: "Cerrar ticket" }).click();
+  await expect(page.getByRole("button", { name: "Reabrir ticket" })).toBeVisible();
+  await page.goto("/cuenta/tickets");
+  await page.getByRole("link", { name: "Duda de alta" }).click();
+  await expect(page.getByText("Este ticket está cerrado")).toBeVisible();
 });

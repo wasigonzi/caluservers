@@ -16,7 +16,7 @@ test("páginas públicas en escritorio y móvil", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.locator(".mobile-tabbar")).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-mobile.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-mobile.png" });
   await expect(page.locator(".brand .logo-mobile")).toBeVisible();
   await expect(page.locator(".brand .logo-desktop")).toBeHidden();
 });
@@ -24,7 +24,7 @@ test("páginas públicas en escritorio y móvil", async ({ page }) => {
 test("el aviso de red no se presenta como monitorización", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".topbar")).toContainText("Aviso manual, no es monitorización");
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-home.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-home.png" });
 });
 
 test("hosting confirmado enlaza al producto y dedicados no piden pedido", async ({ page }) => {
@@ -36,7 +36,7 @@ test("hosting confirmado enlaza al producto y dedicados no piden pedido", async 
   await expect(page.getByText("La tienda pública no lista servidores dedicados")).toBeVisible();
   await expect(page.locator('a[href*="cart.php"]')).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Consultar disponibilidad" }).first()).toBeVisible();
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-dedicated.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-dedicated.png" });
 });
 
 test("VPS New York Normal muestra el precio público, no cero", async ({ page }) => {
@@ -61,7 +61,7 @@ test("el formulario de contacto envía de verdad y queda registrado", async ({ p
   await expect(page.getByText("Mensaje recibido")).toBeVisible();
   // Nada salió al portal externo.
   expect(external).toEqual([]);
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-contact.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-contact.png" });
 
   // El panel lo muestra en la bandeja.
   await page.goto("/admin/login");
@@ -135,5 +135,5 @@ test("la búsqueda de dominios muestra disponibilidad real y nunca inventa un «
 
   // Buscar no navega al portal por su cuenta.
   expect(external).toEqual([]);
-  await page.screenshot({ path: "/opt/cursor/artifacts/e2e-domains.png" });
+  await page.screenshot({ path: "test-results/screenshots/e2e-domains.png" });
 });

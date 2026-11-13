@@ -127,6 +127,12 @@ function commerce(mocks = {}) {
         return { id: "pay_1", ...args.data };
       },
     },
+    customerOrder: {
+      update: async (args) => {
+        state.orderStatus = args.data.status;
+        return args.data;
+      },
+    },
     customerService: {
       create: async (args) => {
         state.services.push(args.data);
@@ -188,6 +194,7 @@ test("un cobro correcto marca la factura pagada y crea el servicio pendiente", a
   assert.equal(payment.providerRef, "CAP1");
   assert.equal(payment.amountCents, 1299);
   assert.equal(state.invoiceUpdates[0].status, "paid");
+  assert.equal(state.orderStatus, "paid");
   assert.equal(state.services[0].status, "pending_provision");
   assert.match(state.events[0].details, /provider=paypal/);
 });
@@ -229,6 +236,7 @@ test("una carrera entre la vuelta del cliente y el webhook deja un solo cobro", 
         throw Object.assign(new Error("unique"), { code: "P2002" });
       },
     },
+    customerOrder: { update: async (args) => args.data },
     customerService: {
       create: async (args) => {
         state.services.push(args.data);

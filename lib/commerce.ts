@@ -235,6 +235,10 @@ async function recordPayment(input: {
       where: { id: invoice.id },
       data: { status: "paid" },
     });
+    await tx.customerOrder.update({
+      where: { id: invoice.orderId },
+      data: { status: "paid" },
+    });
     await tx.customerService.create({
       data: {
         userId: invoice.userId,
@@ -349,6 +353,16 @@ export async function setServiceStatus(input: {
         throw new CommerceError("Solo un servicio pendiente de alta puede activarse.", 409);
       }
     }
+    // El cerrojo de alta solo bloquea mientras es reciente: uno atascado se puede cancelar.
+    if (
+      service.status === "provisioning" &&
+      Date.now() - service.updatedAt.getTime() < 2 * 60_000
+    ) {
+      throw new CommerceError("Hay un alta en curso para este servicio. Espera a que termine.", 409);
+    }
+    if (input.status === "cancelled" && service.status === "cancelled") {
+      throw new CommerceError("El servicio ya está cancelado.", 409);
+    }
     if (input.status === "pending_provision" && service.status === "active") {
       throw new CommerceError("No se puede devolver un servicio activo a pendiente.", 409);
     }
@@ -362,6 +376,72 @@ export async function setServiceStatus(input: {
         action: "service.status",
         entityId: service.id,
         details: `${service.status}->${input.status}`,
+      },
+    });
+    return updated;
+  });
+}
+
+/**
+ * Anula una factura que no se va a cobrar. No borra nada: la factura y el pedido
+ * quedan en el histórico como anulados. Una factura con cobro confirmado no se anula.
+ */
+export async function voidInvoice(input: { actor: string; invoiceId: string; note: string }) {
+  const note = input.note.trim();
+  if (note.length < 8 || note.length > 500) {
+    throw new CommerceError("Indica por qué se anula la factura.", 400);
+  }
+  return db.$transaction(async (tx) => {
+    const invoice = await tx.customerInvoice.findUnique({
+      where: { id: input.invoiceId },
+      include: { payment: true },
+    });
+    if (!invoice) throw new CommerceError("Factura no encontrada.", 404);
+    if (invoice.payment) {
+      throw new CommerceError("Una factura con cobro registrado no se puede anular.", 409);
+    }
+    if (invoice.status === "void") return invoice;
+    const updated = await tx.customerInvoice.update({
+      where: { id: invoice.id },
+      data: { status: "void" },
+    });
+    await tx.customerOrder.update({
+      where: { id: invoice.orderId },
+      data: { status: "cancelled" },
+    });
+    await tx.commerceEvent.create({
+      data: {
+        actor: input.actor,
+        action: "invoice.voided",
+        entityId: invoice.id,
+        details: `number=${invoice.number};note=${note}`,
+      },
+    });
+    return updated;
+  });
+}
+
+/** Cierra o reabre un ticket desde el panel. */
+export async function setTicketStatus(input: {
+  actor: string;
+  ticketId: string;
+  status: "open" | "closed";
+}) {
+  return db.$transaction(async (tx) => {
+    const ticket = await tx.supportTicket.findUnique({ where: { id: input.ticketId } });
+    if (!ticket) throw new CommerceError("Ticket no encontrado.", 404);
+    if (ticket.status === input.status) return ticket;
+    if (input.status === "open" && ticket.status !== "closed") return ticket;
+    const updated = await tx.supportTicket.update({
+      where: { id: ticket.id },
+      data: { status: input.status },
+    });
+    await tx.commerceEvent.create({
+      data: {
+        actor: input.actor,
+        action: input.status === "closed" ? "ticket.closed" : "ticket.reopened",
+        entityId: ticket.id,
+        details: `${ticket.status}->${input.status}`,
       },
     });
     return updated;
