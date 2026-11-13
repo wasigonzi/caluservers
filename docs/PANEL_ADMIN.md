@@ -42,7 +42,22 @@ respuesta del cliente avisan a la dirección de contacto del sitio (o `CONTACT_I
 El correo lleva solo el enlace, no el contenido. Si el aviso no sale, el mensaje ya está
 guardado y el panel lo dice.
 
-## Lado del cliente
+## Área de cliente
 
-`/cuenta/tickets` lista los tickets y `/cuenta/tickets/[id]` muestra la conversación con las
-respuestas de soporte y permite contestar mientras el ticket no esté cerrado.
+`/cuenta` es un panel propio, con su menú y sus contadores de pendientes:
+
+| Ruta | Para qué |
+| --- | --- |
+| `/cuenta` | Resumen: servicios activos, importe por pagar, soporte y «qué hacer ahora». |
+| `/cuenta/servicios` | Servicios contratados, su estado, usuario cPanel y enlace a cPanel. |
+| `/cuenta/facturas` y `/cuenta/facturas/[id]` | Lista y detalle imprimible, con el pago por PayPal y las instrucciones de pago manual. |
+| `/cuenta/tickets` y `/cuenta/tickets/[id]` | Soporte: abrir tickets y seguir la conversación. |
+| `/cuenta/perfil` | Cambiar el nombre y la contraseña. |
+
+El enlace a cPanel se deduce del servidor WHM configurado en el panel (mismo host, puerto 2083)
+y solo aparece en servicios activos con usuario cPanel.
+
+Las instrucciones de pago manual se escriben en Configuración → Negocio y cobros. Se muestran
+en las facturas pendientes; el cobro se confirma a mano en Pedidos y facturas.
+
+Cada consulta filtra por el dueño: una factura o un ticket ajeno responde 404.

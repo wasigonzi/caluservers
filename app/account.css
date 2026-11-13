@@ -1,0 +1,104 @@
+/* Área de cliente. El panel reutiliza el armazón y las piezas de .admin-app;
+   aquí va solo lo propio: acceso, servicios, factura e impresión. */
+
+/* ---------- Acceso: entrar, registro, recuperación, contratación ---------- */
+.account-auth{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:40px 18px;
+  background:#070e15;color:#e8faff;font:16px/1.5 system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden}
+.account-auth-glow{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(620px 420px at 18% 8%,rgba(0,229,255,.2),transparent 65%),radial-gradient(560px 420px at 88% 92%,rgba(42,107,255,.2),transparent 65%);
+  animation:auth-drift 18s ease-in-out infinite alternate}
+@keyframes auth-drift{to{transform:translate3d(2%,-2%,0) scale(1.06)}}
+.account-auth-brand{position:relative;display:flex;align-items:center;gap:10px;font-weight:900;font-size:20px;letter-spacing:.03em;color:#fff;text-decoration:none}
+.account-auth-brand .accent{color:#00e5ff}
+.account-auth-card{position:relative;width:min(100%,460px);padding:32px 30px;border-radius:22px;background:rgba(13,26,38,.86);border:1px solid rgba(0,229,255,.22);
+  box-shadow:0 30px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(14px)}
+.account-auth-card main.wrap{padding:0!important;max-width:none;margin:0}
+.account-auth-card h1{font-size:28px;margin:0 0 8px;letter-spacing:-.03em}
+.account-auth-card .muted{color:#a0bbcd;font-size:14px}
+.account-auth-card .field{display:block;margin:16px 0;font-size:14px;font-weight:600}
+.account-auth-card .field input{display:block;width:100%;margin-top:7px;padding:13px 14px;border-radius:12px;border:1px solid #ffffff30;background:#07131d;color:#fff;font:inherit;font-weight:400}
+.account-auth-card .field input:focus-visible{outline:2px solid #00e5ff;outline-offset:2px}
+.account-auth-card .field .muted{display:block;margin-top:6px;font-weight:400;font-size:12.5px}
+.account-auth-card .btn{display:inline-flex;justify-content:center;align-items:center;width:100%;min-height:48px;padding:13px 20px;border-radius:12px;border:0;cursor:pointer;
+  font:700 15px inherit;color:#00212a;background:linear-gradient(100deg,#00f0ee,#00b8d9);box-shadow:0 12px 34px rgba(0,229,255,.3);transform:none}
+.account-auth-card .btn:hover{filter:brightness(1.07)}
+.account-auth-card .btn:disabled{opacity:.55;cursor:not-allowed}
+.account-auth-card a{color:#9be9ff}
+.account-auth-card p{margin:14px 0 0}
+.account-auth-card .notice{padding:12px 14px;margin:14px 0;border-radius:12px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);color:#d7f6ff;font-size:14px}
+.account-auth-card .error{color:#ff9494}
+.account-auth-foot{position:relative;margin:0;font-size:13px}
+.account-auth-foot a{color:#9cb1c4;text-decoration:none}
+.account-auth-foot a:hover{color:#fff}
+
+/* ---------- Panel ---------- */
+.account-app .account-new{margin-top:6px;width:100%}
+.account-user{margin:0;display:grid;gap:2px;font-size:13px;min-width:0}
+.account-user .muted{font-size:12px;overflow-wrap:anywhere}
+.account-app .account-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.account-app .attention-list span{font-size:14px}
+.account-app .plain-list li{justify-content:space-between}
+.account-app .plain-list li > span:first-child{min-width:0;overflow-wrap:anywhere}
+.account-app .field{font-size:14px;font-weight:600}
+.account-app .field input{font-weight:400}
+.account-app .field input:disabled{opacity:.6}
+.account-app .form-hint{font-size:12.5px;margin:-4px 0 14px}
+.account-app .btn.primary{background:var(--admin-cyan);color:#00212a}
+.account-app .notice{color:#d7f6ff;font-size:14px}
+
+.service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.admin-app .service-tile{margin:0;display:flex;flex-direction:column;gap:14px}
+.service-tile-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.admin-app .service-tile h2{margin:0 0 4px;font-size:19px}
+.service-tile-head .muted{margin:0;font-size:14px;overflow-wrap:anywhere}
+.service-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;padding:14px 0;border-top:1px solid #ffffff12;border-bottom:1px solid #ffffff12}
+.service-facts dt{font-size:11.5px;color:#8fa8bb;margin-bottom:3px}
+.service-facts dd{margin:0;font-size:14px;font-weight:600}
+.service-note,.service-hint{margin:0;font-size:13px;line-height:1.55}
+
+.admin-app .invoice-doc{max-width:860px;padding:30px}
+.invoice-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.admin-app .invoice-head h1{font-size:30px;margin:0 0 4px}
+.invoice-head .muted{margin:0;font-size:14px}
+.invoice-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.invoice-parties{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0 0 20px}
+.invoice-parties dt{font-size:11.5px;color:#8fa8bb;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.invoice-parties dd{margin:0;overflow-wrap:anywhere}
+.invoice-totals{margin:16px 0 0 auto;max-width:300px;display:grid;gap:8px}
+.invoice-totals > div{display:flex;justify-content:space-between;gap:16px;font-size:14px}
+.invoice-totals dt{color:#a7becf}
+.invoice-totals dd{margin:0;font-variant-numeric:tabular-nums}
+.invoice-totals .invoice-total{padding-top:10px;border-top:1px solid #ffffff22;font-size:19px;font-weight:700}
+.invoice-totals .invoice-total dt{color:#fff}
+.invoice-paid{margin:20px 0 0;padding:14px 16px;border-radius:12px;background:#45e3a114;border:1px solid #45e3a140;color:#8df0c4}
+.invoice-pay{margin-top:24px;padding-top:20px;border-top:1px solid #ffffff14}
+.admin-app .invoice-pay h2{margin:0 0 12px;font-size:16px}
+.invoice-instructions{white-space:pre-wrap;overflow-wrap:anywhere;padding:14px 16px;border-radius:12px;background:#07131d;border:1px solid #ffffff1f;margin:10px 0;line-height:1.6}
+
+/* Configuración: formulario dentro de un panel */
+.config-form{margin-top:18px;padding-top:18px;border-top:1px solid #ffffff12}
+.config-form h3{margin:0 0 6px;font-size:14px}
+.config-form > .muted{margin:0 0 4px;font-size:13px;line-height:1.55}
+
+@media(max-width:1100px){.service-grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .account-app .account-kpis,.invoice-parties,.service-facts{grid-template-columns:1fr}
+  .admin-app .invoice-doc{padding:20px 16px}
+  .account-auth-card{padding:26px 20px}
+}
+
+/* ---------- Impresión de factura ---------- */
+@media print{
+  .no-print,.admin-sidebar,.admin-topbar,.admin-overlay,.admin-skip-link{display:none!important}
+  .admin-app{display:block;background:#fff;color:#000}
+  .admin-app .admin-main{padding:0}
+  .admin-app .invoice-doc{border:0;background:#fff;color:#000;max-width:none;padding:0}
+  .admin-app .invoice-doc :is(h1,dd,td,th,.invoice-total dt){color:#000}
+  .admin-app .invoice-doc :is(.muted,dt){color:#444}
+  .admin-app .invoice-doc .table-wrap{background:#fff;border-color:#bbb}
+  .admin-app .invoice-doc th{background:#f2f2f2}
+  .admin-app .invoice-doc td,.admin-app .invoice-doc th{border-bottom-color:#ccc}
+  .admin-app .invoice-doc .studio-eyebrow{color:#000}
+  .badge{border-color:#888;color:#000;background:#fff}
+  .invoice-paid{background:#fff;border-color:#888;color:#000}
+}

@@ -115,9 +115,9 @@ function Nav({ settings }: { settings: SiteSettings }) {
           ))}
         </nav>
         <div className="nav-actions">
-          <a className="btn secondary" href={settings.whmcs}>
+          <Link className="btn secondary" href="/cuenta">
             {settings.chrome.clientAreaLabel}
-          </a>
+          </Link>
           <SafeLink
             className="btn primary"
             href={settings.chrome.headerCtaHref}
@@ -213,8 +213,8 @@ function Footer({ settings }: { settings: SiteSettings }) {
           </div>
           <div>
             <h4>Explorar</h4>
-            <a href={whmcs}>Área de Cliente</a>
-            <a href={`${whmcs}/submitticket.php`}>Soporte</a>
+            <Link href="/cuenta">Área de Cliente</Link>
+            <Link href="/cuenta/tickets">Soporte</Link>
             <Link href="/aup">Política de uso</Link>
             <Link href="/abuse">Abuso</Link>
           </div>

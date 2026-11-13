@@ -61,6 +61,9 @@ function lookup(map: Record<string, StatusInfo>, status: string): StatusInfo {
   return map[status] ?? { label: status, tone: "muted" };
 }
 export const invoiceStatus = (s: string) => lookup(INVOICE, s);
+/** La misma factura vista por el cliente: «por cobrar» es, para él, «por pagar». */
+export const customerInvoiceStatus = (s: string): StatusInfo =>
+  s === "issued" ? { label: "Por pagar", tone: "warn" } : lookup(INVOICE, s);
 export const serviceStatus = (s: string) => lookup(SERVICE, s);
 export const ticketStatus = (s: string) => lookup(TICKET, s);
 export const orderStatus = (s: string) => lookup(ORDER, s);
@@ -76,6 +79,7 @@ const ACTIONS: Record<string, string> = {
   "payment.started": "Cobro iniciado en PayPal",
   "whm.settings.updated": "Conexión WHM guardada",
   "whm.provision.updated": "Alta automática configurada",
+  "billing.instructions.updated": "Instrucciones de pago actualizadas",
   "system.test_email": "Correo de prueba enviado",
   "ticket.closed": "Ticket cerrado",
   "ticket.reopened": "Ticket reabierto",

@@ -4,6 +4,7 @@ import { CapturePayment } from "@/components/account/AccountForms";
 import { db } from "@/lib/db";
 import { customerSession } from "@/lib/customer-session";
 import { paypalReady } from "@/lib/paypal";
+import { PageHeader } from "@/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,9 @@ export default async function PaymentReturn({
   const paid = mine?.payment?.status === "confirmed";
 
   return (
-    <main className="wrap" style={{ padding: "48px 0" }}>
-      <h1>Confirmar el pago</h1>
+    <>
+      <PageHeader eyebrow="ÁREA DE CLIENTE" title="Confirmar el pago" />
+      <div className="panel">
       {!paypalReady() ? (
         <p className="error">El cobro con PayPal no está configurado.</p>
       ) : null}
@@ -58,8 +60,9 @@ export default async function PaymentReturn({
         </>
       ) : null}
       <p>
-        <Link href="/cuenta">Volver a tu cuenta</Link>
+        <Link className="row-link" href="/cuenta">Volver a tu cuenta</Link>
       </p>
-    </main>
+      </div>
+    </>
   );
 }

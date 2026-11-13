@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CircleAlert, CircleCheck, CircleDashed } from "lucide-react";
 import { isAdmin } from "@/lib/auth";
 import { isBlobConfiguredEnv } from "@/lib/branding-upload";
+import { paymentInstructions, PAYMENT_INSTRUCTIONS_MAX } from "@/lib/billing-settings";
 import { billingPolicy } from "@/lib/commerce";
 import { noticeRecipient } from "@/lib/contact-intake";
 import { schemaGaps } from "@/lib/admin-data";
@@ -12,6 +13,7 @@ import { paypalEnv, paypalReady, paypalWebhookReady } from "@/lib/paypal";
 import { totpConfig } from "@/lib/totp";
 import { whmConfiguration } from "@/lib/whm";
 import { provisionConfiguration } from "@/lib/whm-provision";
+import PaymentInstructionsForm from "@/components/admin/PaymentInstructionsForm";
 import SystemTest from "@/components/admin/SystemTest";
 import { PageHeader } from "@/components/admin/ui";
 
@@ -71,6 +73,7 @@ export default async function ConfigPage() {
       .then((rows) => Number(rows[0]?.count ?? 0))
       .catch(() => null),
   ]);
+  const instructions = await paymentInstructions();
   const mfa = totpConfig(process.env.ADMIN_TOTP_SECRET);
   const customerAuth = (process.env.BETTER_AUTH_SECRET || "").length >= 32;
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").trim();
@@ -236,6 +239,14 @@ export default async function ConfigPage() {
         <section className="panel" aria-labelledby="cfg-business">
           <h2 id="cfg-business">Negocio y cobros</h2>
           <Rows rows={business} />
+          <div className="config-form">
+            <h3>Instrucciones de pago manual</h3>
+            <p className="muted">
+              Lo que el cliente ve en una factura pendiente para pagarte fuera de PayPal:
+              transferencia, ATH Móvil, depósito… Tú confirmas el cobro en Pedidos y facturas.
+            </p>
+            <PaymentInstructionsForm initial={instructions} max={PAYMENT_INSTRUCTIONS_MAX} />
+          </div>
         </section>
         <section className="panel" aria-labelledby="cfg-mail">
           <h2 id="cfg-mail">Correo y avisos</h2>

@@ -3,6 +3,7 @@ import "./styles.css";
 import "./site-premium.css";
 import "./premium-workspaces.css";
 import "./site-motion.css";
+import "./account.css";
 
 export const metadata: Metadata = {
   title: {
