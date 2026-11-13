@@ -1,11 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useCatalog } from "@/lib/catalog-context";
 import { PageHero } from "@/components/site/SiteShell";
 import { useCopy } from "@/lib/page-content-context";
 
 export default function Client() {
-  const { catalog } = useCatalog();
   const kicker = useCopy("kicker", "Client Portal");
   const title = useCopy("title", "Tus servicios.");
   const titleAccent = useCopy("titleAccent", "Un solo lugar.");
@@ -18,7 +16,8 @@ export default function Client() {
     "ctaLead",
     "La cuenta propia vive en esta web. El portal anterior no se desactiva.",
   );
-  const ctaLabel = useCopy("ctaLabel", "Abrir Área de Cliente ↗");
+
+  const ctaLabel = useCopy("ctaLabel", "Abrir Área de Cliente").replace(/\s*↗\s*$/, "");
 
   return (
     <>
@@ -37,12 +36,12 @@ export default function Client() {
             <h2>{ctaTitle}</h2>
             <p className="muted">{ctaLead}</p>
           </div>
-          <Link className="btn primary" href="/cuenta/registro">
-            Crear cuenta propia
-          </Link>
-          <a className="btn secondary" href={catalog.settings.whmcs}>
+          <Link className="btn primary" href="/cuenta/entrar">
             {ctaLabel}
-          </a>
+          </Link>
+          <Link className="btn secondary" href="/cuenta/registro">
+            Crear cuenta
+          </Link>
         </div>
       </section>
     </>
