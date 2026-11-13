@@ -37,15 +37,26 @@ export function SectionHead({
   );
 }
 
-/** Tira de confianza: píldoras frosted con hechos reales del catálogo. */
+/**
+ * Tira de confianza: hechos reales del catálogo en una cinta que se desplaza.
+ * La lista se lee una vez; las repeticiones que hacen el bucle son decorativas.
+ * Se detiene al pasar el cursor o al enfocarla, y con reduced-motion no se mueve.
+ */
 export function TrustStrip({ items }: { items: string[] }) {
+  const loops = [0, 1, 2, 3];
   return (
-    <div className="trust-strip glass">
-      {items.map((item) => (
-        <span key={item} className="pill">
-          {item}
-        </span>
-      ))}
+    <div className="trust-strip trust-marquee glass" tabIndex={0} aria-label="Datos de CaluServers">
+      <div className="trust-track">
+        {loops.map((loop) => (
+          <ul key={loop} className="trust-group" aria-hidden={loop > 0 ? true : undefined}>
+            {items.map((item) => (
+              <li key={item} className="pill">
+                {item}
+              </li>
+            ))}
+          </ul>
+        ))}
+      </div>
     </div>
   );
 }
