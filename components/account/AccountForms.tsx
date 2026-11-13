@@ -11,25 +11,39 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        if (busy) return;
+        setBusy(true);
         setError("");
-        const result = await customerAuthClient.signUp.email({ name, email, password });
-        if (result.error) {
-          setError("No se pudo crear la cuenta. Revisa los datos o espera unos minutos.");
-          return;
+        setMessage("");
+        try {
+          const result = await customerAuthClient.signUp.email({ name, email, password });
+          if (result.error) {
+            setError(
+              result.error.status === 503
+                ? "El registro no está disponible ahora mismo. Inténtalo en unos minutos."
+                : "No se pudo crear la cuenta. Revisa los datos o espera unos minutos.",
+            );
+            return;
+          }
+          setMessage("Cuenta creada. Revisa el correo de verificación. El enlace no se muestra aquí.");
+        } catch {
+          setError("No hubo conexión con el servidor. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
         }
-        setMessage("Cuenta creada. Revisa el correo de verificación. El enlace no se muestra aquí.");
       }}
     >
-      <label className="field">Nombre<input value={name} required onChange={(event) => setName(event.target.value)} /></label>
-      <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="field">Contraseña<input type="password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="field">Nombre<input autoComplete="name" value={name} required onChange={(event) => setName(event.target.value)} /></label>
+      <label className="field">Email<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="field">Contraseña<input type="password" autoComplete="new-password" minLength={12} value={password} required onChange={(event) => setPassword(event.target.value)} /><span className="muted">Mínimo 12 caracteres.</span></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
       {message ? <p className="notice" role="status">{message}</p> : null}
-      <button className="btn primary" type="submit">Crear cuenta</button>
+      <button className="btn primary" type="submit" disabled={busy}>{busy ? "Creando…" : "Crear cuenta"}</button>
     </form>
   );
 }
@@ -39,24 +53,65 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [unverified, setUnverified] = useState(false);
+  const [busy, setBusy] = useState(false);
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        if (busy) return;
+        setBusy(true);
         setError("");
-        const result = await customerAuthClient.signIn.email({ email, password });
-        if (result.error) {
-          setError("No se pudo entrar. Verifica el correo y la contraseña.");
-          return;
+        setNotice("");
+        setUnverified(false);
+        try {
+          const result = await customerAuthClient.signIn.email({ email, password });
+          if (result.error) {
+            // 403 = la cuenta existe pero el correo no está verificado.
+            if (result.error.status === 403) {
+              setUnverified(true);
+              setError("Tu correo todavía no está verificado. Abre el enlace que te enviamos al registrarte.");
+            } else if (result.error.status === 503) {
+              setError("El área de clientes no está disponible ahora mismo. Inténtalo en unos minutos.");
+            } else {
+              setError("No se pudo entrar. Revisa el correo y la contraseña.");
+            }
+            return;
+          }
+          router.push("/cuenta");
+          router.refresh();
+        } catch {
+          setError("No hubo conexión con el servidor. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
         }
-        router.push("/cuenta");
-        router.refresh();
       }}
     >
-      <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
-      <label className="field">Contraseña<input type="password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="field">Email<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
+      <label className="field">Contraseña<input type="password" autoComplete="current-password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
-      <button className="btn primary" type="submit">Entrar</button>
+      {unverified ? (
+        <p>
+          <button
+            className="link-button"
+            type="button"
+            onClick={async () => {
+              setNotice("");
+              try {
+                await customerAuthClient.sendVerificationEmail({ email, callbackURL: "/cuenta" });
+                setNotice("Si la cuenta existe, te reenviamos el enlace de verificación.");
+              } catch {
+                setNotice("No se pudo reenviar el enlace. Inténtalo en unos minutos.");
+              }
+            }}
+          >
+            Reenviar el enlace de verificación
+          </button>
+        </p>
+      ) : null}
+      {notice ? <p className="notice" role="status">{notice}</p> : null}
+      <button className="btn primary" type="submit" disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
     </form>
   );
 }

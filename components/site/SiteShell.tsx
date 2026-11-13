@@ -116,7 +116,7 @@ function Nav({ settings }: { settings: SiteSettings }) {
         </nav>
         <div className="nav-actions">
           <Link className="btn secondary" href="/cuenta">
-            {settings.chrome.clientAreaLabel}
+            {settings.chrome.clientAreaLabel.replace(/\s*↗\s*$/, "")}
           </Link>
           <SafeLink
             className="btn primary"
@@ -145,8 +145,9 @@ function MobileTabBar({ settings }: { settings: SiteSettings }) {
     <nav className="mobile-tabbar" aria-label="Navegación móvil">
       {items.map((tab) => {
         const Icon = iconByKey[tab.key] || IconHome;
-        const href = resolveHref(tab.href, settings.whmcs);
-        const external = tab.href === "whmcs" || href.startsWith("http");
+        // La pestaña de cliente lleva al área propia (/cuenta), no al portal externo.
+        const href = tab.href === "whmcs" ? "/cuenta" : resolveHref(tab.href, settings.whmcs);
+        const external = href.startsWith("http");
         if (external) {
           return (
             <a key={tab.key} className="mobile-tab" href={href} target="_blank" rel="noreferrer">
