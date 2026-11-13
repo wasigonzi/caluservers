@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { customerAuthClient } from "@/lib/customer-auth-client";
 
@@ -106,32 +107,192 @@ export function RecoverForm() {
   );
 }
 
-export function OrderButton({ planId }: { planId: string }) {
+/**
+ * Crea el pedido y, si hay pasarela configurada, enlaza el pago.
+ * El dominio es obligatorio en los planes de hosting: es el que se da de alta en cPanel.
+ */
+export function OrderButton({
+  planId,
+  needsDomain = false,
+  paymentReady = false,
+}: {
+  planId: string;
+  needsDomain?: boolean;
+  paymentReady?: boolean;
+}) {
   const [idempotencyKey] = useState(() => `ord_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
-  const [message, setMessage] = useState("");
+  const [domain, setDomain] = useState("");
+  const [created, setCreated] = useState<{ invoiceId: string | null; summary: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  if (created) {
+    return (
+      <div>
+        <p className="notice" role="status">{created.summary}</p>
+        {created.invoiceId && paymentReady ? (
+          <PayInvoiceButton invoiceId={created.invoiceId} />
+        ) : (
+          <p className="muted">
+            El cobro no está activo en esta web. Un administrador confirmará el pago.
+          </p>
+        )}
+      </div>
+    );
+  }
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        if (busy) return;
+        setBusy(true);
         setError("");
-        const response = await fetch("/api/account/orders", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ planId, idempotencyKey }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          setError(data.error || "No se pudo crear el pedido.");
-          return;
+        try {
+          const response = await fetch("/api/account/orders", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ planId, idempotencyKey, domain }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            setError(data.error || "No se pudo crear el pedido.");
+            return;
+          }
+          setCreated({
+            invoiceId: data.invoiceId ?? null,
+            summary: `Pedido ${data.id} creado. Total ${(data.totalCents / 100).toFixed(2)} ${data.currency}.`,
+          });
+        } catch {
+          setError("No hubo conexión al crear el pedido.");
+        } finally {
+          setBusy(false);
         }
-        setMessage(`Pedido ${data.id}. Total ${data.totalCents} centavos ${data.currency}. El pago no se marca solo.`);
       }}
     >
+      {needsDomain ? (
+        <label className="field">
+          Dominio para este plan
+          <input
+            value={domain}
+            onChange={(event) => setDomain(event.target.value)}
+            placeholder="midominio.com"
+            maxLength={253}
+            required
+          />
+          <span className="muted">
+            Es el dominio con el que se crea tu cuenta cPanel. Puedes registrarlo antes o
+            apuntar uno que ya tengas.
+          </span>
+        </label>
+      ) : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
-      {message ? <p className="notice" role="status">{message}</p> : null}
-      <button className="btn primary" type="submit">Crear pedido</button>
+      <button className="btn primary" type="submit" disabled={busy}>
+        {busy ? "Creando…" : "Crear pedido"}
+      </button>
     </form>
+  );
+}
+
+/** Abre el cobro con PayPal para una factura. El importe lo decide el servidor. */
+export function PayInvoiceButton({ invoiceId }: { invoiceId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <>
+      <button
+        className="btn primary"
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
+          setError("");
+          try {
+            const response = await fetch("/api/account/paypal", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ action: "start", invoiceId }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data?.approveUrl) {
+              setError(data?.error || "No se pudo abrir el pago.");
+              setBusy(false);
+              return;
+            }
+            window.location.href = data.approveUrl;
+          } catch {
+            setError("No hubo conexión con la pasarela.");
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Abriendo PayPal…" : "Pagar con PayPal"}
+      </button>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+    </>
+  );
+}
+
+/** Cierra el cobro a la vuelta de PayPal. El id de orden lo pone PayPal en la URL. */
+export function CapturePayment({
+  invoiceId,
+  orderId,
+}: {
+  invoiceId: string;
+  orderId: string;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "working" | "done" | "failed">("idle");
+  const [message, setMessage] = useState("");
+  return (
+    <div>
+      {state === "idle" ? (
+        <button
+          className="btn primary"
+          type="button"
+          onClick={async () => {
+            setState("working");
+            try {
+              const response = await fetch("/api/account/paypal", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "capture", invoiceId, orderId }),
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data?.paid) {
+                setState("failed");
+                setMessage(
+                  data?.error ||
+                    "No se pudo confirmar el cobro. Si PayPal te cobró, lo veremos por su aviso y lo registraremos.",
+                );
+                return;
+              }
+              setState("done");
+              setMessage(
+                data.provisioned
+                  ? "Pago confirmado y servicio dado de alta. Revisa tu correo: ahí van los datos de acceso."
+                  : "Pago confirmado. El alta del servicio queda pendiente y te avisamos al terminarla.",
+              );
+              router.refresh();
+            } catch {
+              setState("failed");
+              setMessage("No hubo conexión al confirmar el cobro.");
+            }
+          }}
+        >
+          Confirmar el pago
+        </button>
+      ) : null}
+      {state === "working" ? <p className="notice">Confirmando con PayPal…</p> : null}
+      {state === "done" ? (
+        <p className="notice" role="status">{message}</p>
+      ) : null}
+      {state === "failed" ? <p className="error" role="alert">{message}</p> : null}
+      {state !== "idle" && state !== "working" ? (
+        <p>
+          <Link href="/cuenta">Volver a tu cuenta</Link>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

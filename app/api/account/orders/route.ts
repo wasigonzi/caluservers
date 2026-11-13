@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       planId: String(body?.planId || ""),
       idempotencyKey: String(body?.idempotencyKey || ""),
+      domain: String(body?.domain || ""),
     });
     return NextResponse.json({
       id: order.id,

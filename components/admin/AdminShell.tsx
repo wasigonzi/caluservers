@@ -6,7 +6,9 @@ import {
   FileText,
   Users,
   Server,
+  ServerCog,
   Package,
+  Inbox,
   Settings,
   ExternalLink,
   Menu,
@@ -21,8 +23,10 @@ const NAV_ICONS = {
   "/admin/site": Palette,
   "/admin/pages": FileText,
   "/admin/comercio": Users,
+  "/admin/mensajes": Inbox,
   "/admin/accounts": Server,
   "/admin/packages": Package,
+  "/admin/provision": ServerCog,
   "/admin/settings": Settings,
 };
 type NavItem = { label: string; href: keyof typeof NAV_ICONS };
@@ -39,6 +43,7 @@ const GROUPS: NavGroup[] = [
       { label: "Marca y sitio", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
       { label: "Clientes propios", href: "/admin/comercio" },
+      { label: "Mensajes", href: "/admin/mensajes" },
     ],
   },
   {
@@ -50,7 +55,10 @@ const GROUPS: NavGroup[] = [
   },
   {
     title: "Ajustes",
-    items: [{ label: "Conexión WHM", href: "/admin/settings" }],
+    items: [
+      { label: "Conexión WHM", href: "/admin/settings" },
+      { label: "Alta automática", href: "/admin/provision" },
+    ],
   },
 ];
 

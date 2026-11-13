@@ -6,7 +6,10 @@ import { E2E_EMAIL, E2E_PASSWORD } from "./fixtures";
 const sink = "/tmp/calu-mail-e2e";
 
 async function latestLink() {
-  const files = (await readdir(sink)).filter((name) => name.endsWith(".txt")).sort();
+  // Solo los correos de autenticación: los avisos de contacto comparten el sumidero.
+  const files = (await readdir(sink))
+    .filter((name) => name.endsWith("-verify.txt") || name.endsWith("-reset.txt"))
+    .sort();
   const text = await readFile(`${sink}/${files.at(-1)}`, "utf8");
   const link = text.split("\n").find((line) => line.startsWith("http"));
   if (!link) throw new Error("missing verification link");
@@ -32,8 +35,12 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/cuenta$/);
   await page.goto("/cuenta/contratar?plan=wh0");
+  // Un plan de hosting exige el dominio con el que se creará la cuenta cPanel.
   await page.getByRole("button", { name: "Crear pedido" }).click();
-  await expect(page.getByText("399")).toBeVisible();
+  await expect(page.locator('input[required]:invalid')).toHaveCount(1);
+  await page.getByLabel("Dominio para este plan").fill("cliente-prueba.example");
+  await page.getByRole("button", { name: "Crear pedido" }).click();
+  await expect(page.getByText("Total 3.99 USD")).toBeVisible();
   await page.screenshot({ path: "/opt/cursor/artifacts/e2e-order.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "Contratar" })).toBeVisible();
@@ -46,10 +53,12 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.goto("/admin/comercio");
   await page.getByLabel("Nota del cobro manual").fill("transferencia revisada en el panel");
   await page.getByRole("button", { name: "Confirmar pago manual" }).click();
-  await expect(page.getByText("pending_provision")).toBeVisible();
+  await expect(page.getByText("pendiente de alta")).toBeVisible();
+  // El alta automática está desactivada: no debe aparecer el botón que llama a WHM.
+  await expect(page.getByRole("button", { name: "Dar de alta en WHM ahora" })).toHaveCount(0);
   await page.getByLabel("Nota de alta manual").fill("alta manual sin llamar a WHM");
   await page.getByRole("button", { name: "Marcar alta manual" }).click();
-  await expect(page.getByText("active")).toBeVisible();
+  await expect(page.getByText("activo")).toBeVisible();
   await page.screenshot({ path: "/opt/cursor/artifacts/e2e-admin-commerce.png" });
   await page.context().clearCookies();
   await page.goto("/cuenta/entrar");
@@ -57,6 +66,8 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/cuenta$/);
+  await expect(page.getByText("cliente-prueba.example")).toBeVisible();
+  await expect(page.getByText(/pagada \(manual\)/)).toBeVisible();
   await page.goto("/cuenta/tickets");
   await page.getByLabel("Asunto").fill("Duda de alta");
   await page.getByLabel("Mensaje").fill("¿Cuándo queda activo?");

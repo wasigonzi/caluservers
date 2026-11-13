@@ -706,7 +706,7 @@ export const SEED_CATALOG: Catalog = {
       heroCtaPrimaryHref: "/web-hosting",
       heroCtaSecondaryHref: "/vps",
       contactLead:
-        "El formulario no envía el mensaje. Abre el portal de cliente para crear el ticket allí.",
+        "Escríbenos y te respondemos al correo que indiques. El mensaje queda registrado en nuestro panel.",
       footerBlurb: "Soporte 24/7 por ticket, en inglés y español.",
       servicesKicker: "Nuestros servicios",
       servicesTitle: "Infraestructura que te impulsa hacia adelante.",
