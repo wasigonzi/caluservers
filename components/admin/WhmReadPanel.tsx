@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { RefreshCw, Server, Layers3 } from "lucide-react";
 import type { WhmRows } from "@/lib/whm-transport";
@@ -10,6 +10,9 @@ type Overview = {
   accounts: WhmRows;
   packages: WhmRows;
 };
+const REFRESH_MS = 60_000;
+const TIME = new Intl.DateTimeFormat("es", { timeStyle: "short" });
+
 export default function WhmReadPanel({
   configured,
   mode = "overview",
@@ -22,10 +25,16 @@ export default function WhmReadPanel({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [result, setResult] = useState<Overview | WhmRows | null>(null);
-  async function read() {
+  const [readAt, setReadAt] = useState<Date | null>(null);
+  const inFlight = useRef(false);
+  const failed = useRef(false);
+  const canRead = configured && !storageError;
+
+  const read = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
-    setResult(null);
     try {
       const r = await fetch("/api/admin/whm", {
         method: "POST",
@@ -44,15 +53,38 @@ export default function WhmReadPanel({
           : !Array.isArray(data.rows)
       )
         throw Error("invalid");
+      failed.current = false;
       setResult(data);
+      setReadAt(new Date());
     } catch {
+      // Un dato viejo no se deja en pantalla como si fuera el actual.
+      failed.current = true;
+      setResult(null);
       setError(
-        "Lectura no confirmada. Revisa la configuración, permisos del token y conectividad HTTPS con el servidor. No se reintentó automáticamente.",
+        "Lectura no confirmada. Revisa la configuración, permisos del token y conectividad HTTPS con el servidor. La actualización automática queda en pausa hasta que pulses «Actualizar».",
       );
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
-  }
+  }, [mode]);
+
+  // Lee al abrir la página y se mantiene al día: cada minuto con la pestaña visible
+  // y al volver a ella. Tras un fallo se detiene, para no insistir contra un servidor caído.
+  useEffect(() => {
+    if (!canRead) return;
+    void read();
+    const tick = () => {
+      if (document.visibilityState === "visible" && !failed.current) void read();
+    };
+    const timer = window.setInterval(tick, REFRESH_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [canRead, read]);
+
   const overview = mode === "overview" && result ? (result as Overview) : null;
   const table = mode !== "overview" && result ? (result as WhmRows) : null;
   const columns =
@@ -91,11 +123,14 @@ export default function WhmReadPanel({
         <button
           type="button"
           className="btn secondary"
-          disabled={!configured || busy || Boolean(storageError)}
-          onClick={read}
+          disabled={!canRead || busy}
+          onClick={() => {
+            failed.current = false;
+            void read();
+          }}
         >
           <RefreshCw size={15} aria-hidden="true" />
-          {busy ? "Consultando…" : "Consultar ahora"}
+          {busy ? "Actualizando…" : "Actualizar"}
         </button>
       </div>
       <p role="status" className="muted">
@@ -103,13 +138,11 @@ export default function WhmReadPanel({
           ? "Almacenamiento no disponible"
           : !configured
             ? "Pendiente configuración: servidor, usuario y token."
-            : busy
-              ? "Consultando WHM por HTTPS…"
-              : error
-                ? "No conectado / lectura fallida"
-                : result
-                  ? "Lectura confirmada por WHM"
-                  : "Configuración guardada; datos aún no consultados."}
+            : error
+              ? "No conectado / lectura fallida"
+              : result
+                ? `Lectura confirmada por WHM${readAt ? ` a las ${TIME.format(readAt)}` : ""}. Se actualiza sola cada minuto.`
+                : "Consultando WHM por HTTPS…"}
       </p>
       {storageError || error ? (
         <p role="alert" className="error">
@@ -154,7 +187,7 @@ export default function WhmReadPanel({
             timeStyle: "short",
             timeZone: "America/Halifax",
           }).format(new Date(overview.checkedAt))}{" "}
-          (Halifax). Los datos no se actualizan automáticamente.
+          (Halifax).
         </p>
       ) : null}
       {table ? (
