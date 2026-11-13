@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./styles.css";
 import "./site-premium.css";
 import "./premium-workspaces.css";
+import "./site-motion.css";
 
 export const metadata: Metadata = {
   title: {

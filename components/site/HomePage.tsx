@@ -3,10 +3,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import SafeLink from "@/components/site/SafeLink";
 import ServiceFinder from "@/components/site/ServiceFinder";
-import SplineHero from "@/components/site/SplineHero";
-const iconHosting = "/icons/servicio-hosting.svg";
-const iconVps = "/icons/servicio-vps.svg";
-const iconDedicados = "/icons/servicio-dedicados.svg";
+import HeroVisual from "@/components/site/HeroVisual";
+import { DedicatedArt, HostingArt, VpsArt } from "@/components/site/Illustrations";
 const iconRed = "/icons/servicio-red.svg";
 const iconSeguridad = "/icons/servicio-seguridad.svg";
 const iconSoporte = "/icons/servicio-soporte.svg";
@@ -172,7 +170,7 @@ export default function Home() {
             </span>
             <h1>
               {content.heroTitle}{" "}
-              <span className="neon-text">{content.heroTitleAccent}</span>
+              <span className="neon-text hero-accent">{content.heroTitleAccent}</span>
             </h1>
             <p className="lead">{content.heroLead}</p>
             <div className="hero-ctas">
@@ -217,7 +215,7 @@ export default function Home() {
             </div>
           </div>
           <div className="premium-hero-stage">
-            <SplineHero />
+            <HeroVisual locations={enabledLocations.length} />
             <ServiceFinder
               options={[
                 {
@@ -258,9 +256,9 @@ export default function Home() {
             lead={content.servicesLead}
           />
           <div className="cards service-cards">
-            <article className="card glass">
-              <div className="icon-chip">
-                <img src={iconHosting} alt="" />
+            <article className="card glass service-card">
+              <div className="service-media">
+                <HostingArt />
               </div>
               <h3>Web Hosting</h3>
               <p>
@@ -275,9 +273,9 @@ export default function Home() {
                 Ver planes →
               </Link>
             </article>
-            <article className="card glass">
-              <div className="icon-chip">
-                <img src={iconVps} alt="" />
+            <article className="card glass service-card">
+              <div className="service-media">
+                <VpsArt />
               </div>
               <h3>VPS Hosting</h3>
               <p>
@@ -292,9 +290,9 @@ export default function Home() {
                 Ver planes →
               </Link>
             </article>
-            <article className="card glass">
-              <div className="icon-chip">
-                <img src={iconDedicados} alt="" />
+            <article className="card glass service-card">
+              <div className="service-media">
+                <DedicatedArt />
               </div>
               <h3>Dedicated Servers</h3>
               <p>

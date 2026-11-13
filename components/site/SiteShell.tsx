@@ -12,6 +12,7 @@ import type { SiteSettings } from "@/lib/site-settings";
 import { applySiteTheme, logoSrc, socialEntries } from "@/lib/site-settings";
 import { resolveHref } from "@/lib/safe-links";
 import { useRevealOnScroll } from "@/components/site/Interactive";
+import AnimatedBackdrop from "@/components/site/AnimatedBackdrop";
 
 const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/", label: "Inicio" },
@@ -243,9 +244,46 @@ export function SiteShell({
   useEffect(() => {
     applySiteTheme(settings);
   }, [settings]);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<HTMLSpanElement>(null);
+
+  // Brillo que sigue al cursor dentro de cada tarjeta, y barra de progreso de lectura.
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const GLOW = ".glass, .card, .plan-card, .service-finder, .step-card, .loc-show-card";
+    const onMove = (event: PointerEvent) => {
+      const card = (event.target as Element | null)?.closest?.(GLOW) as HTMLElement | null;
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--my", `${event.clientY - rect.top}px`);
+    };
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        const ratio = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+        progressRef.current?.style.setProperty("transform", `scaleX(${ratio})`);
+        shell.classList.toggle("is-scrolled", window.scrollY > 24);
+      });
+    };
+    onScroll();
+    shell.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      shell.removeEventListener("pointermove", onMove);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
 
   return (
-    <div className="site-shell has-mobile-tabbar">
+    <div className="site-shell has-mobile-tabbar" ref={shellRef}>
+      <span className="scroll-progress" ref={progressRef} aria-hidden="true" />
       <a className="skip-link" href="#contenido-principal">
         Saltar al contenido
       </a>
@@ -254,6 +292,7 @@ export function SiteShell({
         aria-hidden="true"
         style={{ backgroundImage: `url(${HERO_BG_DATA_URI})` }}
       />
+      <AnimatedBackdrop />
       <TopBar settings={settings} />
       <Nav settings={settings} />
       <main id="contenido-principal" className="site-main" ref={mainRef} tabIndex={-1}>
