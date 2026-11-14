@@ -200,6 +200,8 @@ function provisionModule(mocks = {}) {
     events: [],
     mail: [],
     writes: [],
+    reads: [],
+    listaccts: mocks.listaccts ?? null,
     updateManyResult: mocks.updateManyResult ?? 1,
   };
   const db = {
@@ -262,6 +264,16 @@ function provisionModule(mocks = {}) {
         return { statusmsg: "ok", user: params.username };
       },
     },
+    "@/lib/whm-transport": {
+      readWhm: async () => {
+        state.reads.push({});
+        if (mocks.readThrows) throw new Error("sin lectura");
+        return state.listaccts ?? { rows: [], total: 0, truncated: false };
+      },
+    },
+    "@/lib/whm": {
+      decryptWhm: () => ({ username: "root", token: TOKEN }),
+    },
     env: mocks.env,
   });
   const provision = h.load("lib/whm-provision.ts");
@@ -300,17 +312,25 @@ test("el usuario cPanel es determinista, de 8 caracteres y empieza por letra", (
   }
 });
 
-test("la contraseña inicial es larga y variada", () => {
+test("la contraseña inicial es determinista por servicio, con las 4 clases y sin el usuario", () => {
   const { provision } = provisionModule();
-  const passwords = new Set();
-  for (let index = 0; index < 20; index++) {
-    const password = provision.initialPassword();
+  const first = provision.initialPassword("svc_1", "miti1a2b");
+  assert.equal(first, provision.initialPassword("svc_1", "miti1a2b"));
+  assert.notEqual(first, provision.initialPassword("svc_2", "miti1a2b"));
+  assert.notEqual(first, provision.initialPassword("svc_1", "otro1a2b"));
+  for (const [serviceId, username] of [
+    ["svc_1", "miti1a2b"],
+    ["svc_2", "abc12345"],
+    ["svc_3", "x9y8z7w6"],
+  ]) {
+    const password = provision.initialPassword(serviceId, username);
     assert.equal(password.length, 20);
-    assert.match(password, /[A-Za-z]/);
+    assert.match(password, /[a-z]/);
+    assert.match(password, /[A-Z]/);
+    assert.match(password, /[0-9]/);
     assert.match(password, /[!@#%^*\-_=+]/);
-    passwords.add(password);
+    assert.ok(!password.toLowerCase().includes(username.toLowerCase()));
   }
-  assert.ok(passwords.size > 15, "no debe repetirse");
 });
 
 test("el paquete por plan gana al paquete por defecto", () => {
@@ -442,6 +462,76 @@ test("si WHM falla, el servicio vuelve a pendiente con un motivo saneado", async
   assert.ok(release, "debe liberar el cerrojo");
   assert.match(release.data.provisionError, /rejected/);
   assert.ok(!release.data.provisionError.includes(TOKEN));
+  assert.ok(state.events.some((event) => event.action === "service.provision_failed"));
+});
+
+test("si la respuesta se pierde pero WHM creó la cuenta, el reintento la adopta sin duplicarla", async () => {
+  const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+    writeThrowsCode: "timeout",
+  });
+  const username = provision.cpanelUsername("svc_1", "midominio.com");
+  state.listaccts = {
+    rows: [{ user: username, domain: "midominio.com", plan: "basico" }],
+    total: 1,
+    truncated: false,
+  };
+  const result = await provision.provisionService({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.status, "active");
+  assert.equal(result.cpanelUser, username);
+  assert.equal(result.credentialsSent, true);
+  // Solo el intento fallido: no se llamó a createacct una segunda vez.
+  assert.equal(state.writes.length, 1);
+  assert.ok(state.reads.length >= 1, "debió comprobar la lista de cuentas");
+  // La contraseña enviada es la determinista: es la que tiene la cuenta adoptada.
+  const password = provision.initialPassword("svc_1", username);
+  assert.ok(state.mail[0].text.includes(password));
+  assert.ok(state.mail[0].text.includes(username));
+  assert.ok(
+    state.events.some(
+      (event) =>
+        event.action === "service.provisioned" && event.details.includes("adopted=1"),
+    ),
+  );
+  assert.ok(!state.events.some((event) => event.action === "service.provision_failed"));
+});
+
+test("una cuenta con otro dominio no se adopta: el fallo queda visible", async () => {
+  const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+    writeThrowsCode: "rejected",
+  });
+  const username = provision.cpanelUsername("svc_1", "midominio.com");
+  state.listaccts = {
+    rows: [{ user: username, domain: "otro-cliente.com", plan: "basico" }],
+    total: 1,
+    truncated: false,
+  };
+  await assert.rejects(provision.provisionService({ serviceId: "svc_1", actor: "admin" }));
+  const release = state.updates.find(
+    (update) => update.kind === "update" && update.data.status === "pending_provision",
+  );
+  assert.ok(release, "debe liberar el cerrojo");
+  assert.ok(state.events.some((event) => event.action === "service.provision_failed"));
+});
+
+test("sin lectura de WHM no se puede adoptar y el fallo queda visible", async () => {
+  const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+    writeThrowsCode: "network",
+    readThrows: true,
+  });
+  await assert.rejects(provision.provisionService({ serviceId: "svc_1", actor: "admin" }));
+  const release = state.updates.find(
+    (update) => update.kind === "update" && update.data.status === "pending_provision",
+  );
+  assert.ok(release, "debe liberar el cerrojo");
   assert.ok(state.events.some((event) => event.action === "service.provision_failed"));
 });
 
