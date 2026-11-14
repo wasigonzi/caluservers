@@ -15,25 +15,17 @@ export const customerAuth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // Sin verificación de correo por decisión del propietario (2026-11-13): el
+    // cliente entra y contrata al registrarse. No se envía ningún correo de
+    // verificación ni se exige emailVerified en ningún sitio.
+    requireEmailVerification: false,
     minPasswordLength: 12,
     maxPasswordLength: 128,
-    autoSignIn: false,
+    autoSignIn: true,
     sendResetPassword: async ({ user, url }) => {
       await deliverAuthLink({
         to: user.email,
         kind: "reset",
-        url,
-      });
-    },
-  },
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
-      await deliverAuthLink({
-        to: user.email,
-        kind: "verify",
         url,
       });
     },

@@ -3,7 +3,6 @@ import { requireAdmin } from "@/lib/auth";
 import {
   CommerceError,
   confirmManualPayment,
-  markEmailVerified,
   replyTicket,
   setServiceStatus,
   setTicketStatus,
@@ -80,19 +79,6 @@ export async function POST(req: NextRequest) {
         status: body.status === "closed" ? "closed" : "open",
       });
       return NextResponse.json({ id: ticket.id, status: ticket.status });
-    }
-    if (body?.action === "verify-email") {
-      // No se envía ningún correo: solo se marca el correo como verificado para
-      // desbloquear a un cliente cuyo enlace nunca llegó (sin SMTP).
-      const verified = await markEmailVerified({
-        actor: email,
-        userId: String(body.userId || ""),
-      });
-      return NextResponse.json({
-        id: verified.id,
-        email: verified.email,
-        emailVerified: verified.emailVerified,
-      });
     }
     if (body?.action === "provision-service") {
       const result = await provisionService({

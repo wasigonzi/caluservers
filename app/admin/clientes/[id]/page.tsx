@@ -11,7 +11,6 @@ import {
 } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/admin/ui";
-import { VerifyEmailButton } from "@/components/admin/CommerceActions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,17 +51,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <dl className="facts">
         <div>
           <dt>Correo</dt>
-          <dd>
-            {user.email}{" "}
-            <StatusBadge
-              info={
-                user.emailVerified
-                  ? { label: "Verificado", tone: "ok" }
-                  : { label: "Sin verificar", tone: "warn" }
-              }
-            />{" "}
-            {user.emailVerified ? null : <VerifyEmailButton userId={user.id} />}
-          </dd>
+          <dd>{user.email}</dd>
         </div>
         <div>
           <dt>Cliente desde</dt>

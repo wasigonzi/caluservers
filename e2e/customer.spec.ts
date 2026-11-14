@@ -1,23 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { readdir, readFile, rm } from "node:fs/promises";
 import { E2E_EMAIL, E2E_PASSWORD } from "./fixtures";
 
-const sink = "/tmp/calu-mail-e2e";
-
-async function latestLink() {
-  // Solo los correos de autenticación: los avisos de contacto comparten el sumidero.
-  const files = (await readdir(sink))
-    .filter((name) => name.endsWith("-verify.txt") || name.endsWith("-reset.txt"))
-    .sort();
-  const text = await readFile(`${sink}/${files.at(-1)}`, "utf8");
-  const link = text.split("\n").find((line) => line.startsWith("http"));
-  if (!link) throw new Error("missing verification link");
-  return link;
-}
-
 test("registro, pedido, pago manual y ticket", async ({ page }) => {
-  await rm(sink, { recursive: true, force: true });
+  // Recorrido largo con muchas compilaciones en frío en `next dev`: en una VM
+  // lenta el tiempo por defecto (90 s) no alcanza.
+  test.setTimeout(180_000);
   const email = `cliente-${Date.now()}@example.com`;
   const password = `Pw-${randomBytes(9).toString("hex")}`;
   await page.goto("/cuenta/registro");
@@ -25,11 +13,12 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
-  // La primera llamada compila la ruta de autenticación en frío: puede tardar más de 5 s.
-  await expect(page.getByText("Cuenta creada")).toBeVisible({ timeout: 30_000 });
-  const verify = await latestLink();
-  expect(verify).not.toContain(email + password);
-  await page.goto(verify);
+  // Sin verificación de correo: el registro ya inicia la sesión y entra
+  // directo al área de cliente. La primera llamada compila la ruta de
+  // autenticación en frío: puede tardar más de 5 s.
+  await expect(page).toHaveURL(/\/cuenta$/, { timeout: 30_000 });
+  // Y entrar con la contraseña también funciona sin verificar nada.
+  await page.context().clearCookies();
   await page.goto("/cuenta/entrar");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Contraseña").fill(password);
@@ -61,6 +50,9 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.goto("/cuenta");
   await expect(page.getByRole("heading", { level: 1, name: "Hola, Cliente" })).toBeVisible();
   await page.getByRole("link", { name: /Pagar la factura PF-/ }).click();
+  // En `next dev` la navegación por enlace puede tardar en arrancar (compilación
+  // en frío en una VM lenta): se espera la URL antes de afirmar el contenido.
+  await page.waitForURL("**/cuenta/facturas/*", { timeout: 30_000 });
   await expect(page.getByText("ATH Móvil de prueba al 787-555-0100")).toBeVisible();
   await expect(page.locator(".invoice-doc .badge", { hasText: "Por pagar" })).toBeVisible();
   await page.goto("/admin/facturas");
@@ -79,6 +71,7 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.screenshot({ path: "test-results/screenshots/e2e-admin-commerce.png" });
   await page.goto("/admin/clientes");
   await page.getByRole("link", { name: "Cliente Prueba" }).click();
+  await page.waitForURL("**/admin/clientes/*", { timeout: 30_000 });
   await expect(page.getByRole("heading", { level: 1, name: "Cliente Prueba" })).toBeVisible();
   await expect(page.getByText("cliente-prueba.example").first()).toBeVisible();
   await page.goto("/admin/actividad");
@@ -91,10 +84,13 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await expect(page).toHaveURL(/\/cuenta$/);
   await expect(page.getByText("Todo al día")).toBeVisible();
   await page.getByRole("navigation", { name: "Mi cuenta" }).getByRole("link", { name: "Mis servicios" }).click();
+  await page.waitForURL("**/cuenta/servicios", { timeout: 30_000 });
   await expect(page.getByText("cliente-prueba.example")).toBeVisible();
   await expect(page.locator(".service-tile .badge", { hasText: "Activo" })).toBeVisible();
   await page.getByRole("navigation", { name: "Mi cuenta" }).getByRole("link", { name: "Facturas" }).click();
+  await page.waitForURL("**/cuenta/facturas", { timeout: 30_000 });
   await page.locator("td a.row-link").first().click();
+  await page.waitForURL("**/cuenta/facturas/*", { timeout: 30_000 });
   await expect(page.getByText(/Pagada el/)).toBeVisible();
   // Una factura pagada ya no enseña cómo pagar.
   await expect(page.getByText("ATH Móvil de prueba")).toHaveCount(0);

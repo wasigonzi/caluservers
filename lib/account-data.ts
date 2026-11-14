@@ -5,10 +5,10 @@ import { db } from "@/lib/db";
 import { whmConfiguration } from "@/lib/whm";
 import { provisionConfiguration } from "@/lib/whm-provision";
 
-/** Sesión verificada del cliente o redirección a la entrada. */
+/** Sesión del cliente o redirección a la entrada. Sin verificación de correo. */
 export async function requireCustomer() {
   const session = await customerSession();
-  if (!session?.user.emailVerified) redirect("/cuenta/entrar");
+  if (!session?.user) redirect("/cuenta/entrar");
   return session.user;
 }
 

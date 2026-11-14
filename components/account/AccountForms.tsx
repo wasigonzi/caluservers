@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { customerAuthClient } from "@/lib/customer-auth-client";
 
 export function RegisterForm() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +31,11 @@ export function RegisterForm() {
             );
             return;
           }
-          setMessage("Cuenta creada. Revisa el correo de verificación. El enlace no se muestra aquí.");
+          // Sin verificación de correo: la cuenta queda activa al registrarse y
+          // el registro ya inicia la sesión. Se entra directo al área de cliente.
+          setMessage("Cuenta creada. Ya puedes usar tu cuenta.");
+          router.push("/cuenta");
+          router.refresh();
         } catch {
           setError("No hubo conexión con el servidor. Inténtalo de nuevo.");
         } finally {
@@ -53,8 +58,6 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [unverified, setUnverified] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
     <form
@@ -63,16 +66,10 @@ export function LoginForm() {
         if (busy) return;
         setBusy(true);
         setError("");
-        setNotice("");
-        setUnverified(false);
         try {
           const result = await customerAuthClient.signIn.email({ email, password });
           if (result.error) {
-            // 403 = la cuenta existe pero el correo no está verificado.
-            if (result.error.status === 403) {
-              setUnverified(true);
-              setError("Tu correo todavía no está verificado. Abre el enlace que te enviamos al registrarte.");
-            } else if (result.error.status === 503) {
+            if (result.error.status === 503) {
               setError("El área de clientes no está disponible ahora mismo. Inténtalo en unos minutos.");
             } else {
               setError("No se pudo entrar. Revisa el correo y la contraseña.");
@@ -91,26 +88,6 @@ export function LoginForm() {
       <label className="field">Email<input type="email" autoComplete="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="field">Contraseña<input type="password" autoComplete="current-password" value={password} required onChange={(event) => setPassword(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
-      {unverified ? (
-        <p>
-          <button
-            className="link-button"
-            type="button"
-            onClick={async () => {
-              setNotice("");
-              try {
-                await customerAuthClient.sendVerificationEmail({ email, callbackURL: "/cuenta" });
-                setNotice("Si la cuenta existe, te reenviamos el enlace de verificación.");
-              } catch {
-                setNotice("No se pudo reenviar el enlace. Inténtalo en unos minutos.");
-              }
-            }}
-          >
-            Reenviar el enlace de verificación
-          </button>
-        </p>
-      ) : null}
-      {notice ? <p className="notice" role="status">{notice}</p> : null}
       <button className="btn primary" type="submit" disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
     </form>
   );

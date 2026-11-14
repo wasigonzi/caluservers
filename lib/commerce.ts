@@ -448,33 +448,6 @@ export async function setTicketStatus(input: {
   });
 }
 
-/**
- * Marca el correo de un cliente como verificado sin enviar ningún correo: para
- * cuando el enlace de verificación nunca llegó (sin SMTP). No cambia la
- * contraseña ni crea sesión: solo desbloquea el acceso del cliente.
- */
-export async function markEmailVerified(input: { actor: string; userId: string }) {
-  const userId = input.userId.trim();
-  if (!userId) throw new CommerceError("Falta el cliente.", 400);
-  return db.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: userId } });
-    if (!user) throw new CommerceError("Cliente no encontrado.", 404);
-    const updated = await tx.user.update({
-      where: { id: user.id },
-      data: { emailVerified: true },
-      select: { id: true, email: true, emailVerified: true },
-    });
-    await tx.adminAudit.create({
-      data: {
-        action: "customer.email.verified",
-        entityId: user.id,
-        details: `Correo marcado como verificado por ${input.actor} (${user.email}).`,
-      },
-    });
-    return updated;
-  });
-}
-
 export async function createTicket(input: { userId: string; subject: string; body: string }) {
   const subject = input.subject.trim();
   const body = input.body.trim();
