@@ -48,3 +48,53 @@ model PageContent {
   updatedAt DateTime @updatedAt
 }
 
+/// Pedidos de hosting creados desde la web (checkout propio).
+/// El pago se confirma por el admin o por webhook (PAYMENT_WEBHOOK_SECRET);
+/// al confirmarse, el aprovisionamiento crea la cuenta cPanel en WHM
+/// automáticamente (lib/provisioning.ts). Sin proveedor de pago conectado
+/// todavía: la confirmación manual del admin es la vía activa.
+/// status: pending_payment | paid | provisioning | active | provision_failed | cancelled
+/// Aplicar: npx prisma migrate deploy
+model Order {
+  id                String          @id @default(cuid())
+  number            String          @unique
+  lookupToken       String          @unique @default(cuid())
+  customerName      String
+  customerEmail     String
+  domain            String
+  planId            String
+  planName          String
+  planCategory      String          @default("web")
+  price             String
+  status            String          @default("pending_payment")
+  paymentRef        String?
+  paidAt            DateTime?
+  paidVia           String?
+  whmUsername       String?         @unique
+  whmPackage        String?
+  provisionAttempts Int             @default(0)
+  provisionError    String?         @db.Text
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  hostingAccount    HostingAccount?
+
+  @@index([customerEmail, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Cuenta cPanel creada en WHM para un pedido. La contraseña se guarda
+/// cifrada (AES-256-GCM, lib/provisioning.ts) y solo se muestra al admin.
+model HostingAccount {
+  id                String   @id @default(cuid())
+  orderId           String   @unique
+  order             Order    @relation(fields: [orderId], references: [id])
+  whmUsername       String   @unique
+  domain            String
+  package           String
+  /// active | suspended
+  status            String   @default("active")
+  encryptedPassword String   @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+

@@ -322,9 +322,20 @@ export function PlanCard({
           Comparar
         </label>
       ) : null}
-      <a className="btn primary" href={plan.purchaseUrl} target="_blank" rel="noreferrer">
-        Ordenar →
-      </a>
+      {plan.category === "web" ? (
+        <a className="btn primary" href={`/checkout?plan=${plan.id}`}>
+          Ordenar →
+        </a>
+      ) : (
+        <a
+          className="btn primary"
+          href={plan.purchaseUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Ordenar →
+        </a>
+      )}
     </article>
   );
 }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Palette, FileText, ArrowUpRight, PlugZap } from "lucide-react";
+import { Palette, FileText, ArrowUpRight, PlugZap, ShoppingCart } from "lucide-react";
 import { isAdmin } from "@/lib/auth";
 import { whmConfiguration } from "@/lib/whm";
 import { safeWhmError } from "@/lib/whm-security";
@@ -57,6 +57,17 @@ export default async function Admin() {
           </p>
           <span className="workspace-link">
             Editar páginas <ArrowUpRight size={18} aria-hidden="true" />
+          </span>
+        </Link>
+        <Link className="workspace-card" href="/admin/orders">
+          <ShoppingCart size={26} aria-hidden="true" />
+          <span className="studio-eyebrow">VENTAS</span>
+          <h2>Pedidos y aprovisionamiento</h2>
+          <p>
+            Confirma pagos y las cuentas de hosting se crean solas en WHM.
+          </p>
+          <span className="workspace-link">
+            Ver pedidos <ArrowUpRight size={18} aria-hidden="true" />
           </span>
         </Link>
       </section>

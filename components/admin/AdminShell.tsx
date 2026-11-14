@@ -7,6 +7,7 @@ import {
   Server,
   Package,
   Settings,
+  ShoppingCart,
   ExternalLink,
   Menu,
   LogOut,
@@ -19,6 +20,7 @@ const NAV_ICONS = {
   "/admin": LayoutDashboard,
   "/admin/site": Palette,
   "/admin/pages": FileText,
+  "/admin/orders": ShoppingCart,
   "/admin/accounts": Server,
   "/admin/packages": Package,
   "/admin/settings": Settings,
@@ -37,6 +39,10 @@ const GROUPS: NavGroup[] = [
       { label: "Marca y sitio", href: "/admin/site" },
       { label: "Páginas / contenido", href: "/admin/pages" },
     ],
+  },
+  {
+    title: "Ventas",
+    items: [{ label: "Pedidos", href: "/admin/orders" }],
   },
   {
     title: "WHM / cPanel",
