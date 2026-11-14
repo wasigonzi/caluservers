@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type AuthMailKind = "verify" | "reset";
+export type AuthMailKind = "reset";
 
 /**
  * Cierto solo si existe una vía real de envío. El sumidero de archivos cuenta
@@ -15,7 +15,7 @@ export function mailerConfigured(): boolean {
 }
 
 /**
- * Sends verification and reset links. The link is never logged or returned.
+ * Sends reset links. The link is never logged or returned.
  * A file sink exists only outside production so tests can read the message.
  */
 export async function deliverAuthLink(input: {
@@ -23,10 +23,7 @@ export async function deliverAuthLink(input: {
   kind: AuthMailKind;
   url: string;
 }): Promise<{ delivered: boolean; reason: "smtp" | "sink" | "unconfigured" }> {
-  const subject =
-    input.kind === "verify"
-      ? "Verifica tu cuenta de CaluServers"
-      : "Restablece tu contraseña de CaluServers";
+  const subject = "Restablece tu contraseña de CaluServers";
   const text = [
     "Este enlace es de un solo uso y caduca.",
     "Si no solicitaste este mensaje, ignóralo.",

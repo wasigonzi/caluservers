@@ -20,7 +20,7 @@ export default async function PaymentReturn({
 }) {
   const { token = "", invoice = "" } = await searchParams;
   const session = await customerSession();
-  if (!session?.user.emailVerified) redirect("/cuenta/entrar");
+  if (!session?.user) redirect("/cuenta/entrar");
 
   const record = invoice
     ? await db.customerInvoice.findUnique({

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   if (!trustedWrite(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const session = await customerSession();
-  if (!session?.user.emailVerified) {
+  if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

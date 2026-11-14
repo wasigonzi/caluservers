@@ -45,12 +45,12 @@ export default async function HirePage({ searchParams }: { searchParams: Promise
           ) : null}
         </>
       ) : null}
-      {!session?.user.emailVerified ? (
+      {!session?.user ? (
         <p>
-          <Link href="/cuenta/entrar">Entra con el correo verificado para continuar.</Link>
+          <Link href="/cuenta/entrar">Entra para continuar.</Link>
         </p>
       ) : null}
-      {session?.user.emailVerified && orderable ? (
+      {session?.user && orderable ? (
         <OrderButton
           planId={planId}
           needsDomain={Boolean(hosting)}

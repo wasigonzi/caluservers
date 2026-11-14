@@ -198,7 +198,7 @@ export async function systemChecks(): Promise<SystemCheck[]> {
         ? inbox
           ? `Avisos internos hacia ${inbox}`
           : "Activo, pero sin dirección para avisos internos."
-        : "Sin SMTP_URL no salen verificaciones, avisos ni credenciales.",
+        : "Sin SMTP_URL no salen avisos ni credenciales.",
       href: "/admin/configuracion",
     },
     {

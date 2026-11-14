@@ -42,7 +42,6 @@ export default async function CustomersPage({
     id: string;
     name: string;
     email: string;
-    emailVerified: boolean;
     createdAt: Date;
     orders: number;
     paid: Map<string, number>;
@@ -74,7 +73,6 @@ export default async function CustomersPage({
         id: user.id,
         name: user.name,
         email: user.email,
-        emailVerified: user.emailVerified,
         createdAt: user.createdAt,
         orders: user._count.orders,
         paid,
@@ -120,12 +118,7 @@ export default async function CustomersPage({
                       {row.name || row.email}
                     </Link>
                   </td>
-                  <td>
-                    {row.email}{" "}
-                    {row.emailVerified ? null : (
-                      <StatusBadge info={{ label: "Sin verificar", tone: "warn" }} />
-                    )}
-                  </td>
+                  <td>{row.email}</td>
                   <td>{row.orders}</td>
                   <td>
                     {row.paid.size

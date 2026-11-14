@@ -5,7 +5,7 @@ import { clientRateKey } from "@/lib/login-rate-limit";
 import { consumeLoginAttempt } from "@/lib/login-throttle-store";
 
 const handler = toNextJsHandler(customerAuth);
-const LIMITED = ["/sign-in", "/sign-up", "/request-password-reset", "/forget-password", "/send-verification-email"];
+const LIMITED = ["/sign-in", "/sign-up", "/request-password-reset", "/forget-password"];
 
 async function guarded(req: NextRequest) {
   if (!customerAuthReady) {

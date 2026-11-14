@@ -20,8 +20,8 @@ function json(body: unknown, status = 200) {
 export async function POST(req: NextRequest) {
   if (!trustedWrite(req)) return json({ ok: false, error: "Origen no permitido." }, 403);
   const session = await customerSession();
-  if (!session?.user.emailVerified) {
-    return json({ ok: false, error: "Verifica tu correo antes de pagar." }, 401);
+  if (!session?.user) {
+    return json({ ok: false, error: "Debes entrar para pagar." }, 401);
   }
   if (!paypalReady()) {
     return json(
