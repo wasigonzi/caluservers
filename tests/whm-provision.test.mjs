@@ -381,7 +381,7 @@ test("no se da de alta sin pago, sin dominio, desactivado o sin correo", async (
       },
       "unpaid",
     ],
-    [{ ...base, service: { ...PAID_SERVICE, status: "active" } }, "state"],
+    [{ ...base, service: { ...PAID_SERVICE, status: "cancelled" } }, "state"],
     [{ ...base, service: { ...PAID_SERVICE, order: { ...PAID_SERVICE.order, domain: null } } }, "domain"],
     [{ ...base, service: PAID_SERVICE, setting: { enabled: false, packageName: "basico" } }, "disabled"],
     [{ ...base, service: PAID_SERVICE, mailReady: false }, "mail"],
@@ -421,6 +421,25 @@ test("un alta correcta guarda el usuario, envía la contraseña y no la almacena
   const written = JSON.stringify(state.updates);
   assert.ok(!written.includes(sent.params.password), "la contraseña no se guarda");
   assert.ok(state.events.some((event) => event.action === "service.provisioned"));
+});
+
+test("un servicio activo sin cuenta se puede dar de alta de nuevo", async () => {
+  const { provision, state } = provisionModule({
+    service: { ...PAID_SERVICE, status: "active", cpanelUser: null },
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+  });
+  const result = await provision.provisionService({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.status, "active");
+  assert.match(result.cpanelUser, /^[a-z][a-z0-9]{0,7}$/);
+  assert.equal(result.credentialsSent, true);
+  assert.equal(state.writes.length, 1);
+  assert.equal(state.writes[0].action, "createacct");
+  // El cerrojo se tomó desde "active", no desde pendiente.
+  const lock = state.updates.find((update) => update.kind === "updateMany");
+  assert.equal(lock.where.status, "active");
+  assert.equal(lock.where.cpanelUser, null);
+  assert.equal(lock.data.status, "provisioning");
 });
 
 test("el cerrojo impide dos altas para el mismo servicio", async () => {

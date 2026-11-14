@@ -130,6 +130,19 @@ test("pedidos, aislamiento, importes y transiciones", {
       (error) => error.status === 409,
     );
 
+    // Reactivación: un servicio cancelado vuelve a activo con su motivo, y
+    // queda constancia de cada cambio en el diario (alta, baja, reactivación).
+    const reactivated = await commerce.setServiceStatus({ actor: "admin@example.com", serviceId: service.id, status: "active", note: "el cliente retomó el servicio" });
+    assert.equal(reactivated.status, "active");
+    assert.equal(
+      await prisma.commerceEvent.count({ where: { action: "service.status", entityId: service.id } }),
+      3,
+    );
+    await assert.rejects(
+      () => commerce.setServiceStatus({ actor: "admin@example.com", serviceId: service.id, status: "active", note: "otra alta no vale dos" }),
+      (error) => error.status === 409,
+    );
+
     // Cobro por pasarela: la referencia de captura es única, así que el webhook
     // repetido devuelve el mismo cobro en lugar de duplicarlo.
     const gatewayOrder = await commerce.createCustomerOrder({ userId: "user-b", planId: "wh0", idempotencyKey: "idem-gw-0001", domain: "otrodominio.com" });

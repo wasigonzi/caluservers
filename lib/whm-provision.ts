@@ -79,7 +79,7 @@ const MESSAGES = {
   package: "Falta el paquete WHM para ese plan.",
   domain: "El pedido no declara un dominio, así que no se puede crear la cuenta.",
   unpaid: "No se da de alta un servicio sin pago confirmado.",
-  state: "Ese servicio no está pendiente de alta.",
+  state: "El servicio no se puede dar de alta en su estado actual.",
   mail: "Sin SMTP configurado no se puede entregar la contraseña inicial.",
   plan: "Ese plan no se da de alta en cPanel.",
   notfound: "Servicio no encontrado.",
@@ -409,6 +409,11 @@ export type ProvisionOutcome = {
 /**
  * Da de alta el servicio en WHM. Devuelve el resultado o lanza `ProvisionError`
  * con un motivo que el panel puede mostrar. No reintenta por su cuenta.
+ *
+ * Vale para un servicio pendiente de alta y para uno activo sin usuario
+ * cPanel (por ejemplo, reactivado a mano o con el alta manual): en el segundo
+ * caso el cerrojo se toma desde "active" y el alta lo deja activo con su
+ * cuenta. Un servicio que ya tiene usuario cPanel no se vuelve a crear.
  */
 export async function provisionService(input: {
   serviceId: string;
@@ -432,7 +437,12 @@ export async function provisionService(input: {
     };
   }
   if (service.order.invoice?.payment?.status !== "confirmed") fail("unpaid");
-  if (service.status !== "pending_provision") fail("state");
+  // Pendiente de alta, o activo sin cuenta: un servicio reactivado a mano (o
+  // activado con el alta manual) puede darse de alta después sin duplicar
+  // nada; el usuario cPanel determinista y la re-adopción lo protegen.
+  if (service.status !== "pending_provision" && !(service.status === "active" && !service.cpanelUser)) {
+    fail("state");
+  }
 
   const domain = service.order.domain;
   if (!domain) fail("domain");
@@ -450,9 +460,11 @@ export async function provisionService(input: {
   });
   if (!customer?.email) fail("mail");
 
-  // Cerrojo: solo la llamada que cambia la fila de pendiente a "provisioning" sigue.
+  // Cerrojo: solo la llamada que cambia la fila desde su estado actual a
+  // "provisioning" sigue. Para un servicio activo sin cuenta, el cerrojo se
+  // toma desde "active" y el alta lo deja activo con su usuario cPanel.
   const claimed = await db.customerService.updateMany({
-    where: { id: service.id, status: "pending_provision", cpanelUser: null },
+    where: { id: service.id, status: service.status, cpanelUser: null },
     data: {
       status: "provisioning",
       provisionAttempts: { increment: 1 },
