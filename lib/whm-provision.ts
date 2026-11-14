@@ -1,10 +1,11 @@
 import "server-only";
-import { createHmac, randomInt } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { db } from "@/lib/db";
 import { deliverNotice, mailerConfigured } from "@/lib/mailer";
 import { openSecret, sealSecret, SecretBoxError } from "@/lib/secret-box";
 import { validateIdentity, whmBase, WhmError } from "@/lib/whm-security";
-import type { WhmCredentials } from "@/lib/whm-transport";
+import { readWhm, type WhmCredentials } from "@/lib/whm-transport";
+import { decryptWhm } from "@/lib/whm";
 import { writeWhm } from "@/lib/whm-write";
 
 /**
@@ -233,21 +234,166 @@ export function cpanelUsername(serviceId: string, domain: string): string {
   return RESERVED_USERS.has(candidate) ? `c${candidate.slice(1)}` : candidate;
 }
 
-const PASSWORD_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const PASSWORD_LOWER = "abcdefghijkmnopqrstuvwxyz";
+const PASSWORD_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const PASSWORD_DIGITS = "23456789";
 const PASSWORD_SYMBOLS = "!@#%^*-_=+";
 
-/** Contraseña inicial fuerte. No se guarda en ningún sitio: solo se envía al cliente. */
-export function initialPassword(): string {
+/**
+ * 20 caracteres a partir de los bytes de un HMAC: 5 de cada clase
+ * (minúsculas, mayúsculas, dígitos, símbolos) mezclados de forma determinista.
+ */
+function passwordFromBytes(bytes: Buffer): string {
+  const classes = [PASSWORD_LOWER, PASSWORD_UPPER, PASSWORD_DIGITS, PASSWORD_SYMBOLS];
   const chars: string[] = [];
   for (let index = 0; index < 20; index++) {
-    chars.push(PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)]);
+    const alphabet = classes[index % 4];
+    chars.push(alphabet[bytes[index] % alphabet.length]);
   }
-  chars[randomInt(chars.length)] = PASSWORD_SYMBOLS[randomInt(PASSWORD_SYMBOLS.length)];
+  for (let index = chars.length - 1; index > 0; index--) {
+    const other = bytes[20 + (index % 12)] % (index + 1);
+    [chars[index], chars[other]] = [chars[other], chars[index]];
+  }
   return chars.join("");
+}
+
+/**
+ * Contraseña inicial determinista por servicio y usuario (HMAC con
+ * AUTH_SECRET). Un reintento tras una respuesta perdida regenera la MISMA
+ * contraseña, así que adoptar la cuenta ya creada en WHM es seguro: la
+ * contraseña que se envía al cliente es la que tiene la cuenta.
+ * Nunca se guarda en ningún sitio: solo se envía al cliente.
+ */
+export function initialPassword(serviceId: string, username: string): string {
+  const secret = process.env.AUTH_SECRET || "";
+  if (secret.length < 32) throw new WhmError("key");
+  for (let counter = 0; counter < 10; counter++) {
+    const digest = createHmac("sha256", secret)
+      .update(`hosting-password:${serviceId}:${username}:${counter}`)
+      .digest();
+    const password = passwordFromBytes(digest);
+    if (!password.toLowerCase().includes(username.toLowerCase())) return password;
+  }
+  throw new WhmError("key");
 }
 
 export function packageFor(config: ProvisionPublicConfig, planId: string): string {
   return config.packageByPlan[planId] || config.packageName;
+}
+
+/**
+ * Cuenta que WHM ya tiene para este usuario, si existe. Se usa solo cuando el
+ * alta devolvió un error incierto: si WHM creó la cuenta pero la respuesta se
+ * perdió, el reintento la readopta en lugar de chocar con "el usuario ya
+ * existe". Se prueba primero con las credenciales de lectura (ACL listaccts)
+ * y luego con las de escritura. Con una lista truncada no se puede asegurar
+ * la ausencia y no se adopta nada. Nunca lanza: sin lectura disponible, la
+ * respuesta es "no consta".
+ */
+async function findWhmAccount(
+  username: string,
+): Promise<{ user: string; domain: string } | null> {
+  const wanted = username.toLowerCase();
+  const attempts: Array<{ endpoint: string; credentials: WhmCredentials }> = [];
+  for (const id of ["whm", CONFIG_ID]) {
+    try {
+      const row = await db.integrationConfig.findUnique({ where: { id } });
+      if (!row) continue;
+      const credentials =
+        id === CONFIG_ID
+          ? decryptProvisionCredentials(row.encryptedCredentials)
+          : decryptWhm(row.encryptedCredentials);
+      attempts.push({ endpoint: row.endpoint, credentials });
+    } catch {
+      continue;
+    }
+  }
+  for (const { endpoint, credentials } of attempts) {
+    try {
+      const { rows, truncated } = await readWhm(endpoint, credentials, "listaccts");
+      const found = rows.find((entry) => (entry.user ?? "").toLowerCase() === wanted);
+      if (found) return { user: found.user || username, domain: found.domain ?? "" };
+      if (!truncated) return null;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/** Marca el servicio activo y entrega la contraseña inicial al cliente. */
+async function finishProvision(input: {
+  serviceId: string;
+  createdUser: string;
+  domain: string;
+  planName: string;
+  whmPackage: string;
+  password: string;
+  customerEmail: string;
+  customerName: string | null;
+  actor: string;
+  adopted: boolean;
+}): Promise<ProvisionOutcome> {
+  await db.$transaction([
+    db.customerService.update({
+      where: { id: input.serviceId },
+      data: {
+        status: "active",
+        cpanelUser: input.createdUser,
+        provisionedAt: new Date(),
+        provisionError: null,
+        note: `Cuenta cPanel ${input.createdUser} creada para ${input.domain}.`,
+      },
+    }),
+    db.commerceEvent.create({
+      data: {
+        actor: input.actor,
+        action: "service.provisioned",
+        entityId: input.serviceId,
+        details: `user=${input.createdUser};domain=${input.domain};package=${input.whmPackage}${input.adopted ? ";adopted=1" : ""}`,
+      },
+    }),
+  ]);
+
+  let credentialsSent = false;
+  try {
+    const delivery = await deliverNotice({
+      to: input.customerEmail,
+      subject: "Tu cuenta de hosting en CaluServers está lista",
+      text: [
+        `Hola${input.customerName ? ` ${input.customerName}` : ""},`,
+        "",
+        `Tu plan ${input.planName} ya está activo para ${input.domain}.`,
+        "",
+        `Usuario cPanel: ${input.createdUser}`,
+        `Contraseña inicial: ${input.password}`,
+        "",
+        "Cambia la contraseña al entrar por primera vez. No guardamos esta contraseña,",
+        "así que este es el único mensaje que la contiene.",
+        "",
+        "Si no reconoces este alta, responde a este correo de inmediato.",
+      ].join("\n"),
+    });
+    credentialsSent = delivery.delivered;
+  } catch {
+    credentialsSent = false;
+  }
+  if (!credentialsSent) {
+    // La cuenta existe; lo que falló es el aviso. El panel lo muestra para actuar.
+    await db.customerService.update({
+      where: { id: input.serviceId },
+      data: {
+        provisionError:
+          "La cuenta se creó pero el correo con la contraseña no salió. Restablece la contraseña desde WHM y entrégala tú.",
+      },
+    });
+  }
+  return {
+    serviceId: input.serviceId,
+    cpanelUser: input.createdUser,
+    status: "active",
+    credentialsSent,
+  };
 }
 
 /* ------------------------------- alta efectiva ------------------------------- */
@@ -323,7 +469,7 @@ export async function provisionService(input: {
   }
   const credentials = decryptProvisionCredentials(row.encryptedCredentials);
   const username = cpanelUsername(service.id, domain);
-  const password = initialPassword();
+  const password = initialPassword(service.id, username);
 
   try {
     const result = await writeWhm(row.endpoint, credentials, "createacct", {
@@ -335,64 +481,40 @@ export async function provisionService(input: {
       useregns: "0",
       reseller: "0",
     });
-    const created = result.user || username;
-
-    await db.$transaction([
-      db.customerService.update({
-        where: { id: service.id },
-        data: {
-          status: "active",
-          cpanelUser: created,
-          provisionedAt: new Date(),
-          provisionError: null,
-          note: `Cuenta cPanel ${created} creada para ${domain}.`,
-        },
-      }),
-      db.commerceEvent.create({
-        data: {
-          actor: input.actor,
-          action: "service.provisioned",
-          entityId: service.id,
-          details: `user=${created};domain=${domain};package=${whmPackage}`,
-        },
-      }),
-    ]);
-
-    let credentialsSent = false;
-    try {
-      const delivery = await deliverNotice({
-        to: customer.email,
-        subject: "Tu cuenta de hosting en CaluServers está lista",
-        text: [
-          `Hola${customer.name ? ` ${customer.name}` : ""},`,
-          "",
-          `Tu plan ${service.planName} ya está activo para ${domain}.`,
-          "",
-          `Usuario cPanel: ${created}`,
-          `Contraseña inicial: ${password}`,
-          "",
-          "Cambia la contraseña al entrar por primera vez. No guardamos esta contraseña,",
-          "así que este es el único mensaje que la contiene.",
-          "",
-          "Si no reconoces este alta, responde a este correo de inmediato.",
-        ].join("\n"),
-      });
-      credentialsSent = delivery.delivered;
-    } catch {
-      credentialsSent = false;
-    }
-    if (!credentialsSent) {
-      // La cuenta existe; lo que falló es el aviso. El panel lo muestra para actuar.
-      await db.customerService.update({
-        where: { id: service.id },
-        data: {
-          provisionError:
-            "La cuenta se creó pero el correo con la contraseña no salió. Restablece la contraseña desde WHM y entrégala tú.",
-        },
-      });
-    }
-    return { serviceId: service.id, cpanelUser: created, status: "active", credentialsSent };
+    return await finishProvision({
+      serviceId: service.id,
+      createdUser: result.user || username,
+      domain,
+      planName: service.planName,
+      whmPackage,
+      password,
+      customerEmail: customer.email,
+      customerName: customer.name,
+      actor: input.actor,
+      adopted: false,
+    });
   } catch (error) {
+    // El alta pudo completarse aunque la respuesta se perdiera: antes de darla
+    // por fallida se comprueba si WHM ya tiene la cuenta para este servicio.
+    try {
+      const existing = await findWhmAccount(username);
+      if (existing && existing.domain.toLowerCase() === domain.toLowerCase()) {
+        return await finishProvision({
+          serviceId: service.id,
+          createdUser: existing.user,
+          domain,
+          planName: service.planName,
+          whmPackage,
+          password,
+          customerEmail: customer.email,
+          customerName: customer.name,
+          actor: input.actor,
+          adopted: true,
+        });
+      }
+    } catch {
+      // Sin lectura disponible no se puede adoptar: cae al fallo visible.
+    }
     const code = error instanceof WhmError ? error.code : "network";
     await releaseLock(service.id, code);
     await db.commerceEvent
