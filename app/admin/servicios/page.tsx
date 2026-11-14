@@ -141,7 +141,15 @@ export default async function ServicesPage({
             <tbody>
               {services.map((service) => {
                 const pending = service.status === "pending_provision";
-                const cancellable = service.status !== "cancelled";
+                const cancelled = service.status === "cancelled";
+                const cancellable = !cancelled;
+                // Sin usuario cPanel y con dominio: el alta en WHM está
+                // pendiente, tanto si el servicio espera el alta como si se
+                // activó a mano (o se reactivó) sin cuenta.
+                const needsProvision = Boolean(
+                  !service.cpanelUser && service.order.domain && provision?.ready,
+                );
+                const provisionable = (pending || service.status === "active") && needsProvision;
                 return (
                   <tr key={service.id}>
                     <td>
@@ -168,7 +176,7 @@ export default async function ServicesPage({
                     </td>
                     <td>
                       <div className="row-actions">
-                        {pending && provision?.ready && service.order.domain ? (
+                        {provisionable ? (
                           <ProvisionButton serviceId={service.id} />
                         ) : null}
                         {pending ? (
@@ -192,9 +200,18 @@ export default async function ServicesPage({
                             payload={{ action: "service-status", serviceId: service.id, status: "cancelled" }}
                             tone="danger"
                           />
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
+                        ) : null}
+                        {cancelled ? (
+                          <NoteAction
+                            trigger="Reactivar"
+                            title={`Reactivar: ${service.planName}`}
+                            description="Solo reactiva el servicio en el panel y en la cuenta del cliente. No llama a WHM ni recrea la cuenta: si la cuenta en WHM se borró, créala de nuevo en WHM. Si el servicio no tiene usuario cPanel, tras reactivar aparece aquí el botón de alta en WHM."
+                            noteLabel="Motivo de la reactivación"
+                            confirmLabel="Reactivar servicio"
+                            payload={{ action: "service-status", serviceId: service.id, status: "active" }}
+                            tone="secondary"
+                          />
+                        ) : null}
                       </div>
                     </td>
                   </tr>

@@ -349,8 +349,8 @@ export async function setServiceStatus(input: {
     const paid = service.order.invoice?.payment?.status === "confirmed";
     if (input.status === "active") {
       if (!paid) throw new CommerceError("No se activa un servicio sin pago confirmado.", 409);
-      if (service.status !== "pending_provision") {
-        throw new CommerceError("Solo un servicio pendiente de alta puede activarse.", 409);
+      if (service.status !== "pending_provision" && service.status !== "cancelled") {
+        throw new CommerceError("Solo un servicio pendiente de alta o cancelado puede activarse.", 409);
       }
     }
     // El cerrojo de alta solo bloquea mientras es reciente: uno atascado se puede cancelar.
