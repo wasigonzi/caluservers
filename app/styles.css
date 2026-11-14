@@ -91,6 +91,9 @@
 .admin-app th{color:var(--admin-cyan)}
 .admin-app .error,.login .error,.error{color:#ff9494}
 .admin-app .ok,.ok{color:#45e3a1}
+.admin-app .checklist{list-style:none;margin:14px 0;padding:0;display:grid;gap:8px}
+.admin-app .checklist li{font-size:14px;overflow-wrap:anywhere}
+.admin-app .checklist li .muted{font-size:13px}
 .login{
   max-width:470px;margin:14vh auto;border:1px solid #bdefff2d;box-shadow:0 12px 45px #0007;
   backdrop-filter:blur(20px);background:linear-gradient(130deg,#ffffff1a,#ffffff08);
