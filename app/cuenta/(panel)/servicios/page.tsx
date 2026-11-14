@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { cpanelLoginUrl, requireCustomer } from "@/lib/account-data";
 import { dateOnly, serviceStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
+import { initialPasswordOrNull } from "@/lib/whm-provision";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/admin/ui";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,13 @@ export default async function AccountServices() {
       <div className="service-grid">
         {services.map((service) => {
           const active = service.status === "active";
+          // La contraseña inicial es determinista por servicio y usuario: se
+          // calcula en el servidor y solo se muestra al dueño de la cuenta.
+          // Nunca se guarda en base ni sale en logs, URLs o errores.
+          const initialPassword =
+            active && service.cpanelUser
+              ? initialPasswordOrNull(service.id, service.cpanelUser)
+              : null;
           return (
             <article key={service.id} className="panel service-tile">
               <div className="service-tile-head">
@@ -75,6 +83,14 @@ export default async function AccountServices() {
                     </dd>
                   </div>
                 ) : null}
+                {initialPassword ? (
+                  <div>
+                    <dt>Contraseña inicial de cPanel</dt>
+                    <dd>
+                      <code>{initialPassword}</code>
+                    </dd>
+                  </div>
+                ) : null}
                 {service.order.invoice ? (
                   <div>
                     <dt>Factura</dt>
@@ -99,8 +115,17 @@ export default async function AccountServices() {
               </div>
               {active && service.cpanelUser ? (
                 <p className="muted service-hint">
-                  La contraseña inicial se envió a tu correo al crear la cuenta. Si no la tienes,
-                  pídenos una nueva por ticket.
+                  {initialPassword ? (
+                    <>
+                      Esta es la contraseña inicial de tu cuenta cPanel. Cámbiala al
+                      entrar por primera vez; si ya la cambiaste, usa la nueva.
+                    </>
+                  ) : (
+                    <>
+                      La contraseña inicial se envió a tu correo al crear la cuenta. Si no la tienes,
+                      pídenos una nueva por ticket.
+                    </>
+                  )}
                 </p>
               ) : null}
             </article>

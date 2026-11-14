@@ -227,7 +227,8 @@ function provisionModule(mocks = {}) {
       upsert: async (args) => args,
     },
     user: {
-      findUnique: async () => mocks.customer ?? { email: "cliente@example.com", name: "Ana" },
+      findUnique: async () =>
+        "customer" in mocks ? mocks.customer : { email: "cliente@example.com", name: "Ana" },
     },
     customerInvoice: { findUnique: async () => mocks.invoice ?? null },
     commerceEvent: {
@@ -355,12 +356,13 @@ test("el mapa de paquetes descarta claves y nombres no válidos", () => {
   assert.equal(Object.keys(parsed).length, 2);
 });
 
-test("el estado solo es «listo» con activación, token, paquete y correo", async () => {
+test("el estado solo es «listo» con activación, token y paquete; el correo ya no bloquea", async () => {
   const cases = [
     [{ setting: { enabled: true, packageName: "basico" }, mailReady: true }, true],
     [{ setting: { enabled: false, packageName: "basico" }, mailReady: true }, false],
     [{ setting: { enabled: true, packageName: "" }, mailReady: true }, false],
-    [{ setting: { enabled: true, packageName: "basico" }, mailReady: false }, false],
+    // Sin SMTP el alta se hace igual: la contraseña se muestra en el panel.
+    [{ setting: { enabled: true, packageName: "basico" }, mailReady: false }, true],
     [{ setting: { enabled: true, packageName: "basico" }, credentials: null, mailReady: true }, false],
   ];
   for (const [mocks, expected] of cases) {
@@ -368,9 +370,44 @@ test("el estado solo es «listo» con activación, token, paquete y correo", asy
     const config = await provision.provisionConfiguration();
     assert.equal(config.ready, expected, JSON.stringify(mocks));
   }
+  // mailReady se sigue informando, solo deja de bloquear.
+  const { provision } = provisionModule({
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: false,
+  });
+  assert.equal((await provision.provisionConfiguration()).mailReady, false);
 });
 
-test("no se da de alta sin pago, sin dominio, desactivado o sin correo", async () => {
+test("las piezas que faltan se nombran una a una", () => {
+  const { provision } = provisionModule();
+  // Las listas vienen de otro realm (vm): se comparan como texto, no con deepEqual.
+  assert.equal(
+    provision
+      .missingProvisionPieces({
+        enabled: false,
+        url: "",
+        hasToken: false,
+        packageName: "",
+        packageByPlan: {},
+        mailReady: false,
+      })
+      .join(" | "),
+    "alta desactivada | sin servidor WHM | sin token WHM | sin paquete WHM | sin correo saliente (la contraseña se muestra en el panel)",
+  );
+  assert.equal(
+    provision.missingProvisionPieces({
+      enabled: true,
+      url: "https://whm.example.net:2087",
+      hasToken: true,
+      packageName: "basico",
+      packageByPlan: {},
+      mailReady: true,
+    }).length,
+    0,
+  );
+});
+
+test("no se da de alta sin pago, sin dominio, sin cliente o desactivado", async () => {
   const base = { setting: { enabled: true, packageName: "basico" }, mailReady: true };
   const cases = [
     [{ ...base, service: null }, "notfound"],
@@ -384,8 +421,8 @@ test("no se da de alta sin pago, sin dominio, desactivado o sin correo", async (
     [{ ...base, service: { ...PAID_SERVICE, status: "cancelled" } }, "state"],
     [{ ...base, service: { ...PAID_SERVICE, order: { ...PAID_SERVICE.order, domain: null } } }, "domain"],
     [{ ...base, service: PAID_SERVICE, setting: { enabled: false, packageName: "basico" } }, "disabled"],
-    [{ ...base, service: PAID_SERVICE, mailReady: false }, "mail"],
     [{ ...base, service: PAID_SERVICE, setting: { enabled: true, packageName: "" } }, "package"],
+    [{ ...base, service: PAID_SERVICE, customer: null }, "customer"],
   ];
   for (const [mocks, code] of cases) {
     const { provision, state } = provisionModule(mocks);
@@ -396,6 +433,39 @@ test("no se da de alta sin pago, sin dominio, desactivado o sin correo", async (
     );
     assert.equal(state.writes.length, 0, `no debía llamar a WHM: ${code}`);
   }
+});
+
+test("el alta sale sin SMTP configurado y la contraseña queda en el panel, no solo en el correo", async () => {
+  const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: false,
+    mailDelivered: false,
+  });
+  const result = await provision.provisionService({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.status, "active");
+  assert.equal(result.credentialsSent, false);
+  assert.equal(state.writes.length, 1);
+  assert.equal(state.writes[0].action, "createacct");
+  // El correo no salió, pero la contraseña se puede mostrar en el panel.
+  const password = provision.initialPassword("svc_1", result.cpanelUser);
+  assert.equal(provision.initialPasswordOrNull("svc_1", result.cpanelUser), password);
+  const flagged = state.updates.find(
+    (update) => update.kind === "update" && update.data.provisionError,
+  );
+  assert.match(flagged.data.provisionError, /panel del cliente/);
+  // El correo que habría salido ya no dice ser la única copia.
+  assert.ok(!state.mail[0].text.includes("único mensaje"));
+  assert.match(state.mail[0].text, /panel de cliente/);
+});
+
+test("la contraseña para el panel es nula sin usuario o sin secreto", () => {
+  const { provision } = provisionModule();
+  assert.equal(provision.initialPasswordOrNull("svc_1", null), null);
+  assert.equal(
+    provision.initialPasswordOrNull("svc_1", "miti1a2b"),
+    provision.initialPassword("svc_1", "miti1a2b"),
+  );
 });
 
 test("un alta correcta guarda el usuario, envía la contraseña y no la almacena", async () => {
@@ -569,8 +639,10 @@ test("si la cuenta se crea pero el correo no sale, queda constancia", async () =
   assert.match(flagged.data.provisionError, /contraseña/i);
 });
 
-test("el alta automática no se intenta cuando la configuración no está lista", async () => {
+test("el alta automática no se intenta cuando la configuración no está lista, pero el salto queda registrado", async () => {
   const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    invoice: { order: { service: { id: "svc_1" } } },
     setting: { enabled: false, packageName: "" },
     mailReady: false,
   });
@@ -578,6 +650,37 @@ test("el alta automática no se intenta cuando la configuración no está lista"
   assert.equal(result.attempted, false);
   assert.equal(result.provisioned, false);
   assert.equal(state.writes.length, 0);
+  // El motivo nombra las piezas que faltan, no un texto genérico.
+  assert.match(result.reason, /alta desactivada/);
+  assert.match(result.reason, /sin paquete WHM/);
+  assert.match(result.reason, /sin correo saliente/);
+  const skipped = state.events.find((event) => event.action === "service.provision_skipped");
+  assert.ok(skipped, "debe quedar un evento de salto en el diario");
+  assert.equal(skipped.entityId, "svc_1");
+  assert.match(skipped.details, /alta desactivada/);
+  const flagged = state.updates.find(
+    (update) => update.kind === "update" && update.data.provisionError,
+  );
+  assert.ok(flagged, "el servicio debe mostrar el motivo en el panel");
+  assert.match(flagged.data.provisionError, /alta desactivada/);
+});
+
+test("el salto no se registra si el servicio ya tiene su cuenta", async () => {
+  const { provision, state } = provisionModule({
+    service: { ...PAID_SERVICE, status: "active", cpanelUser: "miti1a2b" },
+    invoice: { order: { service: { id: "svc_1" } } },
+    setting: { enabled: false, packageName: "" },
+    mailReady: false,
+  });
+  const result = await provision.maybeAutoProvision({ invoiceId: "inv_1", actor: "admin" });
+  assert.equal(result.attempted, false);
+  assert.equal(result.provisioned, false);
+  assert.equal(state.events.length, 0, "no hay nada que avisar");
+  assert.equal(
+    state.updates.filter((update) => update.kind === "update").length,
+    0,
+    "no se toca el servicio",
+  );
 });
 
 test("un fallo del alta automática no rompe el cobro", async () => {

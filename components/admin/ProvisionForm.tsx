@@ -30,6 +30,37 @@ export default function ProvisionForm({
   const [error, setError] = useState(storageError);
   const [saved, setSaved] = useState("");
 
+  const checks = [
+    {
+      label: "Alta activada",
+      ok: initial.enabled,
+      hint: "Activa la casilla de abajo.",
+    },
+    {
+      label: "Servidor WHM",
+      ok: Boolean(initial.url),
+      hint: "Falta la URL del servidor (https, puerto 2087).",
+    },
+    {
+      label: "Token WHM guardado",
+      ok: initial.hasToken,
+      hint: "Falta el token con permiso createacct.",
+    },
+    {
+      label: "Paquete WHM asignado",
+      ok: Boolean(initial.packageName) || Object.keys(initial.packageByPlan).length > 0,
+      hint: "Falta el paquete por defecto o por plan.",
+    },
+    {
+      label: "Correo saliente (SMTP)",
+      ok: initial.mailReady,
+      hint: "Sin SMTP_URL la contraseña no se envía por correo, pero el alta se hace igual y queda visible en el panel del cliente y en el de administración.",
+    },
+  ];
+  const missing = checks
+    .filter((check) => !check.ok && check.label !== "Correo saliente (SMTP)")
+    .map((check) => check.label);
+
   return (
     <form
       onSubmit={async (event) => {
@@ -71,21 +102,36 @@ export default function ProvisionForm({
       }}
     >
       <p className="muted">
-        Estado:{" "}
         {initial.ready
-          ? "listo"
-          : initial.enabled
-            ? "activado pero incompleto"
-            : "desactivado"}
-        {initial.hasToken ? " · token guardado" : " · sin token"}
-        {initial.mailReady ? " · correo saliente configurado" : " · SIN correo saliente"}
+          ? "El alta automática está lista para el próximo pago."
+          : missing.length
+            ? `Falta para que el alta funcione: ${missing.join(", ")}.`
+            : "El alta automática está desactivada."}
       </p>
-      {!initial.mailReady ? (
-        <p className="notice">
-          Sin <code>SMTP_URL</code> no se da de alta nada: la contraseña inicial no se
-          guarda en la base, se envía al cliente y solo existe en ese correo.
-        </p>
-      ) : null}
+      <ul className="checklist" aria-label="Estado de la configuración del alta automática">
+        {checks.map((check) => (
+          <li key={check.label}>
+            <span aria-hidden="true">{check.ok ? "✓" : "✗"}</span>{" "}
+            <strong>{check.label}</strong>
+            {check.ok ? (
+              <>
+                {check.label === "Servidor WHM" && initial.url ? (
+                  <span className="muted"> · {initial.url}</span>
+                ) : null}
+                {check.label === "Paquete WHM asignado" && initial.packageName ? (
+                  <span className="muted"> · {initial.packageName}</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="muted"> — {check.hint}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="notice">
+        El correo saliente no bloquea el alta: sin SMTP la contraseña inicial no se
+        envía, pero queda visible en el panel del cliente y en el de administración.
+      </p>
 
       <label className="field">
         Servidor WHM (https, puerto 2087)

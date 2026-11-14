@@ -5,7 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, pageNumber, searchTerm, serviceStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
-import { provisionConfiguration } from "@/lib/whm-provision";
+import { initialPasswordOrNull, provisionConfiguration } from "@/lib/whm-provision";
 import { NoteAction, ProvisionButton } from "@/components/admin/CommerceActions";
 import {
   EmptyState,
@@ -163,7 +163,17 @@ export default async function ServicesPage({
                         {service.order.user.email}
                       </Link>
                     </td>
-                    <td>{service.cpanelUser || "—"}</td>
+                    <td>
+                      {service.cpanelUser || "—"}
+                      {service.cpanelUser ? (
+                        <span className="cell-sub">
+                          Contraseña inicial:{" "}
+                          <code>
+                            {initialPasswordOrNull(service.id, service.cpanelUser) ?? "no disponible"}
+                          </code>
+                        </span>
+                      ) : null}
+                    </td>
                     <td>
                       <StatusBadge info={serviceStatus(service.status)} />
                       {service.note ? <span className="cell-sub">{service.note}</span> : null}

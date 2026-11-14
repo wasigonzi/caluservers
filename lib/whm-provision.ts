@@ -16,8 +16,9 @@ import { writeWhm } from "@/lib/whm-write";
  *   `createacct`, distinto del token de solo lectura. El de lectura no se reutiliza.
  * - Solo planes de hosting (cPanel) y solo con un dominio declarado en el pedido.
  * - La contraseña inicial no se guarda: se genera, se crea la cuenta y se envía al
- *   cliente. Sin SMTP configurado no se da de alta, porque no habría forma de
- *   entregarla.
+ *   cliente por correo cuando hay SMTP. Sin SMTP el alta se hace igual y la
+ *   contraseña queda visible en el panel del cliente y en el de administración,
+ *   así que el correo nunca bloquea el alta.
  * - El usuario cPanel es determinista por servicio: un reintento usa el mismo
  *   nombre, así que no se crean dos cuentas para el mismo pedido.
  * - `status = "provisioning"` es un cerrojo en base: solo una llamada lo toma.
@@ -49,7 +50,10 @@ export type ProvisionPublicConfig = {
   enabled: boolean;
   packageName: string;
   packageByPlan: Record<string, string>;
-  /** `ready` solo es cierto con credenciales, paquete, activación y correo salientes. */
+  /** `ready` solo es cierto con credenciales, paquete y activación. El correo
+   * saliente (`mailReady`) se informa aparte, pero no bloquea el alta: sin SMTP
+   * la contraseña inicial se muestra en el panel del cliente y en el de
+   * administración. */
   ready: boolean;
   mailReady: boolean;
 };
@@ -63,7 +67,7 @@ export class ProvisionError extends Error {
       | "domain"
       | "unpaid"
       | "state"
-      | "mail"
+      | "customer"
       | "plan"
       | "notfound",
     message: string,
@@ -80,7 +84,7 @@ const MESSAGES = {
   domain: "El pedido no declara un dominio, así que no se puede crear la cuenta.",
   unpaid: "No se da de alta un servicio sin pago confirmado.",
   state: "El servicio no se puede dar de alta en su estado actual.",
-  mail: "Sin SMTP configurado no se puede entregar la contraseña inicial.",
+  customer: "El cliente no tiene correo registrado, así que no se puede crear la cuenta en WHM.",
   plan: "Ese plan no se da de alta en cPanel.",
   notfound: "Servicio no encontrado.",
 } as const;
@@ -144,13 +148,32 @@ export async function provisionConfiguration(): Promise<ProvisionPublicConfig> {
     packageName,
     packageByPlan,
     mailReady,
+    // El correo no bloquea: sin SMTP la contraseña se muestra en el panel.
     ready:
       enabled &&
       hasToken &&
       Boolean(row?.endpoint) &&
-      (Boolean(packageName) || Object.keys(packageByPlan).length > 0) &&
-      mailReady,
+      (Boolean(packageName) || Object.keys(packageByPlan).length > 0),
   };
+}
+
+/**
+ * Piezas que faltan para que el alta automática funcione, en lenguaje del
+ * panel. Las cuatro primeras bloquean el alta; la del correo solo avisa: sin
+ * SMTP la contraseña inicial no se envía, pero se muestra en el panel.
+ */
+export function missingProvisionPieces(config: ProvisionPublicConfig): string[] {
+  const missing: string[] = [];
+  if (!config.enabled) missing.push("alta desactivada");
+  if (!config.url) missing.push("sin servidor WHM");
+  if (!config.hasToken) missing.push("sin token WHM");
+  if (!config.packageName && Object.keys(config.packageByPlan).length === 0) {
+    missing.push("sin paquete WHM");
+  }
+  if (!config.mailReady) {
+    missing.push("sin correo saliente (la contraseña se muestra en el panel)");
+  }
+  return missing;
 }
 
 export async function saveProvisionConfiguration(input: unknown): Promise<ProvisionPublicConfig> {
@@ -262,7 +285,8 @@ function passwordFromBytes(bytes: Buffer): string {
  * AUTH_SECRET). Un reintento tras una respuesta perdida regenera la MISMA
  * contraseña, así que adoptar la cuenta ya creada en WHM es seguro: la
  * contraseña que se envía al cliente es la que tiene la cuenta.
- * Nunca se guarda en ningún sitio: solo se envía al cliente.
+ * Nunca se guarda en ningún sitio: se envía al cliente por correo cuando hay
+ * SMTP y se muestra en el panel del cliente y en el de administración.
  */
 export function initialPassword(serviceId: string, username: string): string {
   const secret = process.env.AUTH_SECRET || "";
@@ -275,6 +299,23 @@ export function initialPassword(serviceId: string, username: string): string {
     if (!password.toLowerCase().includes(username.toLowerCase())) return password;
   }
   throw new WhmError("key");
+}
+
+/**
+ * Contraseña inicial para mostrarla en el panel (cliente o admin). Nulo si no
+ * hay usuario cPanel o no se puede calcular: la página no debe romperse por
+ * esto. Nunca se registra en logs ni se mete en URLs o respuestas de error.
+ */
+export function initialPasswordOrNull(
+  serviceId: string,
+  username: string | null,
+): string | null {
+  if (!username) return null;
+  try {
+    return initialPassword(serviceId, username);
+  } catch {
+    return null;
+  }
 }
 
 export function packageFor(config: ProvisionPublicConfig, planId: string): string {
@@ -368,8 +409,8 @@ async function finishProvision(input: {
         `Usuario cPanel: ${input.createdUser}`,
         `Contraseña inicial: ${input.password}`,
         "",
-        "Cambia la contraseña al entrar por primera vez. No guardamos esta contraseña,",
-        "así que este es el único mensaje que la contiene.",
+        "Cambia la contraseña al entrar por primera vez. Si ya la cambiaste, usa la nueva.",
+        "La contraseña inicial también está en tu panel de cliente (Mis servicios).",
         "",
         "Si no reconoces este alta, responde a este correo de inmediato.",
       ].join("\n"),
@@ -379,12 +420,13 @@ async function finishProvision(input: {
     credentialsSent = false;
   }
   if (!credentialsSent) {
-    // La cuenta existe; lo que falló es el aviso. El panel lo muestra para actuar.
+    // La cuenta existe; lo que falló es el aviso. La contraseña sigue visible
+    // en el panel del cliente y en el de administración.
     await db.customerService.update({
       where: { id: input.serviceId },
       data: {
         provisionError:
-          "La cuenta se creó pero el correo con la contraseña no salió. Restablece la contraseña desde WHM y entrégala tú.",
+          "La cuenta se creó pero el correo con la contraseña no salió. La contraseña inicial sigue visible en el panel del cliente y en el de administración.",
       },
     });
   }
@@ -450,7 +492,6 @@ export async function provisionService(input: {
   const config = await provisionConfiguration();
   if (!config.enabled) fail("disabled");
   if (!config.hasToken || !config.url) fail("credentials");
-  if (!config.mailReady) fail("mail");
   const whmPackage = packageFor(config, service.planId);
   if (!whmPackage) fail("package");
 
@@ -458,7 +499,9 @@ export async function provisionService(input: {
     where: { id: service.userId },
     select: { email: true, name: true },
   });
-  if (!customer?.email) fail("mail");
+  // El correo se usa como contacto de la cuenta WHM; sin él no se crea.
+  // Que no haya SMTP no bloquea: la contraseña se muestra en el panel.
+  if (!customer?.email) fail("customer");
 
   // Cerrojo: solo la llamada que cambia la fila desde su estado actual a
   // "provisioning" sigue. Para un servicio activo sin cuenta, el cerrojo se
@@ -549,6 +592,11 @@ export async function provisionService(input: {
  * Se llama fuera de la transacción del cobro: una llamada de red dentro de una
  * transacción la mantendría abierta. Si el alta no sale, el pago sigue registrado
  * y el servicio queda pendiente con su motivo, listo para reintentar desde el panel.
+ *
+ * Si la configuración no está lista, el alta NO se intenta, pero el salto queda
+ * registrado donde el admin lo ve: un evento `service.provision_skipped` en el
+ * diario y el motivo en el `provisionError` del servicio, nombrando la pieza
+ * que falta. No se crea ni se provisiona nada sin pago confirmado.
  */
 export async function maybeAutoProvision(input: {
   invoiceId: string;
@@ -560,7 +608,6 @@ export async function maybeAutoProvision(input: {
   } catch {
     return { attempted: false, provisioned: false, reason: "configuración no disponible" };
   }
-  if (!config.ready) return { attempted: false, provisioned: false };
 
   const invoice = await db.customerInvoice
     .findUnique({
@@ -569,7 +616,15 @@ export async function maybeAutoProvision(input: {
     })
     .catch(() => null);
   const serviceId = invoice?.order?.service?.id;
-  if (!serviceId) return { attempted: false, provisioned: false };
+  if (!serviceId) {
+    return { attempted: false, provisioned: false, reason: "sin servicio asociado a la factura" };
+  }
+
+  if (!config.ready) {
+    const reason = `Alta automática no intentada: falta ${missingProvisionPieces(config).join("; ")}.`;
+    await recordProvisionSkipped({ serviceId, actor: input.actor, reason });
+    return { attempted: false, provisioned: false, reason };
+  }
 
   try {
     await provisionService({ serviceId, actor: input.actor });
@@ -581,6 +636,50 @@ export async function maybeAutoProvision(input: {
         : "El alta automática no se completó.";
     return { attempted: true, provisioned: false, reason };
   }
+}
+
+/**
+ * Deja constancia de que un cobro confirmado no disparó el alta porque la
+ * configuración no está lista. Solo se registra cuando el servicio está en un
+ * estado en el que el alta se habría intentado (pendiente, o activo sin
+ * cuenta): un servicio que ya tiene su cuenta o está cancelado no necesita
+ * este aviso. Que el registro falle nunca rompe la respuesta del cobro.
+ */
+async function recordProvisionSkipped(input: {
+  serviceId: string;
+  actor: string;
+  reason: string;
+}) {
+  const service = await db.customerService
+    .findUnique({
+      where: { id: input.serviceId },
+      select: { status: true, cpanelUser: true },
+    })
+    .catch(() => null);
+  if (!service) return;
+  if (service.cpanelUser) return;
+  if (
+    service.status !== "pending_provision" &&
+    !(service.status === "active" && !service.cpanelUser)
+  ) {
+    return;
+  }
+  await db.commerceEvent
+    .create({
+      data: {
+        actor: input.actor,
+        action: "service.provision_skipped",
+        entityId: input.serviceId,
+        details: input.reason,
+      },
+    })
+    .catch(() => {});
+  await db.customerService
+    .update({
+      where: { id: input.serviceId },
+      data: { provisionError: `${input.reason} Revisa la configuración en Alta automática.` },
+    })
+    .catch(() => {});
 }
 
 /** Devuelve el servicio a pendiente con el motivo saneado, para poder reintentar. */
