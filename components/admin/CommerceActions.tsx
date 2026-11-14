@@ -268,3 +268,44 @@ export function TicketStatusButton({
     </>
   );
 }
+
+/**
+ * Marca el correo del cliente como verificado. No envía ningún correo: solo
+ * desbloquea el acceso cuando el enlace de verificación nunca llegó.
+ */
+export function VerifyEmailButton({ userId }: { userId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  return (
+    <>
+      <button
+        className="btn secondary small"
+        type="button"
+        disabled={busy || done}
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
+          setError("");
+          try {
+            await post({ action: "verify-email", userId });
+            setDone(true);
+            router.refresh();
+          } catch (err) {
+            setError(messageOf(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {done ? "Correo verificado" : busy ? "Guardando…" : "Marcar correo como verificado"}
+      </button>
+      {error ? (
+        <span className="error" role="alert">
+          {error}
+        </span>
+      ) : null}
+    </>
+  );
+}
