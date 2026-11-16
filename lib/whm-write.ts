@@ -12,13 +12,14 @@ import { publicTarget, type WhmCredentials } from "@/lib/whm-transport";
  * Transporte WHM de ESCRITURA, separado del de lectura a propósito.
  *
  * `readWhm` sigue rechazando cualquier comando que modifique el servidor: esa
- * garantía no se toca. Las altas pasan por aquí, con su propia lista de comandos,
- * sus propias credenciales (token con ACL `createacct`) y el mismo endurecimiento
- * de red: https, puerto 2087, DNS público, conexión fijada, TLS verificado,
- * sin redirecciones, con plazo y tamaño máximo.
+ * garantía no se toca. Las altas y las suspensiones pasan por aquí, con su
+ * propia lista de comandos, sus propias credenciales (token con ACL
+ * `createacct` y `suspendacct`) y el mismo endurecimiento de red: https,
+ * puerto 2087, DNS público, conexión fijada, TLS verificado, sin
+ * redirecciones, con plazo y tamaño máximo.
  */
 
-export const WHM_WRITE_ACTIONS = ["createacct"] as const;
+export const WHM_WRITE_ACTIONS = ["createacct", "suspendacct"] as const;
 export type WhmWriteAction = (typeof WHM_WRITE_ACTIONS)[number];
 
 const BODY_LIMIT = 512 * 1024;
@@ -37,7 +38,8 @@ export type WhmWriteResult = {
   user: string;
 };
 
-/** Extrae el resultado de `createacct` exigiendo metadata correcta, como en lectura. */
+/** Extrae el resultado de un comando de escritura exigiendo metadata correcta,
+ * como en lectura. `suspendacct` no devuelve usuario: `data` puede ser nulo. */
 export function parseWriteResponse(
   value: unknown,
   action: WhmWriteAction,

@@ -1,17 +1,18 @@
 // Stub WHM local SOLO para pruebas end-to-end (scripts/e2e-provision-on-payment.mjs).
 // NUNCA se despliega: vive en scripts/, fuera de app/. Escucha solo en
-// 127.0.0.1 y registra cada createacct (método, parámetros) devolviendo
-// respuestas con el formato real de WHM (metadata.result/command/version).
-// La contraseña NUNCA sale por /__test__/calls: se devuelve redactada en las
-// llamadas y solo su SHA-256 en la cuenta, para comprobar que la adoptada es
-// la determinista sin imprimirla.
+// 127.0.0.1 y registra cada createacct y suspendacct (método, parámetros)
+// devolviendo respuestas con el formato real de WHM
+// (metadata.result/command/version). La contraseña NUNCA sale por
+// /__test__/calls: se devuelve redactada en las llamadas y solo su SHA-256
+// en la cuenta, para comprobar que la guardada es la que recibió WHM sin
+// imprimirla.
 import http from "node:http";
 import { createHash } from "node:crypto";
 
 const PORT = Number(process.env.STUB_PORT || "18087");
 const PACKAGES = ["Calu Starter", "Calu Professional", "Calu Business"];
 
-const accounts = new Map(); // username -> { domain, plan, passwordSha256 }
+const accounts = new Map(); // username -> { domain, plan, passwordSha256, suspended }
 const calls = []; // { method, path, params (password redactado), at }
 let mode = { failCreate: false, dropCreate: false, failReason: "" };
 
@@ -43,6 +44,7 @@ const server = http.createServer((req, res) => {
           domain: a.domain,
           plan: a.plan,
           passwordSha256: a.passwordSha256,
+          suspended: a.suspended ? "1" : "0",
         })),
         mode,
       }),
@@ -76,7 +78,7 @@ const server = http.createServer((req, res) => {
         user,
         domain: a.domain,
         plan: a.plan,
-        suspended: "0",
+        suspended: a.suspended ? "1" : "0",
         diskused: "0",
         disklimit: "0",
       })),
@@ -117,6 +119,7 @@ const server = http.createServer((req, res) => {
           passwordSha256: createHash("sha256")
             .update(params.password ?? "")
             .digest("hex"),
+          suspended: false,
         });
         req.socket.destroy();
         return;
@@ -147,8 +150,31 @@ const server = http.createServer((req, res) => {
         passwordSha256: createHash("sha256")
           .update(params.password ?? "")
           .digest("hex"),
+        suspended: false,
       });
       whmResponse(res, "createacct", 1, {});
+    });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/json-api/suspendacct") {
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      const params = Object.fromEntries(new URLSearchParams(raw));
+      calls.push({
+        method: "POST",
+        path: "/json-api/suspendacct",
+        params,
+        at: new Date().toISOString(),
+      });
+      console.log(`[stub-whm] suspendacct user=${params.user} reason=${params.reason ?? ""}`);
+      const account = accounts.get(params.user);
+      if (!account) {
+        whmResponse(res, "suspendacct", 0, {}, "The account does not exist");
+        return;
+      }
+      account.suspended = true;
+      whmResponse(res, "suspendacct", 1, null);
     });
     return;
   }

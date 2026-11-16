@@ -48,12 +48,14 @@ export default async function AccountServices() {
       <div className="service-grid">
         {services.map((service) => {
           const active = service.status === "active";
-          // La contraseña inicial es determinista por servicio y usuario: se
-          // calcula en el servidor y solo se muestra al dueño de la cuenta.
-          // Nunca se guarda en base ni sale en logs, URLs o errores.
+          // La contraseña inicial es aleatoria por servicio y se guarda
+          // CIFRADA en base: se descifra en el servidor y solo se muestra
+          // al dueño de la cuenta. Nunca sale en logs, URLs o errores. Si
+          // el servicio se dio de alta antes de este cambio, no hay valor
+          // guardado y se muestra el aviso de pedirla por ticket.
           const initialPassword =
             active && service.cpanelUser
-              ? initialPasswordOrNull(service.id, service.cpanelUser)
+              ? initialPasswordOrNull(service.cpanelPasswordEncrypted)
               : null;
           return (
             <article key={service.id} className="panel service-tile">

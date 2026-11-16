@@ -121,20 +121,56 @@ export function ResetForm({ token }: { token: string }) {
   );
 }
 
-export function RecoverForm() {
+export function RecoverForm({
+  mailConfigured = true,
+  unavailableMessage = "El restablecimiento por correo no está activo. No se envió ningún enlace: contacta a soporte@caluservers.com para recuperar tu cuenta.",
+}: {
+  /** Lo pone la página desde mailerConfigured(): sin correo no se promete enlace. */
+  mailConfigured?: boolean;
+  /** Misma frase que RESET_MAIL_UNAVAILABLE_MESSAGE en lib/mailer.ts. */
+  unavailableMessage?: string;
+}) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!mailConfigured) {
+    return (
+      <div>
+        <p className="error" role="alert">{unavailableMessage}</p>
+        <p className="muted">
+          Si ya tienes sesión en otro dispositivo, puedes cambiar la contraseña desde tu cuenta.
+        </p>
+      </div>
+    );
+  }
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
-        await customerAuthClient.requestPasswordReset({ email, redirectTo: "/cuenta/restablecer" });
-        setMessage("Si la cuenta existe, enviaremos un enlace de un solo uso. No se muestra aquí.");
+        if (busy) return;
+        setBusy(true);
+        setError("");
+        setMessage("");
+        try {
+          const result = await customerAuthClient.requestPasswordReset({ email, redirectTo: "/cuenta/restablecer" });
+          if (result.error) {
+            // Antes se mostraba el mensaje de éxito incluso con error.
+            setError(unavailableMessage);
+            return;
+          }
+          setMessage("Si la cuenta existe, enviaremos un enlace de un solo uso. No se muestra aquí.");
+        } catch {
+          setError("No hubo conexión con el servidor. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <label className="field">Email<input type="email" value={email} required onChange={(event) => setEmail(event.target.value)} /></label>
       {message ? <p className="notice" role="status">{message}</p> : null}
-      <button className="btn primary" type="submit">Pedir enlace</button>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      <button className="btn primary" type="submit" disabled={busy}>{busy ? "Pidiendo…" : "Pedir enlace"}</button>
     </form>
   );
 }
@@ -154,7 +190,7 @@ export function OrderButton({
 }) {
   const [idempotencyKey] = useState(() => `ord_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
   const [domain, setDomain] = useState("");
-  const [created, setCreated] = useState<{ invoiceId: string | null; summary: string } | null>(null);
+  const [created, setCreated] = useState<{ invoiceId: string | null; summary: string; trackingToken: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (created) {
@@ -169,6 +205,17 @@ export function OrderButton({
             <Link href={`/cuenta/facturas/${created.invoiceId}`}>
               {paymentReady ? "Ver la factura y otras formas de pago" : "Ver la factura y cómo pagarla"}
             </Link>
+          </p>
+        ) : null}
+        {created.trackingToken ? (
+          <p>
+            <Link href={`/pedido/${created.trackingToken}`}>
+              Seguir el pedido sin entrar
+            </Link>
+            <span className="muted">
+              {" "}
+              — enlace público: solo muestra el plan, el dominio, los estados y la fecha.
+            </span>
           </p>
         ) : null}
         <p>
@@ -197,6 +244,7 @@ export function OrderButton({
           }
           setCreated({
             invoiceId: data.invoiceId ?? null,
+            trackingToken: data.trackingToken ?? null,
             summary: `Pedido ${data.id} creado. Total ${(data.totalCents / 100).toFixed(2)} ${data.currency}.`,
           });
         } catch {

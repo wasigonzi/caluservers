@@ -169,7 +169,7 @@ export default async function ServicesPage({
                         <span className="cell-sub">
                           Contraseña inicial:{" "}
                           <code>
-                            {initialPasswordOrNull(service.id, service.cpanelUser) ?? "no disponible"}
+                            {initialPasswordOrNull(service.cpanelPasswordEncrypted) ?? "no disponible"}
                           </code>
                         </span>
                       ) : null}
@@ -204,7 +204,7 @@ export default async function ServicesPage({
                           <NoteAction
                             trigger="Cancelar"
                             title={`Cancelar: ${service.planName}`}
-                            description="El servicio queda cancelado en el panel y en la cuenta del cliente. No suspende ni borra la cuenta en WHM: eso se hace en el servidor."
+                            description="El servicio queda cancelado en el panel y en la cuenta del cliente. Si tiene cuenta en WHM y el alta automática está configurada, se intenta suspenderla; si no se puede, el motivo queda visible en esta tabla y la cuenta sigue activa en el servidor."
                             noteLabel="Motivo de la cancelación"
                             confirmLabel="Cancelar servicio"
                             payload={{ action: "service-status", serviceId: service.id, status: "cancelled" }}

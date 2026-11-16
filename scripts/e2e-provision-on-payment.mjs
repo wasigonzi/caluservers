@@ -14,7 +14,7 @@
 //   DATABASE_URL=postgresql://e2e:<clave>@127.0.0.1:5432/postgres \
 //   node --import tsx scripts/e2e-provision-on-payment.mjs
 // Las contraseñas generadas NUNCA se imprimen: solo se comprueba su forma y
-// su igualdad con la determinista, y el stub solo expone su SHA-256.
+// su igualdad con la guardada cifrada en base, y el stub solo expone su SHA-256.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -425,9 +425,9 @@ async function main() {
     check("usuario guardado", b1Row?.cpanelUser === b1User);
     const b1Mail = mailFor(EMAIL, b1User);
     check("correo de credenciales", !!b1Mail && b1Mail.includes(b1User));
-    const b1Password = provision.initialPassword(b1.service.id, b1User);
+    const b1Password = provision.initialPasswordOrNull(b1Row.cpanelPasswordEncrypted);
     check(
-      "la contraseña enviada es la determinista",
+      "la contraseña enviada es la guardada (aleatoria)",
       !!b1Mail && b1Mail.includes(`Contraseña inicial: ${b1Password}`),
     );
     const b1Account = state.accounts.find((a) => a.user === b1User);
@@ -438,6 +438,7 @@ async function main() {
     );
     const b1Page = await get("/cuenta/servicios", customerCookie);
     check("el cliente ve su usuario cPanel", b1Page.text.includes(b1User));
+    check("el cliente ve su contraseña inicial", b1Page.text.includes(b1Password));
 
     // ---- B2. Re-aprovisionar no duplica ----
     console.log("\n== B2. Idempotencia ==");
@@ -484,9 +485,13 @@ async function main() {
       "solo 1 cuenta en WHM",
       state.accounts.filter((a) => a.user === b4User).length === 1,
     );
-    const b4Password = provision.initialPassword(b4.service.id, b4User);
+    const b4Row = await db.customerService.findUnique({ where: { id: b4.service.id } });
+    const b4Password = provision.initialPasswordOrNull(b4Row.cpanelPasswordEncrypted);
     const b4Account = state.accounts.find((a) => a.user === b4User);
-    check("la adoptada tiene la contraseña determinista", b4Account?.passwordSha256 === sha256(b4Password));
+    check(
+      "la adoptada tiene la contraseña guardada (la del intento que creó la cuenta)",
+      b4Account?.passwordSha256 === sha256(b4Password),
+    );
     const b4Mail = mailFor(EMAIL, b4User);
     check(
       "el correo tras adoptar trae la contraseña correcta",

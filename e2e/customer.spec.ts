@@ -31,6 +31,28 @@ test("registro, pedido, pago manual y ticket", async ({ page }) => {
   await page.getByLabel("Dominio para este plan").fill("cliente-prueba.example");
   await page.getByRole("button", { name: "Crear pedido" }).click();
   await expect(page.getByText("Total 3.99 USD")).toBeVisible();
+  // El pedido recién creado enlaza su seguimiento público.
+  const trackingLink = page.getByRole("link", { name: "Seguir el pedido sin entrar" });
+  await expect(trackingLink).toBeVisible();
+  const trackingHref = await trackingLink.getAttribute("href");
+  expect(trackingHref).toMatch(/^\/pedido\/[a-f0-9]{48}$/);
+  // La página de seguimiento es pública: sin sesión también muestra el pedido.
+  await page.context().clearCookies();
+  await page.goto(trackingHref!);
+  await expect(page.getByRole("heading", { name: "Seguimiento de pedido" })).toBeVisible();
+  await expect(page.getByText("cliente-prueba.example")).toBeVisible();
+  await expect(page.getByText("Recibido")).toBeVisible();
+  // Sin token válido, 404 honesto.
+  await page.goto("/pedido/000000000000000000000000000000000000000000000000");
+  await expect(page.getByRole("heading", { name: "Página no encontrada" })).toBeVisible();
+  // La comprobación pública cerró la sesión del cliente: se vuelve a entrar
+  // para que el resto del recorrido siga con su cuenta.
+  await page.goto("/cuenta/entrar");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Contraseña").fill(password);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/cuenta$/);
+  await page.goto("/cuenta/contratar?plan=wh0");
   await page.screenshot({ path: "test-results/screenshots/e2e-order.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "Contratar" })).toBeVisible();

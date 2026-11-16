@@ -43,6 +43,11 @@ export default async function HirePage({ searchParams }: { searchParams: Promise
               confirmará el pago.
             </p>
           ) : null}
+          <p className="muted">
+            Al crear el pedido recibirás un enlace público de seguimiento: solo
+            muestra el plan, el dominio, los estados y la fecha, nunca tus datos de
+            acceso ni de pago.
+          </p>
         </>
       ) : null}
       {!session?.user ? (

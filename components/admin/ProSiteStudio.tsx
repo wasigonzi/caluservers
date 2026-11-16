@@ -1055,9 +1055,9 @@ export default function ProSiteStudio({
                   />
                 </label>
                 <label className="field wide">
-                  URL de compra existente (https)
+                  URL de compra (interna /cuenta/contratar?plan=&lt;id&gt; o https)
                   <input
-                    type="url"
+                    type="text"
                     value={plan.purchaseUrl}
                     onChange={(e) =>
                       updatePlan(plan.category, plan.id, {

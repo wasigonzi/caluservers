@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s | CaluServers",
   },
   description:
-    "Hosting web, VPS y servidores dedicados con infraestructura premium. Portal de clientes en WHMCS.",
+    "Hosting web, VPS y servidores dedicados con infraestructura premium. Área de cliente propia en /cuenta.",
   alternates: { languages: { es: "/", "x-default": "/" } },
   openGraph: {
     locale: "es_ES",

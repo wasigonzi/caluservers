@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { deliverNotice, mailerConfigured } from "@/lib/mailer";
 import { openSecret, sealSecret, SecretBoxError } from "@/lib/secret-box";
@@ -13,18 +13,26 @@ import { writeWhm } from "@/lib/whm-write";
  *
  * Decisiones:
  * - Desactivada por defecto. Hace falta activarla y guardar un token WHM con ACL
- *   `createacct`, distinto del token de solo lectura. El de lectura no se reutiliza.
+ *   `createacct` y `suspendacct`, distinto del token de solo lectura. El de
+ *   lectura no se reutiliza.
  * - Solo planes de hosting (cPanel) y solo con un dominio declarado en el pedido.
- * - La contraseña inicial no se guarda: se genera, se crea la cuenta y se envía al
- *   cliente por correo cuando hay SMTP. Sin SMTP el alta se hace igual y la
- *   contraseña queda visible en el panel del cliente y en el de administración,
- *   así que el correo nunca bloquea el alta.
+ * - La contraseña inicial es ALEATORIA por servicio: se genera una sola vez
+ *   al provisionar (20 caracteres, 4 clases), se cifra con AES-256-GCM y se
+ *   guarda en `CustomerService.cpanelPasswordEncrypted`. Nunca en claro en
+ *   BD ni en logs. Se envía al cliente por correo cuando hay SMTP y se muestra
+ *   en el panel del cliente y en el de administración (descifrada en
+ *   servidor). Si la respuesta de WHM se pierde y la cuenta se re-adopta, la
+ *   contraseña guardada es la de ese mismo intento — la que recibió WHM —,
+ *   así que no se genera otra.
  * - El usuario cPanel es determinista por servicio: un reintento usa el mismo
  *   nombre, así que no se crean dos cuentas para el mismo pedido.
  * - `status = "provisioning"` es un cerrojo en base: solo una llamada lo toma.
  */
 
 const PROVISION_AAD = "caluservers:whm-provision:v1";
+/** AAD propio de la contraseña inicial de cPanel: un ciphertext de aquí no se
+ * puede reutilizar como credencial de WHM ni viceversa. */
+const CPANEL_PASSWORD_AAD = "caluservers:cpanel-password:v1";
 const CONFIG_ID = "whm-provision";
 const SETTING_ID = "whm";
 const PACKAGE_RE = /^[A-Za-z0-9][A-Za-z0-9_.\- ]{0,62}[A-Za-z0-9]$|^[A-Za-z0-9]$/;
@@ -263,8 +271,9 @@ const PASSWORD_DIGITS = "23456789";
 const PASSWORD_SYMBOLS = "!@#%^*-_=+";
 
 /**
- * 20 caracteres a partir de los bytes de un HMAC: 5 de cada clase
- * (minúsculas, mayúsculas, dígitos, símbolos) mezclados de forma determinista.
+ * 20 caracteres a partir de bytes aleatorios: 5 de cada clase (minúsculas,
+ * mayúsculas, dígitos, símbolos) mezclados. Cada llamada da una distinta;
+ * nunca se deriva de ningún secreto ni identificador.
  */
 function passwordFromBytes(bytes: Buffer): string {
   const classes = [PASSWORD_LOWER, PASSWORD_UPPER, PASSWORD_DIGITS, PASSWORD_SYMBOLS];
@@ -281,38 +290,52 @@ function passwordFromBytes(bytes: Buffer): string {
 }
 
 /**
- * Contraseña inicial determinista por servicio y usuario (HMAC con
- * AUTH_SECRET). Un reintento tras una respuesta perdida regenera la MISMA
- * contraseña, así que adoptar la cuenta ya creada en WHM es seguro: la
- * contraseña que se envía al cliente es la que tiene la cuenta.
- * Nunca se guarda en ningún sitio: se envía al cliente por correo cuando hay
- * SMTP y se muestra en el panel del cliente y en el de administración.
+ * Contraseña inicial ALEATORIA para un usuario cPanel. Se genera UNA sola vez
+ * por intento de alta y se cifra antes de llamar a WHM (ver
+ * `sealInitialPassword`): si el alta se reintenta tras un fallo, se genera
+ * otra nueva; si se re-adopta una cuenta ya creada, se reutiliza la de ese
+ * intento, que es la que recibió WHM. Nunca se deriva del servicio, del
+ * usuario ni de ningún secreto, así que conocer un servicio no revela la
+ * contraseña de otro. Nunca se registra en logs ni se mete en URLs o
+ * respuestas de error.
  */
-export function initialPassword(serviceId: string, username: string): string {
-  const secret = process.env.AUTH_SECRET || "";
-  if (secret.length < 32) throw new WhmError("key");
-  for (let counter = 0; counter < 10; counter++) {
-    const digest = createHmac("sha256", secret)
-      .update(`hosting-password:${serviceId}:${username}:${counter}`)
-      .digest();
-    const password = passwordFromBytes(digest);
+export function generateInitialPassword(username: string): string {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const password = passwordFromBytes(randomBytes(32));
     if (!password.toLowerCase().includes(username.toLowerCase())) return password;
   }
   throw new WhmError("key");
 }
 
-/**
- * Contraseña inicial para mostrarla en el panel (cliente o admin). Nulo si no
- * hay usuario cPanel o no se puede calcular: la página no debe romperse por
- * esto. Nunca se registra en logs ni se mete en URLs o respuestas de error.
- */
-export function initialPasswordOrNull(
-  serviceId: string,
-  username: string | null,
-): string | null {
-  if (!username) return null;
+/** Cifra una contraseña inicial para guardarla en `cpanelPasswordEncrypted`. */
+export function sealInitialPassword(password: string): string {
   try {
-    return initialPassword(serviceId, username);
+    return sealSecret(CPANEL_PASSWORD_AAD, password);
+  } catch (error) {
+    throw error instanceof SecretBoxError ? new WhmError("key") : error;
+  }
+}
+
+/** Descifra una contraseña inicial guardada. Lanza si el valor no es válido. */
+export function openInitialPassword(value: string): string {
+  try {
+    return openSecret(CPANEL_PASSWORD_AAD, value);
+  } catch (error) {
+    throw error instanceof SecretBoxError ? new WhmError("key") : error;
+  }
+}
+
+/**
+ * Contraseña inicial para mostrarla en el panel (cliente o admin), descifrada
+ * en servidor a partir del valor cifrado guardado en el servicio. Nulo si no
+ * hay valor guardado (servicio dado de alta antes de este cambio) o no se
+ * puede descifrar: la página no debe romperse por esto. Nunca se registra en
+ * logs ni se mete en URLs o respuestas de error.
+ */
+export function initialPasswordOrNull(encrypted: string | null | undefined): string | null {
+  if (!encrypted) return null;
+  try {
+    return openInitialPassword(encrypted);
   } catch {
     return null;
   }
@@ -362,7 +385,7 @@ async function findWhmAccount(
   return null;
 }
 
-/** Marca el servicio activo y entrega la contraseña inicial al cliente. */
+/** Marca el servicio activo, guarda la contraseña inicial CIFRADA y la entrega al cliente. */
 async function finishProvision(input: {
   serviceId: string;
   createdUser: string;
@@ -370,6 +393,8 @@ async function finishProvision(input: {
   planName: string;
   whmPackage: string;
   password: string;
+  /** Contraseña ya cifrada (se cifra antes de llamar a WHM). */
+  sealedPassword: string;
   customerEmail: string;
   customerName: string | null;
   actor: string;
@@ -381,6 +406,7 @@ async function finishProvision(input: {
       data: {
         status: "active",
         cpanelUser: input.createdUser,
+        cpanelPasswordEncrypted: input.sealedPassword,
         provisionedAt: new Date(),
         provisionError: null,
         note: `Cuenta cPanel ${input.createdUser} creada para ${input.domain}.`,
@@ -503,6 +529,15 @@ export async function provisionService(input: {
   // Que no haya SMTP no bloquea: la contraseña se muestra en el panel.
   if (!customer?.email) fail("customer");
 
+  // La contraseña se genera y se cifra ANTES de tomar el cerrojo y de llamar
+  // a WHM: si el cifrado falla (sin clave maestra), el alta no se intenta y
+  // el servicio sigue pendiente, sin dejar un cerrojo atascado. La misma
+  // contraseña de este intento es la que recibe WHM y la que se guarda: si
+  // la respuesta se pierde y la cuenta se re-adopta, es la correcta.
+  const username = cpanelUsername(service.id, domain);
+  const password = generateInitialPassword(username);
+  const sealedPassword = sealInitialPassword(password);
+
   // Cerrojo: solo la llamada que cambia la fila desde su estado actual a
   // "provisioning" sigue. Para un servicio activo sin cuenta, el cerrojo se
   // toma desde "active" y el alta lo deja activo con su usuario cPanel.
@@ -523,8 +558,6 @@ export async function provisionService(input: {
     fail("credentials");
   }
   const credentials = decryptProvisionCredentials(row.encryptedCredentials);
-  const username = cpanelUsername(service.id, domain);
-  const password = initialPassword(service.id, username);
 
   try {
     const result = await writeWhm(row.endpoint, credentials, "createacct", {
@@ -543,6 +576,7 @@ export async function provisionService(input: {
       planName: service.planName,
       whmPackage,
       password,
+      sealedPassword,
       customerEmail: customer.email,
       customerName: customer.name,
       actor: input.actor,
@@ -561,6 +595,7 @@ export async function provisionService(input: {
           planName: service.planName,
           whmPackage,
           password,
+          sealedPassword,
           customerEmail: customer.email,
           customerName: customer.name,
           actor: input.actor,
@@ -586,9 +621,107 @@ export async function provisionService(input: {
   }
 }
 
+export type SuspendOutcome = {
+  /** Falso si no hay cuenta cPanel o no hay WHM de escritura configurado. */
+  attempted: boolean;
+  suspended: boolean;
+  /** Motivo en lenguaje del panel, sin tokens ni texto del servidor. */
+  reason: string;
+};
+
+/**
+ * Suspende en WHM la cuenta cPanel de un servicio cancelado (`suspendacct`).
+ *
+ * Se llama DESPUÉS de cancelar el servicio en base: la cancelación nunca se
+ * deshace porque la suspensión falle. El resultado queda visible al admin en
+ * `provisionError` y en el diario (`service.suspended`,
+ * `service.suspend_failed` o `service.suspend_skipped`):
+ * - Sin cuenta cPanel: no hay nada que suspender.
+ * - Sin WHM de escritura configurado o desactivado: la cuenta SIGUE ACTIVA en
+ *   el servidor y el motivo dice que hay que suspenderla a mano.
+ * - Si WHM rechaza o no responde: lo mismo, con el código saneado.
+ * - Si WHM acepta: se limpia el `provisionError` que pudiera quedar de un
+ *   intento anterior.
+ *
+ * Nunca lanza: un fallo aquí no debe romper la respuesta de la cancelación.
+ * El motivo (`reason`) es fijo, no el texto del admin: no sale a WHM ningún
+ * texto libre.
+ */
+export async function suspendServiceAccount(input: {
+  serviceId: string;
+  actor: string;
+}): Promise<SuspendOutcome> {
+  const service = await db.customerService
+    .findUnique({ where: { id: input.serviceId } })
+    .catch(() => null);
+  if (!service?.cpanelUser) {
+    return { attempted: false, suspended: false, reason: "sin cuenta cPanel" };
+  }
+  const user = service.cpanelUser;
+  const record = async (action: string, details: string) => {
+    await db.commerceEvent
+      .create({ data: { actor: input.actor, action, entityId: service.id, details } })
+      .catch(() => {});
+  };
+  const flag = async (message: string | null) => {
+    await db.customerService
+      .update({ where: { id: service.id }, data: { provisionError: message } })
+      .catch(() => {});
+  };
+
+  let config: ProvisionPublicConfig;
+  try {
+    config = await provisionConfiguration();
+  } catch {
+    const reason =
+      `La cuenta cPanel ${user} sigue activa en WHM: no se pudo leer la configuración de escritura. Suspéndela a mano en WHM.`;
+    await record("service.suspend_skipped", `user=${user};config=no-disponible`);
+    await flag(reason);
+    return { attempted: false, suspended: false, reason };
+  }
+  if (!config.enabled || !config.hasToken || !config.url) {
+    // Solo las piezas que hacen falta para suspender: el paquete WHM y el
+    // correo no intervienen aquí y no se nombran.
+    const missing = [
+      !config.enabled ? "alta desactivada" : null,
+      !config.url ? "sin servidor WHM" : null,
+      !config.hasToken ? "sin token WHM" : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const reason =
+      `La cuenta cPanel ${user} sigue activa en WHM: no hay alta automática configurada para suspenderla` +
+      (missing ? ` (falta ${missing}).` : ".") +
+      " Suspéndela a mano en WHM.";
+    await record("service.suspend_skipped", `user=${user};${missing}`);
+    await flag(reason);
+    return { attempted: false, suspended: false, reason };
+  }
+
+  let row;
+  try {
+    row = await db.integrationConfig.findUnique({ where: { id: CONFIG_ID } });
+    if (!row) throw new Error("sin configuración");
+    const credentials = decryptProvisionCredentials(row.encryptedCredentials);
+    await writeWhm(row.endpoint, credentials, "suspendacct", {
+      user,
+      reason: "Cancelado en CaluServers",
+    });
+  } catch (error) {
+    const code = error instanceof WhmError ? error.code : "network";
+    const reason =
+      `La cuenta cPanel ${user} NO se suspendió en WHM (${code}): sigue activa. Suspéndela a mano en WHM.`;
+    await record("service.suspend_failed", `user=${user};code=${code}`);
+    await flag(reason);
+    return { attempted: true, suspended: false, reason };
+  }
+  await record("service.suspended", `user=${user}`);
+  await flag(null);
+  return { attempted: true, suspended: true, reason: `Cuenta cPanel ${user} suspendida en WHM.` };
+}
+
 /**
  * Intento de alta justo después de un cobro, sin romper la respuesta del pago.
- *
  * Se llama fuera de la transacción del cobro: una llamada de red dentro de una
  * transacción la mantendría abierta. Si el alta no sale, el pago sigue registrado
  * y el servicio queda pendiente con su motivo, listo para reintentar desde el panel.

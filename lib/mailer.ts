@@ -4,6 +4,14 @@ import path from "node:path";
 export type AuthMailKind = "reset";
 
 /**
+ * Mensaje honesto cuando no hay correo saliente. Lo usan la página de
+ * recuperación (vía prop) y `sendResetPassword`: sin SMTP no se promete
+ * ningún enlace. Misma frase en ambos sitios para que no diverjan.
+ */
+export const RESET_MAIL_UNAVAILABLE_MESSAGE =
+  "El restablecimiento por correo no está activo. No se envió ningún enlace: contacta a soporte@caluservers.com para recuperar tu cuenta.";
+
+/**
  * Cierto solo si existe una vía real de envío. El sumidero de archivos cuenta
  * fuera de producción porque las pruebas leen de ahí; en producción, no.
  */

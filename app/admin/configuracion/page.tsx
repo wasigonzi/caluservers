@@ -167,7 +167,7 @@ export default async function ConfigPage() {
       label: "Registro de clientes",
       state: customerAuth ? "ok" : "warn",
       value: customerAuth
-        ? "Activo, con verificación de correo obligatoria."
+        ? "Activo, sin verificación de correo: el registro entra directo a /cuenta."
         : "Desactivado: sin el secreto, el registro responde 503.",
       env: "BETTER_AUTH_SECRET · BETTER_AUTH_URL",
     },

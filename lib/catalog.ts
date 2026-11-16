@@ -3,9 +3,16 @@
 // Dedicados: el catálogo en vivo trae 0 planes; estos 5 son los defaults del
 // código original (app.js). Confirmar con el dueño si siguen vigentes.
 // Precios de hosting y VPS contrastados el 2026-11-09 con las páginas públicas
-// de grupo de la tienda (no con el checkout). New York / Normal figura como
-// «Desde $12.99/mes». Los dedicados no aparecen: dedicated y dedicated-servers
-// redirigen a web hosting, así que no llevan precio ni botón de pedido.
+// de grupo de la tienda (no con el checkout). New York / Normal figura en vivo
+// como «Consultar»: su precio es a confirmar por el dueño (auditoría 2026-11-15),
+// por eso lleva "$0.00" y no un precio inventado. Los dedicados no aparecen:
+// dedicated y dedicated-servers redirigen a web hosting, así que no llevan
+// precio ni botón de pedido.
+// Compra: el portal canónico es el área propia /cuenta. Cada purchaseUrl
+// apunta a /cuenta/contratar?plan=<id>; ningún botón de pedido enlaza ya al
+// portal anterior (client.caluservers.com). El campo settings.whmcs se
+// conserva solo como base del carrito de registro de dominios, que aún no
+// tiene flujo propio (ver DomainsPage).
 
 export type PlanCategory = "web" | "vps" | "dedicated";
 
@@ -218,7 +225,7 @@ export const SEED_CATALOG: Catalog = {
       description: "Cuando solo necesitas un sitio.",
       features: ["20 GB NVMe SSD", "1 Website", "100 Email Accounts", "Free SSL", "cPanel", "Softaculous Premium — 250+ Scripts"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/web-hosting/calu-starter",
+      purchaseUrl: "/cuenta/contratar?plan=wh0",
       sortOrder: 0,
       active: true,
     },
@@ -231,7 +238,7 @@ export const SEED_CATALOG: Catalog = {
       description: "Perfecto para múltiples sitios.",
       features: ["50 GB NVMe SSD", "Sitios web ilimitados", "Unlimited Email Accounts", "Free SSL", "cPanel", "Softaculous Premium — 250+ Scripts"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/web-hosting/calu-professional",
+      purchaseUrl: "/cuenta/contratar?plan=wh1",
       sortOrder: 1,
       active: true,
       badge: "Popular",
@@ -240,12 +247,12 @@ export const SEED_CATALOG: Catalog = {
     {
       id: "wh2",
       category: "web",
-      name: "Calu Corporate",
+      name: "Business",
       price: "$9.99",
       description: "Más velocidad y potencia de procesamiento.",
       features: ["100 GB NVMe SSD", "Unlimited Websites", "Unlimited Email Accounts", "Free SSL", "cPanel", "Softaculous Premium — 250+ Scripts"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/web-hosting/calu-corporate",
+      purchaseUrl: "/cuenta/contratar?plan=wh2",
       sortOrder: 2,
       active: true,
     }
@@ -261,7 +268,7 @@ export const SEED_CATALOG: Catalog = {
       description: "1 vCore · AMD Ryzen 9 9950X · 2GB DDR5 5600 MHz",
       features: ["1 vCore", "AMD Ryzen 9 9950X", "2GB DDR5 5600 MHz", "20 GB SSD NVMe GEN 5", "5TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/starter",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754336742",
       sortOrder: 0,
       active: true,
     },
@@ -273,7 +280,7 @@ export const SEED_CATALOG: Catalog = {
       description: "2 vCores · AMD Ryzen 9 · 4GB DDR5",
       features: ["2 vCores", "AMD Ryzen 9", "4GB DDR5", "50 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/lite",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754407361",
       sortOrder: 1,
       active: true,
     },
@@ -285,7 +292,7 @@ export const SEED_CATALOG: Catalog = {
       description: "4 vCores · AMD Ryzen 9 · 8GB DDR5",
       features: ["4 vCores", "AMD Ryzen 9", "8GB DDR5", "100 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/normal",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754470256",
       sortOrder: 2,
       active: true,
     },
@@ -297,7 +304,7 @@ export const SEED_CATALOG: Catalog = {
       description: "6 vCores · AMD Ryzen 9 · 12GB DDR5",
       features: ["6 vCores", "AMD Ryzen 9", "12GB DDR5", "128 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/advanced",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754497934",
       sortOrder: 3,
       active: true,
     },
@@ -309,7 +316,7 @@ export const SEED_CATALOG: Catalog = {
       description: "8 vCores · AMD Ryzen 9 · 16GB DDR4/5",
       features: ["8 vCores", "AMD Ryzen 9", "16GB DDR4/5", "150 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps Shared Uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/deluxe",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754783518",
       sortOrder: 4,
       active: true,
     },
@@ -321,7 +328,7 @@ export const SEED_CATALOG: Catalog = {
       description: "12 vCores · AMD Ryzen 9 · 24GB DDR4/5",
       features: ["12 vCores", "AMD Ryzen 9", "24GB DDR4/5", "256 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps Shared Uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/ultimate",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754810824",
       sortOrder: 5,
       active: true,
     },
@@ -333,7 +340,7 @@ export const SEED_CATALOG: Catalog = {
       description: "16 vCores · AMD Ryzen 9 · 32GB DDR4/5",
       features: ["16 vCores", "AMD Ryzen 9", "32GB DDR4/5", "512 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 incluida en el precio"],
       locationId: "us-miami",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-miami/mystic",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754834484",
       sortOrder: 6,
       active: true,
     },
@@ -345,7 +352,7 @@ export const SEED_CATALOG: Catalog = {
       description: "1 vCore · AMD Ryzen 9 · 2GB DDR5",
       features: ["1 vCore", "AMD Ryzen 9", "2GB DDR5", "20 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/starter-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754945886",
       sortOrder: 7,
       active: true,
     },
@@ -357,7 +364,7 @@ export const SEED_CATALOG: Catalog = {
       description: "2 vCores · AMD Ryzen 9 · 4GB DDR5",
       features: ["2 vCores", "AMD Ryzen 9", "4GB DDR5", "50 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/lite-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793754989658",
       sortOrder: 8,
       active: true,
     },
@@ -365,11 +372,13 @@ export const SEED_CATALOG: Catalog = {
       id: "plan-1793755011801",
       category: "vps",
       name: "Normal",
-      price: "$12.99",
+      // Precio a confirmar por el dueño: en vivo figura como «Consultar»
+      // (auditoría 2026-11-15). "$0.00" = precio a confirmar, nunca $0.
+      price: "$0.00",
       description: "4 vCores · AMD Ryzen 9 · 8GB DDR5",
       features: ["4 vCores", "AMD Ryzen 9", "8GB DDR5", "100 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/normal-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755011801",
       sortOrder: 9,
       active: true,
     },
@@ -381,7 +390,7 @@ export const SEED_CATALOG: Catalog = {
       description: "6 vCores · AMD Ryzen 9 · 12GB DDR5",
       features: ["6 vCores", "AMD Ryzen 9", "12GB DDR5", "128 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/advanced-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755031531",
       sortOrder: 10,
       active: true,
     },
@@ -393,7 +402,7 @@ export const SEED_CATALOG: Catalog = {
       description: "8 vCores · AMD Ryzen 9 · 16GB DDR4/5",
       features: ["8 vCores", "AMD Ryzen 9", "16GB DDR4/5", "150 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps Shared Uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/deluxe-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755054263",
       sortOrder: 11,
       active: true,
     },
@@ -405,7 +414,7 @@ export const SEED_CATALOG: Catalog = {
       description: "12 vCores · AMD Ryzen 9 · 24GB DDR4/5",
       features: ["12 vCores", "AMD Ryzen 9", "24GB DDR4/5", "256 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps Shared Uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/ultimate-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755083053",
       sortOrder: 12,
       active: true,
     },
@@ -417,7 +426,7 @@ export const SEED_CATALOG: Catalog = {
       description: "16 vCores · AMD Ryzen 9 · 32GB DDR4/5",
       features: ["16 vCores", "AMD Ryzen 9", "32GB DDR4/5", "512 GB SSD NVMe GEN 5", "Unlimited @ 10Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-ny",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-ny/mystic-1",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755103930",
       sortOrder: 13,
       active: true,
     },
@@ -429,7 +438,7 @@ export const SEED_CATALOG: Catalog = {
       description: "1 vCore · AMD Ryzen 9 9950X · 2GB DDR5 5600 MHz",
       features: ["1 vCore", "AMD Ryzen 9 9950X", "2GB DDR5 5600 MHz", "20 GB SSD NVMe GEN 5", "5TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/starter-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755197233",
       sortOrder: 14,
       active: true,
     },
@@ -441,7 +450,7 @@ export const SEED_CATALOG: Catalog = {
       description: "2 vCores · AMD Ryzen 9 9950X · 4GB DDR5 5600 MHz",
       features: ["2 vCores", "AMD Ryzen 9 9950X", "4GB DDR5 5600 MHz", "50 GB SSD NVMe GEN 5", "10TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/lite-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755219569",
       sortOrder: 15,
       active: true,
     },
@@ -453,7 +462,7 @@ export const SEED_CATALOG: Catalog = {
       description: "4 vCores · AMD Ryzen 9 9950X · 8GB DDR5 5600 MHz",
       features: ["4 vCores", "AMD Ryzen 9 9950X", "8GB DDR5 5600 MHz", "100 GB SSD NVMe GEN 5", "10TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/normal",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755240639",
       sortOrder: 16,
       active: true,
     },
@@ -465,7 +474,7 @@ export const SEED_CATALOG: Catalog = {
       description: "6 vCores · AMD Ryzen 9 9950X · 12GB DDR5 5600 MHz",
       features: ["6 vCores", "AMD Ryzen 9 9950X", "12GB DDR5 5600 MHz", "128 GB SSD NVMe GEN 5", "20TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/advanced-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755262920",
       sortOrder: 17,
       active: true,
     },
@@ -477,7 +486,7 @@ export const SEED_CATALOG: Catalog = {
       description: "8 vCores · AMD Ryzen 9 9950X · 16GB DDR5 5600 MHz",
       features: ["8 vCores", "AMD Ryzen 9 9950X", "16GB DDR5 5600 MHz", "150 GB SSD NVMe GEN 5", "35TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/deluxe-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755287580",
       sortOrder: 18,
       active: true,
     },
@@ -489,7 +498,7 @@ export const SEED_CATALOG: Catalog = {
       description: "12 vCores · AMD Ryzen 9 9950X · 24GB DDR5 5600 MHz",
       features: ["12 vCores", "AMD Ryzen 9 9950X", "24GB DDR5 5600 MHz", "256 GB SSD NVMe GEN 5", "50TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/ultimate-3",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755319209",
       sortOrder: 19,
       active: true,
     },
@@ -501,7 +510,7 @@ export const SEED_CATALOG: Catalog = {
       description: "14 vCores · AMD Ryzen 9 9950X · 32GB DDR5 5600 MHz",
       features: ["14 vCores", "AMD Ryzen 9 9950X", "32GB DDR5 5600 MHz", "512 GB SSD NVMe GEN 5", "50TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/mystic-2",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755366561",
       sortOrder: 20,
       active: true,
     },
@@ -513,7 +522,7 @@ export const SEED_CATALOG: Catalog = {
       description: "16 vCores · AMD Ryzen 9 9950X · 64GB DDR5 5600 MHz",
       features: ["16 vCores", "AMD Ryzen 9 9950X", "64GB DDR5 5600 MHz", "960 GB SSD NVMe GEN 5", "50TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-dallas",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-dallas/phantom",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755386673",
       sortOrder: 21,
       active: true,
     },
@@ -525,7 +534,7 @@ export const SEED_CATALOG: Catalog = {
       description: "1 vCore · AMD Ryzen 9 9950X · 2GB DDR5 5600 MHz",
       features: ["1 vCore", "AMD Ryzen 9 9950X", "2GB DDR5 5600 MHz", "20 GB SSD NVMe GEN 5", "5TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-la",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-los-angeles/starter-3",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755439840",
       sortOrder: 22,
       active: true,
     },
@@ -537,7 +546,7 @@ export const SEED_CATALOG: Catalog = {
       description: "2 vCores · AMD Ryzen 9 9950X · 4GB DDR5 5600 MHz",
       features: ["2 vCores", "AMD Ryzen 9 9950X", "4GB DDR5 5600 MHz", "50 GB SSD NVMe GEN 5", "10TB @ 1Gbps shared uplink", "IPv4 + IPv6 incluidos en el precio"],
       locationId: "us-la",
-      purchaseUrl: "https://client.caluservers.com/index.php?rp=/store/vps-windows-los-angeles/lite-3",
+      purchaseUrl: "/cuenta/contratar?plan=plan-1793755487341",
       sortOrder: 23,
       active: true,
     }
@@ -742,7 +751,7 @@ export const SEED_CATALOG: Catalog = {
     },
     seo: {
       title: "CaluServers | Web Hosting • VPS • Dedicated",
-      description: "Hosting web, VPS y servidores dedicados con infraestructura premium. Portal de clientes en WHMCS.",
+      description: "Hosting web, VPS y servidores dedicados con infraestructura premium. Área de cliente propia en /cuenta.",
       ogTitle: "CaluServers | Hosting & VPS",
       ogDescription: "Infraestructura premium para sitios, apps y cargas exigentes.",
     },
@@ -750,7 +759,7 @@ export const SEED_CATALOG: Catalog = {
       headerCtaLabel: "Comenzar",
       headerCtaHref: "/domains",
       footerCtaLabel: "Área de Cliente",
-      footerCtaHref: "whmcs",
+      footerCtaHref: "/cuenta",
       clientAreaLabel: "Área de Cliente ↗",
       showNetworkStatus: true,
     },
@@ -771,7 +780,7 @@ export const SEED_CATALOG: Catalog = {
       { key: "hosting", label: "Hosting", href: "/web-hosting", enabled: true },
       { key: "vps", label: "VPS", href: "/vps", enabled: true },
       { key: "domains", label: "Dominios", href: "/domains", enabled: true },
-      { key: "client", label: "Cliente", href: "whmcs", enabled: true },
+      { key: "client", label: "Cliente", href: "/cuenta", enabled: true },
     ],
   },
 };
@@ -844,23 +853,23 @@ export interface LegalSection {
 }
 
 export const LEGAL_TERMS: LegalSection[] = [
-  { heading: "1. Acuerdo", text: "Estos Términos y Condiciones son una plantilla inicial y deben ser revisados por un asesor legal calificado y adaptados a las leyes y operaciones reales de CaluServers antes de su publicación." },
+  { heading: "1. Acuerdo", text: "Al crear una cuenta o hacer un pedido en CaluServers aceptas estos términos. Ofrecemos hosting, VPS y servidores dedicados; los precios del catálogo son los que se facturan. Titular: [dato a completar por el propietario: nombre legal, dirección y número de registro]." },
   { heading: "2. Servicios", text: "Los servicios se prestan según la descripción del producto, la confirmación del pedido y cualquier acuerdo de nivel de servicio aplicable. Las funciones, ubicaciones y disponibilidad deben confirmarse al momento de la compra." },
   { heading: "3. Facturación y pagos", text: "Las tarifas, ciclos de facturación, fechas de vencimiento, impuestos, manejo de pagos atrasados y métodos de pago aceptados deben divulgarse claramente antes de la compra. Los clientes son responsables de mantener sus datos de facturación actualizados." },
   { heading: "4. Uso aceptable", text: "Los clientes deben cumplir con la ley aplicable y la Política de Uso Aceptable. Se prohíben el abuso, la actividad maliciosa, el envío masivo no solicitado y el contenido ilegal." },
   { heading: "5. Suspensión y terminación", text: "CaluServers puede investigar reportes creíbles de abuso y tomar medidas proporcionales conforme a la ley aplicable y al acuerdo con el cliente. Pueden requerirse acciones de emergencia para proteger los sistemas y redes." },
-  { heading: "6. Reembolsos y cancelaciones", text: "Publica una política clara de reembolsos y cancelaciones por producto antes de aceptar pedidos. No implies una garantía de reembolso salvo que haya sido aprobada y pueda cumplirse." },
-  { heading: "7. Responsabilidad y garantías", text: "Cualquier limitación, garantía, crédito de servicio y compromiso de uptime debe indicarse en el acuerdo final con el cliente y revisarse para verificar su aplicabilidad." },
-  { heading: "8. Contacto", text: "Reemplaza esta sección con tus datos verificados de contacto legal y de soporte." },
+  { heading: "6. Reembolsos y cancelaciones", text: "Hosting: reembolso del primer mes según lo publicado en el sitio. VPS, servidores dedicados y dominios no tienen garantía de devolución publicada. Cancela por ticket o a soporte@caluservers.com; cancelar en el panel no suspende ni borra por sí sola la cuenta en el servidor." },
+  { heading: "7. Responsabilidad y garantías", text: "Compromiso de disponibilidad del 99,9 % publicado, sin importes de crédito publicados. Las copias diarias, el SSL y la migración están incluidos donde el plan lo indica." },
+  { heading: "8. Contacto", text: "Soporte 24/7 por ticket, en inglés y español, desde tu panel del cliente. Correo: soporte@caluservers.com." },
 ];
 
 export const LEGAL_PRIVACY: LegalSection[] = [
-  { heading: "Aviso de privacidad", text: "Describe la información personal recopilada, los fines del tratamiento, las bases legales cuando apliquen, los procesadores, los plazos de retención, las medidas de seguridad, las transferencias internacionales y los derechos de privacidad de los clientes." },
-  { heading: "Entidad responsable", text: "Identifica la entidad comercial real que opera CaluServers y proporciona un contacto de privacidad verificado. Este texto es una plantilla, no una política de privacidad completa." },
+  { heading: "Aviso de privacidad", text: "Recogemos nombre, correo e imagen opcional al registrarte; plan, dominio, importe y moneda en los pedidos; importe, método y referencia en los pagos; asunto y mensajes en los tickets; y nombre, correo, tema y mensaje en los formularios de contacto y abuso. Los usamos para tu cuenta, pedidos, facturas, activación y soporte, y para protegernos contra el abuso. Se comparten con PayPal al pagar en línea, con WHM/cPanel para el alta de hosting y con el servicio de correo para los avisos." },
+  { heading: "Entidad responsable", text: "Titular: [dato a completar por el propietario: nombre legal, dirección y número de registro]. Para revisar o actualizar tu perfil usa tu panel del cliente; para pedir acceso, corrección o eliminación escribe a soporte@caluservers.com." },
 ];
 
 export const LEGAL_AUP: LegalSection[] = [
   { heading: "Actividad prohibida", text: "Los clientes no pueden usar los servicios para phishing, distribución de malware, acceso no autorizado, spam, fraude, infracción de copyright, ataques de denegación de servicio u otra actividad ilegal." },
   { heading: "Integridad de la red", text: "Los clientes no deben interferir con las operaciones de red, intentar eludir los controles de seguridad ni usar los recursos de forma que perjudique a otros clientes." },
-  { heading: "Reportes y aplicación", text: "Los reportes pueden enviarse a través de la página de Abuso. CaluServers debe publicar sus procedimientos de investigación, preservación de evidencia, escalamiento y apelación." },
+  { heading: "Reportes y aplicación", text: "Los reportes se envían desde la página de Abuso o a soporte@caluservers.com. Investigamos cada reporte creíble y aplicamos medidas proporcionales: aviso, suspensión o terminación del servicio. Si tu servicio se ve afectado, puedes responder y pedir información por ticket desde tu panel del cliente." },
 ];

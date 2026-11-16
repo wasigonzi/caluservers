@@ -1,6 +1,15 @@
-# CaluServers · Next.js 15 + Prisma + WHM de sólo lectura
+# CaluServers · Next.js 15 + Prisma + WHM
 
-Aplicación pública de marketing y panel admin. El pedido y el pago ocurren en el portal WHMCS externo. Este panel no restaura la API WHMCS: esas rutas responden 410. La operación de servidor es WHM / cPanel en sólo lectura (`listaccts`, `listpkgs`).
+Aplicación pública de marketing y panel admin, con **área propia de clientes**:
+el pedido se crea en `/cuenta/contratar`, el pago en línea es PayPal
+(Orders API v2) y el alta de hosting puede ser automática en WHM. El portal
+WHMCS externo queda como «Portal anterior» en las tarjetas de planes. Este
+panel no restaura la API WHMCS: esas rutas responden 410.
+
+La operación de servidor es WHM / cPanel: lectura (`listaccts`, `listpkgs`)
+con un token de solo lectura en `/admin/settings`, y alta de cuentas
+(`createacct`) con un segundo token en `/admin/provision`. Ver
+`docs/PROVISION_WHM.md`.
 
 Los tests de WHM y de Blob usan dobles o el estado «no configurado». **No demuestran conexión real** con un servidor WHM ni con un Blob store.
 
@@ -42,11 +51,11 @@ El build ejecuta `scripts/migrate-on-deploy.mjs`. Solo con `VERCEL_ENV=productio
 - Admin: `/admin/login`, `/admin` (resumen), `/admin/site`, `/admin/pages`, `/admin/settings` (WHM)
 - Admin · negocio: `/admin/clientes`, `/admin/facturas`, `/admin/servicios`, `/admin/tickets`, `/admin/mensajes`, `/admin/actividad`. Ver `docs/PANEL_ADMIN.md`.
 
-El aviso de la cabecera es texto manual. No consulta la red. Contacto, abuso y dominios abren el portal externo; esta web no envía tickets ni registra dominios. Los dedicados no tienen producto en la tienda pública, así que no muestran «Ordenar».
+El aviso de la cabecera es texto manual. No consulta la red. Contacto y abuso se guardan en la base y se ven en `/admin/mensajes` (con aviso por correo si hay SMTP); los tickets son propios, no de WHMCS. Dominios tiene búsqueda de disponibilidad por RDAP, pero esta web no registra dominios. Los dedicados no tienen producto en la tienda pública, así que no muestran «Ordenar».
 
 ## Cuenta propia
 
-El alta de clientes, pedidos, facturas, servicios y tickets propios está en `docs/CLIENTE_PROPIO.md`. No reemplaza todavía el portal remoto ni una contabilidad legal. La pasarela de pago no está elegida.
+El alta de clientes, pedidos, facturas, servicios y tickets propios está en `docs/CLIENTE_PROPIO.md`. No reemplaza todavía el portal remoto ni una contabilidad legal. La pasarela de pago es **PayPal** (ver `docs/COBRO_PAYPAL.md`); sin sus credenciales el cobro es manual desde `/admin/facturas`. El alta en WHM es automática si está activada (ver `docs/PROVISION_WHM.md`).
 
 ## Comprobaciones
 

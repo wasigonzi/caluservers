@@ -27,11 +27,13 @@ test("el aviso de red no se presenta como monitorización", async ({ page }) => 
   await page.screenshot({ path: "test-results/screenshots/e2e-home.png" });
 });
 
-test("hosting confirmado enlaza al producto y dedicados no piden pedido", async ({ page }) => {
+test("hosting confirmado enlaza a la contratación propia y dedicados no piden pedido", async ({ page }) => {
   await page.goto("/web-hosting");
-  await expect(page.getByText("Calu Corporate").first()).toBeVisible();
+  await expect(page.getByText("Business").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Contratar aquí" }).first()).toBeVisible();
-  await expect(page.locator('a[href*="/store/web-hosting/calu-starter"]').first()).toBeVisible();
+  await expect(page.locator('a[href="/cuenta/contratar?plan=wh0"]').first()).toBeVisible();
+  // Ningún botón de pedido lleva al portal anterior.
+  await expect(page.locator('a[href*="client.caluservers.com"]')).toHaveCount(0);
   await page.goto("/dedicated");
   await expect(page.getByText("La tienda pública no lista servidores dedicados")).toBeVisible();
   await expect(page.locator('a[href*="cart.php"]')).toHaveCount(0);
@@ -39,9 +41,10 @@ test("hosting confirmado enlaza al producto y dedicados no piden pedido", async 
   await page.screenshot({ path: "test-results/screenshots/e2e-dedicated.png" });
 });
 
-test("VPS New York Normal muestra el precio público, no cero", async ({ page }) => {
+test("VPS New York Normal muestra «Consultar»: precio a confirmar, no $12.99 ni $0.00", async ({ page }) => {
   await page.goto("/vps");
-  await expect(page.locator("body")).toContainText("$12.99");
+  await expect(page.locator("body")).toContainText("Consultar");
+  await expect(page.locator("body")).not.toContainText("$12.99");
   await expect(page.locator("body")).not.toContainText("$0.00");
 });
 

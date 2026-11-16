@@ -169,6 +169,9 @@ model CustomerOrder {
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   idempotencyKey  String
+  /// Token público de seguimiento (48 hex). No da acceso a la cuenta: la
+  /// página /pedido/[token] solo muestra plan, dominio, estados y fecha.
+  trackingToken   String   @unique
   planId          String
   planName        String
   /// Dominio que el cliente declara para el servicio. Obligatorio para el alta
@@ -257,6 +260,11 @@ model CustomerService {
   note              String
   /// Usuario cPanel creado en WHM. Si existe, el alta ya ocurrió y no se repite.
   cpanelUser        String?       @unique
+  /// Contraseña inicial de cPanel: aleatoria por servicio, generada una sola
+  /// vez al provisionar y guardada CIFRADA con AES-256-GCM (secret-box, AAD
+  /// propio). Nunca en claro en BD, nunca en logs. Los servicios dados de
+  /// alta antes de este cambio quedan con NULL y muestran "no disponible".
+  cpanelPasswordEncrypted String?
   provisionedAt     DateTime?
   provisionAttempts Int           @default(0)
   /// Último motivo de fallo, ya saneado. Nunca contraseñas ni tokens.

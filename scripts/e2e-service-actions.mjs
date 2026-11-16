@@ -1,6 +1,7 @@
 // Verificación end-to-end REAL de las acciones de gestión de servicios del
 // panel (/admin/servicios): cancelar, reactivar, alta manual y alta en WHM
-// de un servicio activo sin cuenta, más la vista móvil a 390px. Arranca el
+// de un servicio activo sin cuenta, más la suspensión en WHM al cancelar y
+// la vista móvil a 390px. Arranca el
 // stub WHM local, habla por HTTP con el servidor Next real (dev) y la base
 // Postgres de pruebas. NUNCA toca WHM real, proveedor real ni producción.
 //
@@ -454,10 +455,10 @@ async function main() {
     check("stub recibió 1 createacct", createCallsFor(D("e2e-a"), state).length === 1);
     aRow = await db.customerService.findUnique({ where: { id: a.service.id } });
     check("activo en BD con usuario", aRow?.status === "active" && aRow?.cpanelUser === aUser);
-    const aPassword = provision.initialPassword(a.service.id, aUser);
+    const aPassword = provision.initialPasswordOrNull(aRow.cpanelPasswordEncrypted);
     const aMail = mailFor(EMAIL, aUser);
     check(
-      "el correo trae la contraseña determinista",
+      "el correo trae la contraseña guardada",
       !!aMail && aMail.includes(`Contraseña inicial: ${aPassword}`),
     );
     const aAccount = state.accounts.find((acc) => acc.user === aUser);
@@ -470,6 +471,54 @@ async function main() {
     check("re-aprovisionar no-op", aAgain.cpanelUser === aUser && aAgain.status === "active");
     state = await stubState();
     check("sigue 1 createacct", createCallsFor(D("e2e-a"), state).length === 1);
+
+    // ---- B2. Cancelar por HTTP: el transporte real exige https:2087 con DNS
+    // público, así que contra el stub la suspensión no llega y el fallo debe
+    // quedar visible sin deshacer la cancelación ----
+    console.log("\n== B2. Cancelar por HTTP: la suspensión falla y queda visible ==");
+    const cancelA = await serviceStatus(a.service.id, "cancelled", "Baja pedida por el cliente.");
+    check("cancelar por HTTP 200", cancelA.status === 200, `status ${cancelA.status}`);
+    check("cancelado", cancelA.value?.status === "cancelled");
+    check("la suspensión no se completó", cancelA.value?.suspended === false);
+    check(
+      "el motivo nombra la suspensión",
+      /NO se suspendió/.test(cancelA.value?.suspendNote ?? ""),
+      cancelA.value?.suspendNote ?? "",
+    );
+    aRow = await db.customerService.findUnique({ where: { id: a.service.id } });
+    check("cancelado en BD", aRow?.status === "cancelled");
+    check(
+      "el fallo de suspensión queda en el servicio",
+      /NO se suspendió/.test(aRow?.provisionError ?? ""),
+      aRow?.provisionError ?? "",
+    );
+    check(
+      "evento de suspensión fallida en el diario",
+      (await db.commerceEvent.count({
+        where: { entityId: a.service.id, action: "service.suspend_failed" },
+      })) === 1,
+    );
+
+    // ---- B3. Suspensión con el motor real contra el stub (adaptador) ----
+    console.log("\n== B3. Suspensión en WHM (motor real + stub) ==");
+    const suspend = await provision.suspendServiceAccount({ serviceId: a.service.id, actor: "e2e" });
+    check("suspendida", suspend.suspended === true);
+    state = await stubState();
+    const suspendCalls = state.calls.filter(
+      (c) => c.path === "/json-api/suspendacct" && c.params.user === aUser,
+    );
+    check("stub recibió 1 suspendacct", suspendCalls.length === 1);
+    check("suspendacct con motivo", suspendCalls[0]?.params?.reason === "Cancelado en CaluServers");
+    const aSuspended = state.accounts.find((acc) => acc.user === aUser);
+    check("cuenta suspendida en stub WHM", aSuspended?.suspended === "1");
+    aRow = await db.customerService.findUnique({ where: { id: a.service.id } });
+    check("el error de suspensión se limpia tras el éxito", !aRow?.provisionError);
+    check(
+      "evento de suspensión en el diario",
+      (await db.commerceEvent.count({
+        where: { entityId: a.service.id, action: "service.suspended" },
+      })) === 1,
+    );
 
 
     console.log(`\n== Resultado: ${failures === 0 ? "TODO OK" : `${failures} fallos`} ==`);

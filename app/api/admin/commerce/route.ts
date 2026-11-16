@@ -12,7 +12,7 @@ import { notifyCustomerOfReply } from "@/lib/ticket-notify";
 import { db } from "@/lib/db";
 import { trustedWrite } from "@/lib/request";
 import { WhmError, safeWhmError } from "@/lib/whm-security";
-import { maybeAutoProvision, ProvisionError, provisionService } from "@/lib/whm-provision";
+import { maybeAutoProvision, ProvisionError, provisionService, suspendServiceAccount } from "@/lib/whm-provision";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,7 +62,33 @@ export async function POST(req: NextRequest) {
         status: body.status === "cancelled" ? "cancelled" : "active",
         note: String(body.note || ""),
       });
-      return NextResponse.json({ id: service.id, status: service.status });
+      // Al cancelar, si el servicio tiene cuenta cPanel, se intenta
+      // suspenderla en WHM FUERA de la transacción del cambio de estado (una
+      // llamada de red no va dentro), igual que el alta automática tras el
+      // cobro. La cancelación en BD ya está hecha y no se deshace aunque la
+      // suspensión falle: el intento y su motivo quedan visibles al admin en
+      // `provisionError` y en el diario (ver `suspendServiceAccount`).
+      let suspension = null;
+      if (service.status === "cancelled" && service.cpanelUser) {
+        suspension = await suspendServiceAccount({
+          serviceId: service.id,
+          actor: email,
+        }).catch(() => ({
+          attempted: false,
+          suspended: false,
+          reason:
+            "No se pudo intentar la suspensión en WHM. La cuenta cPanel sigue activa: suspéndela a mano en WHM.",
+        }));
+      }
+      return NextResponse.json({
+        id: service.id,
+        status: service.status,
+        // Solo al cancelar un servicio con cuenta cPanel: si la suspensión en
+        // WHM no se intentó o falló, la cuenta sigue activa y el motivo queda
+        // también en `provisionError` y en el diario del servicio.
+        suspended: suspension?.suspended ?? null,
+        suspendNote: suspension?.reason ?? null,
+      });
     }
     if (body?.action === "void-invoice") {
       const invoice = await voidInvoice({

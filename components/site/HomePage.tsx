@@ -34,7 +34,7 @@ function minPrice(prices: string[]): string {
 const faq = [
   {
     q: "¿Cómo compro un plan?",
-    a: "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.",
+    a: "Elige el plan que te convenga y pulsa «Contratar aquí». El pedido se completa en tu área de cliente, donde también gestionas facturación y renovaciones.",
   },
   {
     q: "¿Cómo recibo soporte si algo falla?",
@@ -66,7 +66,7 @@ export default function Home() {
       q: useCopy("faq1q", "¿Cómo compro un plan?"),
       a: useCopy(
         "faq1a",
-        "Elige el plan que te convenga y pulsa «Ordenar». Te lleva al portal de cliente (WHMCS) en client.caluservers.com, donde completas el pedido y el pago de forma segura.",
+        "Elige el plan que te convenga y pulsa «Contratar aquí». El pedido se completa en tu área de cliente, donde también gestionas facturación y renovaciones.",
       ),
     },
     {
@@ -129,7 +129,7 @@ export default function Home() {
       ),
     },
     {
-      title: useCopy("step2Title", "Compra segura en WHMCS"),
+      title: useCopy("step2Title", "Compra segura en tu cuenta"),
       text: useCopy(
         "step2Text",
         "El pedido se completa en el portal de cliente de CaluServers, donde también gestionas facturación y renovaciones.",

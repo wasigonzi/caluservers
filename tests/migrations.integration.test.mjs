@@ -96,7 +96,7 @@ test("instalación vacía y actualización de las 3 migraciones crean auditoría
       "provider",
       "providerRef",
     ]);
-    assert.deepEqual(await columns(freshUrl, "CustomerOrder", ["domain"]), ["domain"]);
+    assert.deepEqual(await columns(freshUrl, "CustomerOrder", ["domain", "trackingToken"]), ["domain", "trackingToken"]);
     assert.deepEqual(
       await columns(freshUrl, "CustomerService", [
         "cpanelUser",

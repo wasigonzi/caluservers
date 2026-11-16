@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { parseCatalogPayload, seedCatalogPayload } from "./catalog-validate";
 import { db } from "./db";
 import { DomainNameError, normalizeDomainName } from "./domain-name";
@@ -70,6 +71,11 @@ export function orderDomainFor(kind: PlanKind, raw: unknown): string | null {
 
 export type PlanKind = "webHosting" | "vps" | "dedicated";
 
+/** Token público de seguimiento del pedido: 48 hex, no adivinable. */
+export function generateOrderTrackingToken(): string {
+  return randomBytes(24).toString("hex");
+}
+
 export async function createCustomerOrder(input: {
   userId: string;
   planId: string;
@@ -109,22 +115,28 @@ export async function createCustomerOrder(input: {
   const taxCents = policy.ok ? 0 : null;
   const payable = policy.ok;
 
-  return db.$transaction(async (tx) => {
-    const existing = await tx.customerOrder.findUnique({
-      where: { idempotencyKey: key },
-      include: { invoice: true },
-    });
-    if (existing) {
-      if (existing.userId !== input.userId || existing.planId !== plan.id) {
-        throw new CommerceError("Esa clave de idempotencia ya pertenece a otro pedido.", 409);
-      }
-      return existing;
-    }
-    const order = await tx.customerOrder.create({
-      data: {
-        userId: input.userId,
-        idempotencyKey: key,
-        planId: plan.id,
+  // Un choque de token único es casi imposible, pero si ocurre se reintenta
+  // con otro token; el segundo intento además resuelve la carrera de dos
+  // pedidos con la misma clave de idempotencia devolviendo el ya creado.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await db.$transaction(async (tx) => {
+        const existing = await tx.customerOrder.findUnique({
+          where: { idempotencyKey: key },
+          include: { invoice: true },
+        });
+        if (existing) {
+          if (existing.userId !== input.userId || existing.planId !== plan.id) {
+            throw new CommerceError("Esa clave de idempotencia ya pertenece a otro pedido.", 409);
+          }
+          return existing;
+        }
+        const order = await tx.customerOrder.create({
+          data: {
+            userId: input.userId,
+            idempotencyKey: key,
+            trackingToken: generateOrderTrackingToken(),
+            planId: plan.id,
         planName: plan.name,
         domain,
         currency,
@@ -171,7 +183,13 @@ export async function createCustomerOrder(input: {
       },
     });
     return { ...order, invoice };
-  });
+      });
+    } catch (error) {
+      if (attempt === 0 && isUniqueViolation(error)) continue;
+      throw error;
+    }
+  }
+  throw new CommerceError("No se pudo crear el pedido.", 503);
 }
 
 /**
