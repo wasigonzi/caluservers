@@ -65,11 +65,10 @@ function writeModule(mocks = {}) {
   return { write: h.load("lib/whm-write.ts"), https };
 }
 
-test("el transporte de escritura solo admite createacct y no sale a la red con otro comando", async () => {
+test("el transporte de escritura solo admite createacct y suspendacct y no sale a la red con otro comando", async () => {
   const { write, https } = writeModule();
   for (const action of [
     "listaccts",
-    "suspendacct",
     "passwd",
     "removeacct",
     "__proto__",
@@ -83,6 +82,35 @@ test("el transporte de escritura solo admite createacct y no sale a la red con o
     );
   }
   assert.equal(https.calls.length, 0);
+});
+
+test("suspendacct sale como POST con usuario y motivo, y su respuesta sin datos vale", async () => {
+  const { write, https } = writeModule({
+    https: {
+      body: {
+        metadata: { result: 1, command: "suspendacct", version: 1, reason: "OK" },
+        data: null,
+      },
+    },
+  });
+  await write.writeWhm(HOST, { username: "root", token: TOKEN }, "suspendacct", {
+    user: "miti1a2b",
+    reason: "Cancelado en CaluServers",
+  });
+  const call = https.calls[0];
+  assert.equal(call.url, "https://whm.example.net:2087/json-api/suspendacct");
+  assert.equal(call.options.method, "POST");
+  const form = new URLSearchParams(call.payload);
+  assert.equal(form.get("user"), "miti1a2b");
+  assert.equal(form.get("reason"), "Cancelado en CaluServers");
+  // WHM no devuelve usuario al suspender: `data` puede ser nulo.
+  const parsed = write.parseWriteResponse(
+    { metadata: { result: 1, command: "suspendacct", version: 1, reason: "OK" }, data: null },
+    "suspendacct",
+    TOKEN,
+  );
+  assert.equal(parsed.statusmsg, "OK");
+  assert.equal(parsed.user, "");
 });
 
 test("la lectura sigue rechazando createacct: el permiso no se mezcla", async () => {
@@ -253,9 +281,29 @@ function provisionModule(mocks = {}) {
       },
     },
     "@/lib/secret-box": {
-      sealSecret: () => "sealed",
-      openSecret: () => JSON.stringify({ username: "root", token: TOKEN }),
-      SecretBoxError: class SecretBoxError extends Error {},
+      // Imita el formato real `v1:iv:tag:cuerpo` con el AAD ligado: un valor
+      // sellado con otro AAD no abre, y el texto en claro no aparece en el
+      // valor sellado. Los valores "sealed" de las filas simuladas de
+      // IntegrationConfig siguen devolviendo las credenciales.
+      sealSecret: (aad, plaintext) =>
+        `sealed:${aad}:${Buffer.from(plaintext, "utf8").toString("base64")}`,
+      openSecret: (aad, value) => {
+        // Solo el valor "sealed" de las filas simuladas de IntegrationConfig
+        // devuelve las credenciales; cualquier otro valor inválido lanza.
+        if (value === "sealed") return JSON.stringify({ username: "root", token: TOKEN });
+        if (typeof value === "string" && value.startsWith("sealed:")) {
+          const prefix = `sealed:${aad}:`;
+          if (value.startsWith(prefix))
+            return Buffer.from(value.slice(prefix.length), "base64").toString("utf8");
+        }
+        throw new SecretBoxError("data");
+      },
+      SecretBoxError: class SecretBoxError extends Error {
+        constructor(code) {
+          super(`secret-box:${code}`);
+          this.code = code;
+        }
+      },
     },
     "@/lib/whm-write": {
       writeWhm: async (endpoint, credentials, action, params) => {
@@ -313,18 +361,14 @@ test("el usuario cPanel es determinista, de 8 caracteres y empieza por letra", (
   }
 });
 
-test("la contraseña inicial es determinista por servicio, con las 4 clases y sin el usuario", () => {
+test("la contraseña inicial es aleatoria por intento, con las 4 clases y sin el usuario", () => {
   const { provision } = provisionModule();
-  const first = provision.initialPassword("svc_1", "miti1a2b");
-  assert.equal(first, provision.initialPassword("svc_1", "miti1a2b"));
-  assert.notEqual(first, provision.initialPassword("svc_2", "miti1a2b"));
-  assert.notEqual(first, provision.initialPassword("svc_1", "otro1a2b"));
-  for (const [serviceId, username] of [
-    ["svc_1", "miti1a2b"],
-    ["svc_2", "abc12345"],
-    ["svc_3", "x9y8z7w6"],
-  ]) {
-    const password = provision.initialPassword(serviceId, username);
+  const first = provision.generateInitialPassword("miti1a2b");
+  const second = provision.generateInitialPassword("miti1a2b");
+  // Aleatoria: dos generaciones para el mismo servicio y usuario difieren.
+  assert.notEqual(first, second);
+  for (const username of ["miti1a2b", "abc12345", "x9y8z7w6"]) {
+    const password = provision.generateInitialPassword(username);
     assert.equal(password.length, 20);
     assert.match(password, /[a-z]/);
     assert.match(password, /[A-Z]/);
@@ -332,6 +376,17 @@ test("la contraseña inicial es determinista por servicio, con las 4 clases y si
     assert.match(password, /[!@#%^*\-_=+]/);
     assert.ok(!password.toLowerCase().includes(username.toLowerCase()));
   }
+});
+
+test("la contraseña se cifra con su propio AAD: en claro no abre y con otro AAD tampoco", () => {
+  const { provision } = provisionModule();
+  const sealed = provision.sealInitialPassword("Secreta-1234");
+  assert.ok(!sealed.includes("Secreta-1234"));
+  assert.equal(provision.openInitialPassword(sealed), "Secreta-1234");
+  assert.equal(provision.initialPasswordOrNull(sealed), "Secreta-1234");
+  // Un valor sellado con otro AAD (aquí, el de las credenciales de WHM) no
+  // se descifra como contraseña: el panel devuelve nulo, no basura.
+  assert.equal(provision.initialPasswordOrNull("sealed:otro-aad:Secreta-1234"), null);
 });
 
 test("el paquete por plan gana al paquete por defecto", () => {
@@ -447,9 +502,14 @@ test("el alta sale sin SMTP configurado y la contraseña queda en el panel, no s
   assert.equal(result.credentialsSent, false);
   assert.equal(state.writes.length, 1);
   assert.equal(state.writes[0].action, "createacct");
-  // El correo no salió, pero la contraseña se puede mostrar en el panel.
-  const password = provision.initialPassword("svc_1", result.cpanelUser);
-  assert.equal(provision.initialPasswordOrNull("svc_1", result.cpanelUser), password);
+  // El correo no salió, pero la contraseña se guardó cifrada y se puede mostrar en el panel.
+  const stored = state.updates.find(
+    (update) => update.kind === "update" && update.data.cpanelPasswordEncrypted,
+  );
+  assert.ok(stored, "la contraseña cifrada debe guardarse al provisionar");
+  const password = provision.initialPasswordOrNull(stored.data.cpanelPasswordEncrypted);
+  assert.ok(password && password.length === 20);
+  assert.ok(state.mail[0].text.includes(`Contraseña inicial: ${password}`));
   const flagged = state.updates.find(
     (update) => update.kind === "update" && update.data.provisionError,
   );
@@ -459,16 +519,16 @@ test("el alta sale sin SMTP configurado y la contraseña queda en el panel, no s
   assert.match(state.mail[0].text, /panel de cliente/);
 });
 
-test("la contraseña para el panel es nula sin usuario o sin secreto", () => {
+test("la contraseña para el panel es nula sin valor guardado o si no se puede descifrar", () => {
   const { provision } = provisionModule();
-  assert.equal(provision.initialPasswordOrNull("svc_1", null), null);
-  assert.equal(
-    provision.initialPasswordOrNull("svc_1", "miti1a2b"),
-    provision.initialPassword("svc_1", "miti1a2b"),
-  );
+  assert.equal(provision.initialPasswordOrNull(null), null);
+  assert.equal(provision.initialPasswordOrNull(undefined), null);
+  assert.equal(provision.initialPasswordOrNull("basura"), null);
+  const sealed = provision.sealInitialPassword("Secreta-1234");
+  assert.equal(provision.initialPasswordOrNull(sealed), "Secreta-1234");
 });
 
-test("un alta correcta guarda el usuario, envía la contraseña y no la almacena", async () => {
+test("un alta correcta guarda el usuario, envía la contraseña y la guarda cifrada, no en claro", async () => {
   const { provision, state } = provisionModule({
     service: PAID_SERVICE,
     setting: { enabled: true, packageName: "basico" },
@@ -486,10 +546,20 @@ test("un alta correcta guarda el usuario, envía la contraseña y no la almacena
   assert.equal(sent.params.contactemail, "cliente@example.com");
   assert.ok(sent.params.password.length >= 20);
 
-  // La contraseña va al correo del cliente y a ninguna escritura de base.
+  // La contraseña va al correo del cliente; en base solo queda cifrada.
   assert.ok(state.mail[0].text.includes(sent.params.password));
   const written = JSON.stringify(state.updates);
-  assert.ok(!written.includes(sent.params.password), "la contraseña no se guarda");
+  assert.ok(!written.includes(sent.params.password), "la contraseña no se guarda en claro");
+  const stored = state.updates.find(
+    (update) => update.kind === "update" && update.data.cpanelPasswordEncrypted,
+  );
+  assert.ok(stored, "la contraseña cifrada queda guardada en el servicio");
+  assert.ok(!stored.data.cpanelPasswordEncrypted.includes(sent.params.password));
+  assert.equal(
+    provision.initialPasswordOrNull(stored.data.cpanelPasswordEncrypted),
+    sent.params.password,
+    "lo guardado descifra a la contraseña enviada a WHM",
+  );
   assert.ok(state.events.some((event) => event.action === "service.provisioned"));
 });
 
@@ -574,8 +644,12 @@ test("si la respuesta se pierde pero WHM creó la cuenta, el reintento la adopta
   // Solo el intento fallido: no se llamó a createacct una segunda vez.
   assert.equal(state.writes.length, 1);
   assert.ok(state.reads.length >= 1, "debió comprobar la lista de cuentas");
-  // La contraseña enviada es la determinista: es la que tiene la cuenta adoptada.
-  const password = provision.initialPassword("svc_1", username);
+  // La contraseña enviada es la guardada: la de este intento, que es la que
+  // recibió WHM al crear la cuenta adoptada. No se genera otra.
+  const stored = state.updates.find(
+    (update) => update.kind === "update" && update.data.cpanelPasswordEncrypted,
+  );
+  const password = provision.initialPasswordOrNull(stored.data.cpanelPasswordEncrypted);
   assert.ok(state.mail[0].text.includes(password));
   assert.ok(state.mail[0].text.includes(username));
   assert.ok(
@@ -695,4 +769,84 @@ test("un fallo del alta automática no rompe el cobro", async () => {
   assert.equal(result.attempted, true);
   assert.equal(result.provisioned, false);
   assert.ok(result.reason);
+});
+
+/* ------------------------------ la suspensión ------------------------------ */
+
+const CANCELLED_SERVICE = {
+  ...PAID_SERVICE,
+  status: "cancelled",
+  cpanelUser: "miti1a2b",
+};
+
+test("suspender una cuenta cancelada llama a suspendacct y deja constancia", async () => {
+  const { provision, state } = provisionModule({
+    service: CANCELLED_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+  });
+  const result = await provision.suspendServiceAccount({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.attempted, true);
+  assert.equal(result.suspended, true);
+  assert.equal(state.writes.length, 1);
+  assert.equal(state.writes[0].action, "suspendacct");
+  assert.equal(state.writes[0].params.user, "miti1a2b");
+  assert.equal(state.writes[0].params.reason, "Cancelado en CaluServers");
+  assert.ok(state.events.some((event) => event.action === "service.suspended"));
+  const cleared = state.updates.find(
+    (update) => update.kind === "update" && "provisionError" in update.data,
+  );
+  assert.equal(cleared.data.provisionError, null);
+});
+
+test("sin cuenta cPanel no se intenta suspender nada", async () => {
+  const { provision, state } = provisionModule({
+    service: PAID_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+  });
+  const result = await provision.suspendServiceAccount({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.attempted, false);
+  assert.equal(result.suspended, false);
+  assert.equal(state.writes.length, 0);
+  assert.equal(state.events.length, 0);
+});
+
+test("sin WHM de escritura no se suspende, pero el motivo queda visible", async () => {
+  const { provision, state } = provisionModule({
+    service: CANCELLED_SERVICE,
+    setting: { enabled: false, packageName: "basico" },
+    mailReady: true,
+  });
+  const result = await provision.suspendServiceAccount({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.attempted, false);
+  assert.equal(result.suspended, false);
+  assert.equal(state.writes.length, 0);
+  assert.match(result.reason, /sigue activa/);
+  assert.match(result.reason, /a mano/);
+  assert.ok(state.events.some((event) => event.action === "service.suspend_skipped"));
+  const flagged = state.updates.find(
+    (update) => update.kind === "update" && update.data.provisionError,
+  );
+  assert.match(flagged.data.provisionError, /sigue activa/);
+});
+
+test("si WHM rechaza la suspensión, la cuenta queda marcada como activa", async () => {
+  const { provision, state } = provisionModule({
+    service: CANCELLED_SERVICE,
+    setting: { enabled: true, packageName: "basico" },
+    mailReady: true,
+    writeThrowsCode: "rejected",
+  });
+  const result = await provision.suspendServiceAccount({ serviceId: "svc_1", actor: "admin" });
+  assert.equal(result.attempted, true);
+  assert.equal(result.suspended, false);
+  assert.match(result.reason, /NO se suspendió/);
+  assert.match(result.reason, /rejected/);
+  assert.ok(state.events.some((event) => event.action === "service.suspend_failed"));
+  const flagged = state.updates.find(
+    (update) => update.kind === "update" && update.data.provisionError,
+  );
+  assert.match(flagged.data.provisionError, /NO se suspendió/);
+  assert.ok(!flagged.data.provisionError.includes(TOKEN));
 });

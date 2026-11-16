@@ -1,6 +1,6 @@
 import type { Catalog, Plan, PlanCategory, VpsLocation } from "./catalog";
 import { SEED_CATALOG } from "./catalog";
-import { isHttpsUrl, isPlainText } from "@/lib/safe-links";
+import { isContratarUrl, isHttpsUrl, isPlainText } from "@/lib/safe-links";
 
 export type CatalogPayload = Omit<Catalog, "settings">;
 
@@ -25,7 +25,14 @@ function parsePlan(raw: unknown, fallbackCategory: PlanCategory): Plan | null {
   if (!id || !name) return null;
   if (!isPlainText(name, 80) || !isPlainText(description, 400)) return null;
   if (price && !isPlainText(price, 24)) return null;
-  if (!isHttpsUrl(purchaseUrl, { allowEmpty: true })) return null;
+  // purchaseUrl: https, vacío, o la contratación interna /cuenta/contratar?plan=<id>.
+  if (
+    purchaseUrl &&
+    !isHttpsUrl(purchaseUrl, { allowEmpty: false }) &&
+    !isContratarUrl(purchaseUrl)
+  ) {
+    return null;
+  }
   const features = Array.isArray(o.features)
     ? o.features
         .filter((f): f is string => typeof f === "string")
@@ -108,7 +115,11 @@ export function validateCatalogPayload(payload: CatalogPayload): string | null {
   for (const plan of all) {
     if (ids.has(plan.id)) return `ID de plan duplicado: ${plan.id}`;
     ids.add(plan.id);
-    if (plan.purchaseUrl && !isHttpsUrl(plan.purchaseUrl, { allowEmpty: false })) {
+    if (
+      plan.purchaseUrl &&
+      !isHttpsUrl(plan.purchaseUrl, { allowEmpty: false }) &&
+      !isContratarUrl(plan.purchaseUrl)
+    ) {
       return `URL de compra inválida en ${plan.name}`;
     }
   }

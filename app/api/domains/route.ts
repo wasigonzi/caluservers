@@ -18,7 +18,22 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
   });
 }
 
-/** Consulta de disponibilidad. Solo lectura, sin credenciales y limitada por IP. */
+/**
+ * Consulta de disponibilidad. Solo lectura, sin credenciales y limitada por IP.
+ *
+ * Sobre el 403 que vio un crawler de texto en vivo (auditoría 2026-11-15):
+ * esta ruta NO devuelve 403 en ninguna rama (400 sin nombre o dominio no
+ * válido, 429 si se agota el límite, 503 si la base del límite o el RDAP no
+ * responden). No hay middleware ni guarda de origen/UA en el repo, y no se
+ * usa trustedWrite aquí (es GET público). El 403 vino de fuera de la app:
+ * el cortafuegos/bot-protection de Vercel frente a un crawler sin navegador,
+ * o del propio servicio de fetch (la auditoría anotó el mismo patrón en
+ * /admin/login: "403 del servicio de fetch, no del sitio"). No se quitó nada:
+ * el límite y el RDAP siguen intactos. Para verificarlo, con navegador real:
+ * abre /domains, busca un dominio y comprueba que la respuesta es 200 con
+ * { ok:true, state:"available"|"registered"|"unverified" }; robots.txt
+ * desautoriza /api/ a crawlers, así que un crawler no debe consultarla.
+ */
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name") || "";
   const tld = req.nextUrl.searchParams.get("tld") || undefined;

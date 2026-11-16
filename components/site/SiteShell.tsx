@@ -367,14 +367,9 @@ export function PlanCard({
         </label>
       ) : null}
       {orderable ? (
-        <>
-          <Link className="btn primary" href={`/cuenta/contratar?plan=${encodeURIComponent(plan.id)}`}>
-            Contratar aquí
-          </Link>
-          <a className="btn secondary" href={plan.purchaseUrl} target="_blank" rel="noreferrer">
-            Portal anterior
-          </a>
-        </>
+        <Link className="btn primary" href={`/cuenta/contratar?plan=${encodeURIComponent(plan.id)}`}>
+          Contratar aquí
+        </Link>
       ) : (
         <Link className="btn secondary" href="/contact">
           Consultar disponibilidad

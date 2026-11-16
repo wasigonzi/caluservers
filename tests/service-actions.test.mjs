@@ -7,7 +7,7 @@ import { loader } from "./helpers/load.mjs";
 
 function fakeDb(service) {
   const store = service ? { ...service } : null;
-  const state = { events: [], updates: [] };
+  const state = { events: [], updates: [], suspends: [] };
   const db = {
     customerService: {
       findUnique: async () => (store ? { ...store } : null),
@@ -85,6 +85,14 @@ function routeModule({ admin = true, trusted = true, service } = {}) {
         }
       },
       provisionService: async () => ({}),
+      suspendServiceAccount: async ({ serviceId }) => {
+        state.suspends.push(serviceId);
+        return {
+          attempted: true,
+          suspended: true,
+          reason: "Cuenta cPanel miti1a2b suspendida en WHM.",
+        };
+      },
     },
   });
   const route = h.load("app/api/admin/commerce/route.ts");
@@ -124,6 +132,23 @@ test("la ruta cancela un servicio activo", async () => {
   assert.equal(res.status, 200);
   assert.equal((await res.json()).status, "cancelled");
   assert.equal(state.events[0].details, "active->cancelled");
+  // Sin cuenta cPanel no hay nada que suspender en WHM.
+  assert.equal(state.suspends.length, 0);
+});
+
+test("la ruta cancela un servicio con cuenta cPanel e intenta suspenderla en WHM", async () => {
+  const { route, state } = routeModule({
+    service: { ...paidService("active"), cpanelUser: "miti1a2b" },
+  });
+  const res = await route.POST(
+    fakeReq({ action: "service-status", serviceId: "svc-1", status: "cancelled", note: "baja pedida por el cliente" }),
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.status, "cancelled");
+  assert.equal(body.suspended, true);
+  assert.match(body.suspendNote, /suspendida/);
+  assert.deepEqual(state.suspends, ["svc-1"]);
 });
 
 test("reactivar un servicio ya activo se rechaza con 409", async () => {

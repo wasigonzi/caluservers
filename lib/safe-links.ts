@@ -45,6 +45,23 @@ export function isSafeHref(value: string, { allowEmpty = false } = {}): boolean 
   return isHttpsUrl(v, { allowEmpty: false });
 }
 
+/**
+ * Enlace interno de contratación del área propia:
+ * /cuenta/contratar?plan=<id>. Es la forma canónica de purchaseUrl desde la
+ * auditoría 2026-11-15 (tareas 3+4): ningún botón de pedido enlaza ya al
+ * portal anterior.
+ */
+export function isContratarUrl(value: string): boolean {
+  const v = value.trim();
+  if (!v.startsWith("/cuenta/contratar")) return false;
+  try {
+    const u = new URL(v, "https://caluservers.local");
+    return u.pathname === "/cuenta/contratar" && Boolean(u.searchParams.get("plan"));
+  } catch {
+    return false;
+  }
+}
+
 export function resolveHref(value: string, whmcs: string): string {
   const v = value.trim();
   if (v === "whmcs") return whmcs;

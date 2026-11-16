@@ -429,13 +429,13 @@ async function main() {
       check(`sin correo, credenciales no enviadas (${domain})`, result.credentialsSent === false);
       const row = await db.customerService.findUnique({ where: { id: service.id } });
       check(`activo en BD con usuario (${domain})`, row?.status === "active" && row?.cpanelUser === user);
-      const password = provision.initialPassword(service.id, user);
+      const password = provision.initialPasswordOrNull(row.cpanelPasswordEncrypted);
       const state = await stubState();
       check(`stub recibió 1 createacct (${domain})`, createCallsFor(domain, state).length === 1);
       const account = state.accounts.find((acc) => acc.user === user);
       check(`cuenta en stub WHM (${domain})`, !!account);
       check(
-        `el stub recibió la contraseña determinista (${domain})`,
+        `el stub recibió la contraseña guardada (${domain})`,
         account?.passwordSha256 === sha256(password),
       );
       return { user, password };

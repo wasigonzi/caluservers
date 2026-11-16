@@ -9,12 +9,12 @@ export default function Client() {
   const titleAccent = useCopy("titleAccent", "Un solo lugar.");
   const lead = useCopy(
     "lead",
-    "Puedes usar la cuenta propia de CaluServers. El portal anterior sigue disponible y no se ha migrado.",
+    "Tu cuenta propia de CaluServers: facturación, servicios, dominios y soporte en un solo lugar.",
   );
   const ctaTitle = useCopy("ctaTitle", "Bienvenido al Área de Cliente");
   const ctaLead = useCopy(
     "ctaLead",
-    "La cuenta propia vive en esta web. El portal anterior no se desactiva.",
+    "Inicia sesión o crea una cuenta para gestionar tus servicios.",
   );
 
   const ctaLabel = useCopy("ctaLabel", "Abrir Área de Cliente").replace(/\s*↗\s*$/, "");

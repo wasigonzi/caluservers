@@ -53,8 +53,11 @@ test("pedidos, aislamiento, importes y transiciones", {
     assert.equal(order.totalCents, 399);
     assert.equal(order.currency, "USD");
     assert.equal(order.domain, "midominio.com");
+    // El pedido nace con un token público de seguimiento, no adivinable.
+    assert.match(order.trackingToken, /^[a-f0-9]{48}$/);
     const again = await commerce.createCustomerOrder({ userId: "user-a", planId: "wh0", idempotencyKey: "idem-pay-0001", domain: "midominio.com" });
     assert.equal(again.id, order.id);
+    assert.equal(again.trackingToken, order.trackingToken);
     await assert.rejects(
       () => commerce.createCustomerOrder({ userId: "user-a", planId: "wh1", idempotencyKey: "idem-pay-0001", domain: "midominio.com" }),
       (error) => error.status === 409,
@@ -146,6 +149,9 @@ test("pedidos, aislamiento, importes y transiciones", {
     // Cobro por pasarela: la referencia de captura es única, así que el webhook
     // repetido devuelve el mismo cobro en lugar de duplicarlo.
     const gatewayOrder = await commerce.createCustomerOrder({ userId: "user-b", planId: "wh0", idempotencyKey: "idem-gw-0001", domain: "otrodominio.com" });
+    // Cada pedido tiene su propio token de seguimiento.
+    assert.match(gatewayOrder.trackingToken, /^[a-f0-9]{48}$/);
+    assert.notEqual(gatewayOrder.trackingToken, order.trackingToken);
     await assert.rejects(
       () => commerce.recordGatewayPayment({ invoiceId: gatewayOrder.invoice.id, providerRef: "CAP-TEST-1", amountCents: gatewayOrder.totalCents + 1, currency: "USD", source: "webhook" }),
       (error) => error.status === 409,

@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({
       id: order.id,
+      trackingToken: order.trackingToken,
       totalCents: order.totalCents,
       currency: order.currency,
       invoiceId: order.invoice?.id ?? null,
