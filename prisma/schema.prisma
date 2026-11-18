@@ -240,7 +240,9 @@ model CustomerOrder {
   idempotencyKey  String
   /// Token público de seguimiento (48 hex). No da acceso a la cuenta: la
   /// página /pedido/[token] solo muestra plan, dominio, estados y fecha.
-  trackingToken   String   @unique
+  /// El valor por defecto solo existe para rellenar pedidos viejos al añadir
+  /// la columna en una base con datos (el código siempre pone su propio token).
+  trackingToken   String   @unique @default(dbgenerated("replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')"))
   planId          String
   planName        String
   /// Dominio que el cliente declara para el servicio. Obligatorio para el alta

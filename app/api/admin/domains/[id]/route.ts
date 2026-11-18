@@ -2,10 +2,9 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { CommerceError } from "@/lib/commerce";
-import { createDomainOrder, getRegistrar, retryDomainRegistration } from "@/lib/domains";
+import { createDomainOrder, getRegistrar, publicDomain, retryDomainRegistration } from "@/lib/domains";
 import { db } from "@/lib/db";
 import { trustedWrite } from "@/lib/request";
-import { publicDomain } from "@/app/api/account/domains/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

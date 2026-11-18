@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { CommerceError } from "@/lib/commerce";
-import { createDomainOrder, getRegistrar } from "@/lib/domains";
+import { createDomainOrder, getRegistrar, parseNameservers, publicDomain } from "@/lib/domains";
 import { customerSession } from "@/lib/customer-session";
 import { db } from "@/lib/db";
 import { trustedWrite } from "@/lib/request";
-import { publicDomain } from "../route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,33 +22,6 @@ function registrarMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "el registrador no respondió";
   const clean = raw.replace(/\s+/g, " ").trim().slice(0, 200);
   return clean || "El registrador no respondió.";
-}
-
-const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-
-/** 1-13 hostnames válidos (de formulario llegan separados por comas). */
-export function parseNameservers(raw: unknown): string[] {
-  const list =
-    typeof raw === "string"
-      ? raw.split(",")
-      : Array.isArray(raw)
-        ? raw.map((item) => String(item ?? ""))
-        : [];
-  const names = list.map((name) => name.trim().toLowerCase()).filter(Boolean);
-  if (names.length < 1 || names.length > 13) {
-    throw new CommerceError("Indica entre 1 y 13 servidores de nombres.", 400);
-  }
-  for (const name of names) {
-    if (name.length > 253 || name.split(".").length < 2) {
-      throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
-    }
-    for (const label of name.split(".")) {
-      if (!LABEL_RE.test(label)) {
-        throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
-      }
-    }
-  }
-  return [...new Set(names)];
 }
 
 const ACTIONS = ["autorenew", "nameservers", "renew", "transfer", "authcode", "refresh"] as const;

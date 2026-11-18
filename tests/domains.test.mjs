@@ -747,3 +747,42 @@ test("tryAutoRenewWithCredit con auto-renew desactivado no hace nada", async () 
   assert.equal(result.reason, "auto-renew-desactivado");
   assert.equal(calls.registrar.length, 0);
 });
+
+/* ------------------------------ vista pública y nameservers ------------------------------ */
+
+test("publicDomain real no devuelve el código cifrado ni secretos", async () => {
+  const { mod } = loadDomains();
+  const view = mod.publicDomain({
+    id: "dom_A",
+    domain: "midominio.com",
+    registrarKey: "porkbun",
+    status: "active",
+    autoRenew: true,
+    expiresAt: new Date("2027-01-15T00:00:00.000Z"),
+    nameservers: ["ns1.ejemplo.test", 42, null],
+    createdAt: new Date("2026-01-15T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-15T00:00:00.000Z"),
+    failureReason: null,
+    orderId: "ord_A",
+    authCodeEncrypted: "secreto-cifrado-senuelo",
+  });
+  assert.equal(view.domain, "midominio.com");
+  assert.equal("authCodeEncrypted" in view, false);
+  assert.deepEqual([...view.nameservers], ["ns1.ejemplo.test"]);
+  assert.equal(view.expiresAt, "2027-01-15T00:00:00.000Z");
+  assert.equal(JSON.stringify(view).includes("secreto-cifrado"), false);
+});
+
+test("parseNameservers real normaliza, quita duplicados y rechaza lo inválido", async () => {
+  const { mod } = loadDomains();
+  assert.deepEqual([...mod.parseNameservers("NS1.Ejemplo.test, ns2.ejemplo.test, ns1.ejemplo.test")], [
+    "ns1.ejemplo.test",
+    "ns2.ejemplo.test",
+  ]);
+  assert.throws(() => mod.parseNameservers(["no es un host"]), (e) => e.status === 400);
+  assert.throws(() => mod.parseNameservers([]), (e) => e.status === 400);
+  assert.throws(
+    () => mod.parseNameservers(Array.from({ length: 14 }, (_, i) => `ns${i}.ejemplo.test`)),
+    (e) => e.status === 400,
+  );
+});

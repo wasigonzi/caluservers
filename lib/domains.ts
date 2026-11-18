@@ -42,6 +42,71 @@ export const DOMAIN_PLAN_IDS: Record<DomainKind, string> = {
   transfer: "domain-transfer",
 };
 
+/** Nameservers guardados como Json: se normalizan a lista de texto. */
+export function nameserverList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === "string");
+}
+
+/**
+ * Vista pública de un dominio registrado: nunca incluye el código de
+ * autorización cifrado ni ningún secreto del registrador.
+ */
+export function publicDomain(domain: {
+  id: string;
+  domain: string;
+  registrarKey: string;
+  status: string;
+  autoRenew: boolean;
+  expiresAt: Date | null;
+  nameservers: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  failureReason: string | null;
+  orderId: string | null;
+}) {
+  return {
+    id: domain.id,
+    domain: domain.domain,
+    registrarKey: domain.registrarKey,
+    status: domain.status,
+    autoRenew: domain.autoRenew,
+    expiresAt: domain.expiresAt ? domain.expiresAt.toISOString() : null,
+    nameservers: nameserverList(domain.nameservers),
+    createdAt: domain.createdAt.toISOString(),
+    updatedAt: domain.updatedAt.toISOString(),
+    failureReason: domain.failureReason,
+    orderId: domain.orderId,
+  };
+}
+
+const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/** 1-13 hostnames válidos (de formulario llegan separados por comas). */
+export function parseNameservers(raw: unknown): string[] {
+  const list =
+    typeof raw === "string"
+      ? raw.split(",")
+      : Array.isArray(raw)
+        ? raw.map((item) => String(item ?? ""))
+        : [];
+  const names = list.map((name) => name.trim().toLowerCase()).filter(Boolean);
+  if (names.length < 1 || names.length > 13) {
+    throw new CommerceError("Indica entre 1 y 13 servidores de nombres.", 400);
+  }
+  for (const name of names) {
+    if (name.length > 253 || name.split(".").length < 2) {
+      throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
+    }
+    for (const label of name.split(".")) {
+      if (!LABEL_RE.test(label)) {
+        throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
 const AUTH_CODE_AAD = "domain:auth-code:v1";
 
 /** Días de guarda de Porkbun: no renovar lo registrado/renovado hace < 30 días. */

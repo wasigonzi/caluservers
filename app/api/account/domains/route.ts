@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { CommerceError } from "@/lib/commerce";
-import { createDomainOrder } from "@/lib/domains";
+import { createDomainOrder, publicDomain } from "@/lib/domains";
 import { DomainNameError, normalizeDomainName } from "@/lib/domain-name";
 import { customerSession } from "@/lib/customer-session";
 import { db } from "@/lib/db";
@@ -16,44 +16,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
   });
-}
-
-/** Nameservers guardados como Json: se normalizan a lista de texto. */
-export function nameserverList(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((item): item is string => typeof item === "string");
-}
-
-/**
- * Vista pública de un dominio registrado: nunca incluye el código de
- * autorización cifrado ni ningún secreto del registrador.
- */
-export function publicDomain(domain: {
-  id: string;
-  domain: string;
-  registrarKey: string;
-  status: string;
-  autoRenew: boolean;
-  expiresAt: Date | null;
-  nameservers: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-  failureReason: string | null;
-  orderId: string | null;
-}) {
-  return {
-    id: domain.id,
-    domain: domain.domain,
-    registrarKey: domain.registrarKey,
-    status: domain.status,
-    autoRenew: domain.autoRenew,
-    expiresAt: domain.expiresAt ? domain.expiresAt.toISOString() : null,
-    nameservers: nameserverList(domain.nameservers),
-    createdAt: domain.createdAt.toISOString(),
-    updatedAt: domain.updatedAt.toISOString(),
-    failureReason: domain.failureReason,
-    orderId: domain.orderId,
-  };
 }
 
 const KINDS = ["register", "renewal", "transfer"] as const;
