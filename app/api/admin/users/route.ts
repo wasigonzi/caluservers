@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Mínimo de contraseña para un admin nuevo (igual que el registro de promotor). */
-export const ADMIN_MIN_PASSWORD = 8;
+const ADMIN_MIN_PASSWORD = 8;
 
 type PublicAdminUser = {
   id: string;

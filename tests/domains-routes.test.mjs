@@ -45,6 +45,56 @@ const nextServer = {
   NextRequest: class {},
 };
 
+// Copias fieles de los ayudantes de lib/domains.ts: las rutas los importan
+// de @/lib/domains y este archivo sustituye ese módulo por un doble. La
+// implementación real se prueba en tests/domains.test.mjs.
+function nameserverList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item) => typeof item === "string");
+}
+
+function publicDomain(domain) {
+  return {
+    id: domain.id,
+    domain: domain.domain,
+    registrarKey: domain.registrarKey,
+    status: domain.status,
+    autoRenew: domain.autoRenew,
+    expiresAt: domain.expiresAt ? domain.expiresAt.toISOString() : null,
+    nameservers: nameserverList(domain.nameservers),
+    createdAt: domain.createdAt.toISOString(),
+    updatedAt: domain.updatedAt.toISOString(),
+    failureReason: domain.failureReason,
+    orderId: domain.orderId,
+  };
+}
+
+const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+function parseNameservers(raw) {
+  const list =
+    typeof raw === "string"
+      ? raw.split(",")
+      : Array.isArray(raw)
+        ? raw.map((item) => String(item ?? ""))
+        : [];
+  const names = list.map((name) => name.trim().toLowerCase()).filter(Boolean);
+  if (names.length < 1 || names.length > 13) {
+    throw new CommerceError("Indica entre 1 y 13 servidores de nombres.", 400);
+  }
+  for (const name of names) {
+    if (name.length > 253 || name.split(".").length < 2) {
+      throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
+    }
+    for (const label of name.split(".")) {
+      if (!LABEL_RE.test(label)) {
+        throw new CommerceError(`El servidor de nombres «${name}» no es válido.`, 400);
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
 const DOMAIN_A = {
   id: "dom_A",
   userId: "user_A",
@@ -205,6 +255,8 @@ function accountBuild(mocks = {}) {
     },
     "@/lib/db": { db },
     "@/lib/domains": {
+      publicDomain,
+      parseNameservers,
       createDomainOrder: async (input) => {
         if (mocks.orderError) throw mocks.orderError;
         state.orders.push(input);
@@ -321,6 +373,7 @@ function adminBuild(mocks = {}) {
       getAdminSession: async () => ({ email: "admin@test.local", permissions: ["domains:view"] }),
     },
     "@/lib/domains": {
+      publicDomain,
       retryDomainRegistration: async () => ({ ok: true }),
       createDomainOrder: async () => ({
         id: "ord_1",

@@ -3,7 +3,7 @@ import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { PAGE_SIZE, loadFailure } from "@/lib/admin-data";
 import { pageNumber, searchTerm } from "@/lib/admin-format";
 import { db } from "@/lib/db";
-import { publicDomain } from "@/app/api/account/domains/route";
+import { publicDomain } from "@/lib/domains";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
