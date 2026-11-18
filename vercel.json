@@ -1,0 +1,16 @@
+{
+    "crons": [
+        {
+            "path": "/api/cron/billing",
+            "schedule": "0 6 * * *"
+        },
+        {
+            "path": "/api/cron/renewals",
+            "schedule": "0 7 * * *"
+        },
+        {
+            "path": "/api/cron/domains",
+            "schedule": "0 8 * * *"
+        }
+    ]
+}

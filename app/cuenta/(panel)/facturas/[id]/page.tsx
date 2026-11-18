@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PayInvoiceButton, PrintButton } from "@/components/account/AccountForms";
+import { PayInvoiceOptions, PrintButton } from "@/components/account/AccountForms";
 import { requireCustomer } from "@/lib/account-data";
 import { dateOnly, customerInvoiceStatus, money } from "@/lib/admin-format";
 import { paymentInstructions } from "@/lib/billing-settings";
 import { billingPolicy } from "@/lib/commerce";
 import { db } from "@/lib/db";
-import { paypalReady } from "@/lib/paypal";
+import { availableGateways } from "@/lib/gateways";
 import { StatusBadge } from "@/components/admin/ui";
+
+const PAID_VIA: Record<string, string> = {
+  paypal: " con PayPal.",
+  stripe: " con Stripe.",
+  bank_transfer: " por transferencia bancaria.",
+  manual: ".",
+};
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Factura" };
@@ -23,7 +30,11 @@ export default async function AccountInvoice({ params }: { params: Promise<{ id:
   if (!invoice) notFound();
   const paid = invoice.payment?.status === "confirmed";
   const payable = invoice.status === "issued" && !paid;
-  const online = payable && paypalReady() && billingPolicy().ok;
+  // La transferencia siempre está disponible; el cobro en línea solo si hay
+  // alguna pasarela lista. Sin pasarela y sin instrucciones, mensaje honesto.
+  const gateways = payable ? await availableGateways() : [];
+  const online =
+    payable && gateways.some((gateway) => gateway.online && gateway.ready) && billingPolicy().ok;
   const instructions = payable ? await paymentInstructions() : "";
 
   return (
@@ -97,7 +108,7 @@ export default async function AccountInvoice({ params }: { params: Promise<{ id:
         {paid && invoice.payment ? (
           <p className="notice invoice-paid" role="status">
             Pagada el {dateOnly(invoice.payment.createdAt)}
-            {invoice.payment.provider === "paypal" ? " con PayPal." : "."} Gracias.
+            {PAID_VIA[invoice.payment.provider] ?? "."} Gracias.
           </p>
         ) : null}
         {invoice.status === "void" ? (
@@ -112,10 +123,9 @@ export default async function AccountInvoice({ params }: { params: Promise<{ id:
         {payable ? (
           <section className="invoice-pay no-print" aria-labelledby="pay-title">
             <h2 id="pay-title">Cómo pagar</h2>
-            {online ? <PayInvoiceButton invoiceId={invoice.id} /> : null}
-            {instructions ? (
+            <PayInvoiceOptions invoiceId={invoice.id} invoiceNumber={invoice.number} />
+            {instructions && !online ? (
               <>
-                {online ? <p className="muted">O paga por otro medio:</p> : null}
                 <p className="invoice-instructions">{instructions}</p>
                 <p className="muted">
                   Indica el número de factura <strong>{invoice.number}</strong> al pagar. Lo

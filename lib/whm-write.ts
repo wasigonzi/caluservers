@@ -12,14 +12,26 @@ import { publicTarget, type WhmCredentials } from "@/lib/whm-transport";
  * Transporte WHM de ESCRITURA, separado del de lectura a propósito.
  *
  * `readWhm` sigue rechazando cualquier comando que modifique el servidor: esa
- * garantía no se toca. Las altas y las suspensiones pasan por aquí, con su
- * propia lista de comandos, sus propias credenciales (token con ACL
- * `createacct` y `suspendacct`) y el mismo endurecimiento de red: https,
- * puerto 2087, DNS público, conexión fijada, TLS verificado, sin
- * redirecciones, con plazo y tamaño máximo.
+ * garantía no se toca. Las altas, las suspensiones, las reactivaciones y las
+ * terminaciones pasan por aquí, con su propia lista de comandos, sus propias
+ * credenciales (token con ACL `createacct`, `suspendacct`, `unsuspendacct` y
+ * `terminateacct`) y el mismo endurecimiento de red: https, puerto 2087, DNS
+ * público, conexión fijada, TLS verificado, sin redirecciones, con plazo y
+ * tamaño máximo.
+ *
+ * El token de escritura NECESITA la ACL `terminateacct` para poder terminar
+ * cuentas: sin ella WHM rechaza `terminateacct` (y `unsuspendacct` sin su
+ * ACL). Nada de este código comprueba la ACL por adelantado; el rechazo
+ * queda registrado como `service.terminate_failed` / `service.unsuspend_failed`
+ * con el motivo visible al admin.
  */
 
-export const WHM_WRITE_ACTIONS = ["createacct", "suspendacct"] as const;
+export const WHM_WRITE_ACTIONS = [
+  "createacct",
+  "suspendacct",
+  "unsuspendacct",
+  "terminateacct",
+] as const;
 export type WhmWriteAction = (typeof WHM_WRITE_ACTIONS)[number];
 
 const BODY_LIMIT = 512 * 1024;
@@ -39,7 +51,10 @@ export type WhmWriteResult = {
 };
 
 /** Extrae el resultado de un comando de escritura exigiendo metadata correcta,
- * como en lectura. `suspendacct` no devuelve usuario: `data` puede ser nulo. */
+ * como en lectura. `suspendacct`, `unsuspendacct` y `terminateacct` no
+ * devuelven usuario: `data` puede ser nulo. El mensaje de reserva depende
+ * del comando: sin motivo del servidor, "Cuenta creada." solo vale para
+ * `createacct`. */
 export function parseWriteResponse(
   value: unknown,
   action: WhmWriteAction,
@@ -68,8 +83,14 @@ export function parseWriteResponse(
   }
   const data = body.data as Record<string, unknown> | undefined;
   const options = (data?.options ?? {}) as Record<string, unknown>;
+  const fallback: Record<WhmWriteAction, string> = {
+    createacct: "Cuenta creada.",
+    suspendacct: "Cuenta suspendida.",
+    unsuspendacct: "Cuenta reactivada.",
+    terminateacct: "Cuenta terminada.",
+  };
   return {
-    statusmsg: clean(body.metadata.reason) || "Cuenta creada.",
+    statusmsg: clean(body.metadata.reason) || fallback[action],
     user: clean(options.username ?? data?.user ?? ""),
   };
 }

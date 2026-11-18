@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { PAGE_DEFS } from "@/lib/page-content";
 import {
   getAllPageContent,
@@ -11,7 +12,11 @@ import PageContentStudio from "@/components/admin/PageContentStudio";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPagesPage() {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("content:write")) {
+    return <AccessDenied permission="content:write" />;
+  }
   const [pages, db] = await Promise.all([
     getAllPageContent(),
     pageContentDbReady(),

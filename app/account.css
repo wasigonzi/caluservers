@@ -104,3 +104,60 @@
 }
 .link-button{background:none;border:0;padding:0;color:#9be9ff;font:inherit;text-decoration:underline;cursor:pointer}
 .link-button:hover{color:#fff}
+
+/* ---------- Diseños del portal (Fase 5, frente B) ----------
+   Tres diseños reales sobre APPEARANCE_PRESETS (default/ocean/midnight):
+   paleta, fondo, radio de tarjetas y espaciado cambian de verdad, no solo
+   el acento. La densidad (comfortable/compact/relaxed) ajusta paddings y
+   huecos. El admin fija el preset por defecto; el cliente elige el suyo
+   en /cuenta/perfil (User.portalTheme / User.portalDensity). */
+.account-app .admin-topbar-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.account-app .admin-topbar .language-selector select{max-width:130px}
+.portal-content-section .portal-content-body{display:block;margin-top:6px;font-size:14px;line-height:1.55}
+.portal-faq{display:grid;gap:14px;margin:0}
+.portal-faq dt{font-weight:700}
+.portal-faq dd{margin:4px 0 0;color:inherit;opacity:.85}
+
+/* Densidad: paddings y huecos del panel. */
+.account-app.portal-density-compact{--portal-pad:14px;--portal-gap:10px;--portal-font:14px}
+.account-app.portal-density-comfortable{--portal-pad:22px;--portal-gap:18px;--portal-font:15px}
+.account-app.portal-density-relaxed{--portal-pad:30px;--portal-gap:26px;--portal-font:16px}
+.account-app.portal-density-compact .panel{padding:var(--portal-pad)}
+.account-app.portal-density-comfortable .panel{padding:var(--portal-pad)}
+.account-app.portal-density-relaxed .panel{padding:var(--portal-pad)}
+.account-app.portal-density-compact .dash-columns,
+.account-app.portal-density-compact .kpi-grid{gap:var(--portal-gap)}
+.account-app.portal-density-comfortable .dash-columns,
+.account-app.portal-density-comfortable .kpi-grid{gap:var(--portal-gap)}
+.account-app.portal-density-relaxed .dash-columns,
+.account-app.portal-density-relaxed .kpi-grid{gap:var(--portal-gap)}
+.account-app.portal-density-compact{font-size:var(--portal-font)}
+.account-app.portal-density-relaxed{font-size:var(--portal-font)}
+
+/* Tema por defecto: cian Calu sobre oscuro (aspecto actual del portal). */
+.account-app.portal-theme-default{background:#070e15;color:#e8faff}
+.account-app.portal-theme-default .panel{background:rgba(13,26,38,.86);border:1px solid rgba(0,229,255,.22);border-radius:20px}
+.account-app.portal-theme-default .kpi{background:rgba(13,26,38,.86);border:1px solid rgba(0,229,255,.22);border-radius:20px}
+.account-app.portal-theme-default .btn{background:linear-gradient(100deg,#00f0ee,#00b8d9);color:#00212a;border-radius:12px}
+
+/* Tema océano: azul profundo, paneles con borde azul marcado, radio medio. */
+.account-app.portal-theme-ocean{background:linear-gradient(180deg,#06101c 0%,#081826 100%);color:#eaf3ff}
+.account-app.portal-theme-ocean .admin-sidebar{background:#081426;border-right:1px solid #1c4d8f}
+.account-app.portal-theme-ocean .admin-topbar{background:#081426;border-bottom:1px solid #1c4d8f}
+.account-app.portal-theme-ocean .panel{background:#0a1628;border:1px solid #2a6fd6;border-radius:14px;box-shadow:0 10px 30px rgba(0,60,140,.35)}
+.account-app.portal-theme-ocean .kpi{background:#0a1a30;border:1px solid #2a6fd6;border-radius:14px}
+.account-app.portal-theme-ocean .btn{background:linear-gradient(100deg,#007bff,#00b8d9);color:#fff;border-radius:10px}
+.account-app.portal-theme-ocean .btn.secondary{background:#0d2138;color:#cfe6ff;border:1px solid #2a6fd6}
+.account-app.portal-theme-ocean .admin-nav-link.active{background:#123a6b;color:#fff}
+.account-app.portal-theme-ocean a{color:#7cc4ff}
+
+/* Tema medianoche: casi negro, acento turquesa, tarjetas muy redondeadas. */
+.account-app.portal-theme-midnight{background:#04080f;color:#eef6ff}
+.account-app.portal-theme-midnight .admin-sidebar{background:#050b16;border-right:1px solid #1b2f4a}
+.account-app.portal-theme-midnight .admin-topbar{background:#050b16;border-bottom:1px solid #1b2f4a}
+.account-app.portal-theme-midnight .panel{background:#0a101c;border:1px solid #22385a;border-radius:28px;box-shadow:0 18px 44px rgba(0,0,0,.55)}
+.account-app.portal-theme-midnight .kpi{background:#0a101c;border:1px solid #22385a;border-radius:28px}
+.account-app.portal-theme-midnight .btn{background:linear-gradient(100deg,#00f0ee,#4da3ff);color:#001318;border-radius:999px;padding-left:26px;padding-right:26px}
+.account-app.portal-theme-midnight .btn.secondary{background:#0d1526;color:#d6ecff;border:1px solid #22385a;border-radius:999px}
+.account-app.portal-theme-midnight .admin-nav-link.active{background:#12233d;color:#8ef5f2}
+.account-app.portal-theme-midnight a{color:#8ef5f2}

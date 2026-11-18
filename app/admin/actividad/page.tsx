@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import {
   activityLog,
   activityTotal,
@@ -20,7 +21,11 @@ export default async function ActivityPage({
 }: {
   searchParams: Promise<{ p?: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("audit:view")) {
+    return <AccessDenied permission="audit:view" />;
+  }
   const params = await searchParams;
   let failed: LoadFailure | null = null;
   let total = 0;

@@ -1127,3 +1127,9 @@
   .config-where { flex-basis:100%; align-items:flex-start; padding-left:30px; }
   .admin-app .config-where code { text-align:left; }
 }
+
+/* ---------- Gestores de contenido y KB (Fase 5, frente B) ---------- */
+.content-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}
+.content-filters .field{flex:1 1 160px;margin:0}
+.row-actions{display:inline-flex;gap:8px;flex-wrap:wrap}
+.content-preview{margin-top:16px}

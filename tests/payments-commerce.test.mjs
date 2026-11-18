@@ -107,7 +107,7 @@ const INVOICE = {
 };
 
 function commerce(mocks = {}) {
-  const state = { payments: [], services: [], events: [], invoiceUpdates: [] };
+  const state = { payments: [], services: [], events: [], invoiceUpdates: [], subscriptions: [] };
   const invoice = mocks.invoice === undefined ? INVOICE : mocks.invoice;
   const tx = {
     customerInvoice: {
@@ -136,7 +136,14 @@ function commerce(mocks = {}) {
     customerService: {
       create: async (args) => {
         state.services.push(args.data);
-        return args.data;
+        return { id: "svc_1", ...args.data };
+      },
+    },
+    subscription: {
+      findUnique: async () => null,
+      create: async (args) => {
+        state.subscriptions.push(args.data);
+        return { id: "sub_1", ...args.data };
       },
     },
     commerceEvent: {
@@ -197,6 +204,12 @@ test("un cobro correcto marca la factura pagada y crea el servicio pendiente", a
   assert.equal(state.orderStatus, "paid");
   assert.equal(state.services[0].status, "pending_provision");
   assert.match(state.events[0].details, /provider=paypal/);
+  // El primer pago deja la suscripción recurrente creada (ciclo mensual).
+  assert.equal(state.subscriptions.length, 1);
+  assert.equal(state.subscriptions[0].serviceId, "svc_1");
+  assert.equal(state.subscriptions[0].billingCycle, "monthly");
+  assert.equal(state.subscriptions[0].status, "active");
+  assert.equal(state.subscriptions[0].gatewayKey, "paypal");
 });
 
 test("la misma referencia de captura no cobra dos veces", async () => {

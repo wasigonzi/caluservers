@@ -20,6 +20,13 @@ export default function LoginForm() {
             body: JSON.stringify({ email, password, code }),
           });
           if (!response.ok) {
+            // El servidor solo distingue el bloqueo por MFA sin enrolar
+            // (403 + mfaEnrollmentRequired); el resto sigue siendo genérico
+            // para no enumerar credenciales.
+            const data = await response.json().catch(() => null);
+            if (response.status === 403 && data?.mfaEnrollmentRequired && typeof data.error === "string") {
+              throw Error(data.error);
+            }
             throw Error(
               response.status === 429
                 ? "Demasiados intentos. Espera unos minutos."

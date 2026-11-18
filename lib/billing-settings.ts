@@ -1,4 +1,6 @@
 import "server-only";
+import { sanitizeAudit } from "@/lib/audit-sanitize";
+import { writeAuditLog } from "@/lib/audit-log";
 import { db } from "@/lib/db";
 
 /**
@@ -39,8 +41,15 @@ export async function savePaymentInstructions(raw: unknown): Promise<string> {
       update: { value: { text } },
     }),
     db.adminAudit.create({
-      data: { action: "billing.instructions.updated", details: `chars=${text.length}` },
+      data: { action: "billing.instructions.updated", details: sanitizeAudit(`chars=${text.length}`) },
     }),
   ]);
+  // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+  void writeAuditLog({
+    actorType: "admin",
+    action: "billing.instructions.updated",
+    resourceType: "siteSetting",
+    details: `chars=${text.length}`,
+  });
   return text;
 }

@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { whmConfiguration } from "@/lib/whm";
 import { safeWhmError } from "@/lib/whm-security";
 import { PageHeader } from "@/components/admin/ui";
@@ -10,7 +11,8 @@ export default async function SectionPage({
 }: {
   params: Promise<{ section: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
   const { section } = await params;
   // Rutas del panel anterior: llevan a la sección que hoy hace ese trabajo.
   const moved: Record<string, string> = {
@@ -22,6 +24,10 @@ export default async function SectionPage({
   };
   if (moved[section]) redirect(moved[section]);
   if (section !== "accounts" && section !== "packages") notFound();
+  // Cuentas y paquetes son solo lectura de WHM (Fase 1, tramo D — RBAC).
+  if (!session.permissions.includes("whm:read")) {
+    return <AccessDenied permission="whm:read" />;
+  }
   let configured = false,
     error = "";
   try {

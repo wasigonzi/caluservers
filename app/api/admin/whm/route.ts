@@ -5,7 +5,8 @@ import { whmGuard, whmBody, whmJson, whmFailure } from "@/lib/whm-http";
 export const dynamic = "force-dynamic";
 export const maxDuration = 40;
 export async function POST(req: NextRequest) {
-  const denied = await whmGuard(req, true);
+  // Solo lectura de WHM (test/overview/listaccts/listpkgs): `whm:read`.
+  const denied = await whmGuard(req, true, "whm:read");
   if (denied) return denied;
   try {
     const body = (await whmBody(req)) as { operation?: unknown };

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, money, pageNumber, searchTerm } from "@/lib/admin-format";
 import { db } from "@/lib/db";
@@ -22,7 +23,11 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ q?: string; p?: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("clients:view")) {
+    return <AccessDenied permission="clients:view" />;
+  }
   const params = await searchParams;
   const q = searchTerm(params.q);
   const where: Prisma.UserWhereInput = q

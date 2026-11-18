@@ -22,6 +22,7 @@ export async function notifyCustomerOfReply(ticketId: string): Promise<boolean> 
     });
     if (!ticket?.user.email) return false;
     const base = siteUrl();
+    const ticketUrl = base ? `${base}/cuenta/tickets/${ticket.id}` : "";
     const result = await deliverNotice({
       to: ticket.user.email,
       subject: `Respuesta a tu ticket: ${ticket.subject}`,
@@ -29,6 +30,9 @@ export async function notifyCustomerOfReply(ticketId: string): Promise<boolean> 
         "El equipo de soporte respondió a tu ticket.",
         base ? `Léelo y responde aquí: ${base}/cuenta/tickets/${ticket.id}` : "Entra en tu cuenta para leerlo.",
       ].join("\n"),
+      // Plantilla activa `ticket-reply` si existe; si no, el texto de arriba.
+      templateKey: "ticket-reply",
+      variables: { ticketSubject: ticket.subject, ticketUrl },
     });
     return result.delivered;
   } catch {
@@ -47,6 +51,8 @@ export async function notifyStaffOfTicket(ticketId: string, kind: "new" | "reply
     });
     if (!ticket) return false;
     const base = siteUrl();
+    const ticketUrl = base ? `${base}/admin/tickets/${ticket.id}` : "";
+    const key = kind === "new" ? "ticket-new-staff" : "ticket-reply-staff";
     const result = await deliverNotice({
       to,
       subject: `${kind === "new" ? "Ticket nuevo" : "Respuesta del cliente"}: ${ticket.subject}`,
@@ -55,6 +61,9 @@ export async function notifyStaffOfTicket(ticketId: string, kind: "new" | "reply
         base ? `Ábrelo en el panel: ${base}/admin/tickets/${ticket.id}` : "Ábrelo en el panel de administración.",
       ].join("\n"),
       replyTo: ticket.user.email,
+      // Plantilla activa si existe; si no, el texto de arriba.
+      templateKey: key,
+      variables: { ticketSubject: ticket.subject, ticketUrl, customerEmail: ticket.user.email },
     });
     return result.delivered;
   } catch {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { customerAuthClient } from "@/lib/customer-auth-client";
@@ -382,6 +382,210 @@ export function CapturePayment({
   );
 }
 
+type CheckoutGateway = {
+  key: "paypal" | "stripe" | "bank_transfer";
+  label: string;
+  online: boolean;
+  ready: boolean;
+};
+
+/**
+ * Elige la pasarela para una factura. La lista viene del servidor con su
+ * estado real: solo se ofrecen las listas. El importe lo decide el servidor.
+ * La transferencia no abre ninguna pasarela: muestra las instrucciones y el
+ * pedido queda pendiente de confirmación manual.
+ */
+export function PayInvoiceOptions({
+  invoiceId,
+  invoiceNumber,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+}) {
+  const [gateways, setGateways] = useState<CheckoutGateway[] | null>(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [transfer, setTransfer] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/account/checkout", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "gateways", invoiceId }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && Array.isArray(data?.gateways)) {
+          setGateways(data.gateways);
+        } else if (!cancelled) {
+          setError(data?.error || "No se pudo cargar las formas de pago.");
+        }
+      } catch {
+        if (!cancelled) setError("No hubo conexión al cargar las formas de pago.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId]);
+
+  async function start(gateway: CheckoutGateway) {
+    if (busy) return;
+    setBusy(gateway.key);
+    setError("");
+    try {
+      if (gateway.key === "paypal") {
+        const response = await fetch("/api/account/paypal", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "start", invoiceId }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.approveUrl) {
+          setError(data?.error || "No se pudo abrir el pago.");
+          setBusy("");
+          return;
+        }
+        window.location.href = data.approveUrl;
+        return;
+      }
+      const response = await fetch("/api/account/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "start", gateway: gateway.key, invoiceId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data?.error || "No se pudo abrir el pago.");
+        setBusy("");
+        return;
+      }
+      if (gateway.key === "stripe") {
+        if (!data?.url) {
+          setError("Stripe no devolvió la página de pago.");
+          setBusy("");
+          return;
+        }
+        window.location.href = data.url;
+        return;
+      }
+      // Transferencia: no hay redirección; el pedido queda pendiente.
+      setTransfer(typeof data?.instructions === "string" ? data.instructions : "");
+      setBusy("");
+    } catch {
+      setError("No hubo conexión con la pasarela.");
+      setBusy("");
+    }
+  }
+
+  if (transfer !== null) {
+    return (
+      <div>
+        <p className="notice" role="status">
+          Pedido pendiente por transferencia. Indica el número de factura{" "}
+          <strong>{invoiceNumber}</strong> al pagar; lo confirmamos a mano y tu servicio
+          se activa después.
+        </p>
+        {transfer ? <p className="invoice-instructions">{transfer}</p> : null}
+      </div>
+    );
+  }
+  if (!gateways) {
+    return <p className="muted">Cargando formas de pago…</p>;
+  }
+  const offered = gateways.filter((gateway) => gateway.ready);
+  if (!offered.length) {
+    return <p className="muted">El pago en línea no está activo.</p>;
+  }
+  return (
+    <>
+      {offered.map((gateway) => (
+        <p key={gateway.key}>
+          <button
+            className="btn primary"
+            type="button"
+            disabled={busy !== ""}
+            onClick={() => start(gateway)}
+          >
+            {busy === gateway.key
+              ? "Abriendo…"
+              : gateway.key === "bank_transfer"
+                ? "Pagar por transferencia"
+                : `Pagar con ${gateway.label}`}
+          </button>
+        </p>
+      ))}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+    </>
+  );
+}
+
+/** Cierra el cobro a la vuelta de Stripe Checkout. El id de sesión lo pone Stripe en la URL. */
+export function ConfirmStripePayment({
+  invoiceId,
+  sessionId,
+}: {
+  invoiceId: string;
+  sessionId: string;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "working" | "done" | "failed">("idle");
+  const [message, setMessage] = useState("");
+  return (
+    <div>
+      {state === "idle" ? (
+        <button
+          className="btn primary"
+          type="button"
+          onClick={async () => {
+            setState("working");
+            try {
+              const response = await fetch("/api/account/checkout", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "capture", gateway: "stripe", invoiceId, sessionId }),
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data?.paid) {
+                setState("failed");
+                setMessage(
+                  data?.error ||
+                    "No se pudo confirmar el cobro. Si Stripe te cobró, lo veremos por su aviso y lo registraremos.",
+                );
+                return;
+              }
+              setState("done");
+              setMessage(
+                data.provisioned
+                  ? "Pago confirmado y servicio dado de alta. Revisa tu correo: ahí van los datos de acceso."
+                  : "Pago confirmado. El alta del servicio queda pendiente y te avisamos al terminarla.",
+              );
+              router.refresh();
+            } catch {
+              setState("failed");
+              setMessage("No hubo conexión al confirmar el cobro.");
+            }
+          }}
+        >
+          Confirmar el pago
+        </button>
+      ) : null}
+      {state === "working" ? <p className="notice">Confirmando con Stripe…</p> : null}
+      {state === "done" ? (
+        <p className="notice" role="status">{message}</p>
+      ) : null}
+      {state === "failed" ? <p className="error" role="alert">{message}</p> : null}
+      {state !== "idle" && state !== "working" ? (
+        <p>
+          <Link href="/cuenta">Volver a tu cuenta</Link>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function TicketForm() {
   const router = useRouter();
   const [subject, setSubject] = useState("");
@@ -460,6 +664,56 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
       <label className="field">Tu respuesta<textarea value={body} required maxLength={4000} onChange={(event) => setBody(event.target.value)} /></label>
       {error ? <p className="error" role="alert">{error}</p> : null}
       <button className="btn primary" type="submit" disabled={busy}>Enviar respuesta</button>
+    </form>
+  );
+}
+
+export function TicketAttachmentForm({ ticketId }: { ticketId: string }) {
+  const router = useRouter();
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        const form = event.currentTarget;
+        const input = form.querySelector<HTMLInputElement>('input[type="file"]');
+        const file = input?.files?.[0];
+        if (!file) {
+          setError("Elige un archivo.");
+          return;
+        }
+        setBusy(true);
+        setError("");
+        setInfo("");
+        try {
+          const data = new FormData();
+          data.append("file", file);
+          const response = await fetch(`/api/account/tickets/${ticketId}/attachments`, {
+            method: "POST",
+            body: data,
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            setError(result.error || "No se pudo subir el adjunto.");
+          } else {
+            form.reset();
+            setInfo(`Adjunto guardado: ${result.attachment?.fileName ?? file.name}.`);
+            router.refresh();
+          }
+        } catch {
+          setError("No hubo conexión. Inténtalo de nuevo.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="field">Adjuntar archivo (máx. 10 MB: imágenes, PDF, TXT o ZIP)<input type="file" accept="image/*,.pdf,.txt,.zip" /></label>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      {info ? <p className="notice" role="status">{info}</p> : null}
+      <button className="btn secondary" type="submit" disabled={busy}>Subir adjunto</button>
     </form>
   );
 }

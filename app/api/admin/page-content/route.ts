@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { clientSafeError } from "@/lib/client-error";
 import { trustedWrite } from "@/lib/request";
 import {
@@ -21,8 +21,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
-  } catch {
+    // No hay permiso de vista propio para contenidos: leer y guardar
+    // exigen `content:write` (Fase 1, tramo D — RBAC).
+    await requirePermission("content:write");
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: "Sin permiso para esta acción." }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const path = req.nextUrl.searchParams.get("path");
@@ -56,8 +61,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
-  } catch {
+    await requirePermission("content:write");
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: "Sin permiso para esta acción." }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!trustedWrite(req)) {

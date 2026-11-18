@@ -1,5 +1,8 @@
 import "server-only";
 import { createHmac, randomBytes } from "node:crypto";
+import { sanitizeAudit } from "@/lib/audit-sanitize";
+import { actorTypeFor, writeAuditLog } from "@/lib/audit-log";
+import { raiseAlert } from "@/lib/alerts";
 import { db } from "@/lib/db";
 import { deliverNotice, mailerConfigured } from "@/lib/mailer";
 import { openSecret, sealSecret, SecretBoxError } from "@/lib/secret-box";
@@ -7,14 +10,31 @@ import { validateIdentity, whmBase, WhmError } from "@/lib/whm-security";
 import { readWhm, type WhmCredentials } from "@/lib/whm-transport";
 import { decryptWhm } from "@/lib/whm";
 import { writeWhm } from "@/lib/whm-write";
+import { getControlPanel, panelLabel } from "@/lib/panels";
+import type { ControlPanel } from "@/lib/plugin-types";
 
 /**
- * Alta automática de hosting en WHM después de un pago confirmado.
+ * Alta automática de hosting después de un pago confirmado.
+ *
+ * El panel es el del servicio (`panelKey`, por defecto "whm"):
+ * - WHM: `createacct` directo, como siempre (mismos eventos, errores y
+ *   adopción de la cuenta si la respuesta se pierde).
+ * - Plesk / DirectAdmin: el adaptador `ControlPanel` de `lib/panels.ts`
+ *   (`getControlPanel`), con los mismos datos que el alta WHM (dominio,
+ *   usuario derivado, contraseña generada y cifrada, paquete/plan, correo)
+ *   y el mismo patrón de fallo y reintento: si el panel falla, el pago
+ *   queda registrado, el servicio vuelve a `pending_provision` con el
+ *   motivo en `provisionError` y el reintento manual desde el admin llama
+ *   a `provisionService` igual que en WHM.
+ * - "none" (o una clave desconocida): no se da de alta en ningún panel.
  *
  * Decisiones:
  * - Desactivada por defecto. Hace falta activarla y guardar un token WHM con ACL
- *   `createacct` y `suspendacct`, distinto del token de solo lectura. El de
- *   lectura no se reutiliza.
+ *   `createacct`, `suspendacct`, `unsuspendacct` y `terminateacct`, distinto
+ *   del token de solo lectura. El de lectura no se reutiliza. Sin la ACL
+ *   `terminateacct` WHM rechaza la terminación (y sin `unsuspendacct`, la
+ *   reactivación): el rechazo queda registrado con el motivo visible al
+ *   admin, nunca se simula el éxito.
  * - Solo planes de hosting (cPanel) y solo con un dominio declarado en el pedido.
  * - La contraseña inicial es ALEATORIA por servicio: se genera una sola vez
  *   al provisionar (20 caracteres, 4 clases), se cifra con AES-256-GCM y se
@@ -58,6 +78,11 @@ export type ProvisionPublicConfig = {
   enabled: boolean;
   packageName: string;
   packageByPlan: Record<string, string>;
+  /** Panel de hosting por plan: { planId: "whm" | "plesk" | "directadmin" | "none" }.
+   * Si falta uno, el servicio nace con panel "whm". Opcional en el tipo
+   * para no romper los literales de configuración que aún no lo conocen;
+   * `provisionConfiguration()` siempre lo devuelve. */
+  panelByPlan?: Record<string, PanelKey>;
   /** `ready` solo es cierto con credenciales, paquete y activación. El correo
    * saliente (`mailReady`) se informa aparte, pero no bloquea el alta: sin SMTP
    * la contraseña inicial se muestra en el panel del cliente y en el de
@@ -77,6 +102,8 @@ export class ProvisionError extends Error {
       | "state"
       | "customer"
       | "plan"
+      | "panel"
+      | "upstream"
       | "notfound",
     message: string,
   ) {
@@ -94,6 +121,9 @@ const MESSAGES = {
   state: "El servicio no se puede dar de alta en su estado actual.",
   customer: "El cliente no tiene correo registrado, así que no se puede crear la cuenta en WHM.",
   plan: "Ese plan no se da de alta en cPanel.",
+  panel:
+    "Ese servicio no tiene un panel válido para el alta automática (panel «Sin panel» o clave desconocida): dalo de alta a mano en su panel.",
+  upstream: "El panel no completó el alta.",
   notfound: "Servicio no encontrado.",
 } as const;
 
@@ -137,6 +167,28 @@ export function parsePackageMap(value: unknown): Record<string, string> {
   return out;
 }
 
+/** Paneles de hosting conocidos. "none" = servicio sin panel (alta manual). */
+export const PANEL_KEYS = ["whm", "plesk", "directadmin", "none"] as const;
+export type PanelKey = (typeof PANEL_KEYS)[number];
+
+export function isPanelKey(value: unknown): value is PanelKey {
+  return (
+    typeof value === "string" &&
+    (PANEL_KEYS as readonly string[]).includes(value)
+  );
+}
+
+/** Mapa plan → panel: descarta planes no válidos y paneles desconocidos. */
+export function parsePanelMap(value: unknown): Record<string, PanelKey> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Record<string, PanelKey> = {};
+  for (const [plan, panel] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^[A-Za-z0-9_.-]{1,64}$/.test(plan)) continue;
+    if (isPanelKey(panel)) out[plan] = panel;
+  }
+  return out;
+}
+
 export async function provisionConfiguration(): Promise<ProvisionPublicConfig> {
   const [row, setting] = await Promise.all([
     db.integrationConfig.findUnique({ where: { id: CONFIG_ID } }),
@@ -145,6 +197,7 @@ export async function provisionConfiguration(): Promise<ProvisionPublicConfig> {
   const credentials = row ? decryptProvisionCredentials(row.encryptedCredentials) : null;
   const packageName = setting?.packageName?.trim() ?? "";
   const packageByPlan = parsePackageMap(setting?.packageByPlan);
+  const panelByPlan = parsePanelMap(setting?.panelByPlan);
   const enabled = Boolean(setting?.enabled);
   const hasToken = Boolean(credentials?.token);
   const mailReady = mailerConfigured();
@@ -155,6 +208,7 @@ export async function provisionConfiguration(): Promise<ProvisionPublicConfig> {
     enabled,
     packageName,
     packageByPlan,
+    panelByPlan,
     mailReady,
     // El correo no bloquea: sin SMTP la contraseña se muestra en el panel.
     ready:
@@ -187,7 +241,7 @@ export function missingProvisionPieces(config: ProvisionPublicConfig): string[] 
 export async function saveProvisionConfiguration(input: unknown): Promise<ProvisionPublicConfig> {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new WhmError("invalid");
   const value = input as Record<string, unknown>;
-  const allowed = ["url", "username", "token", "enabled", "packageName", "packageByPlan"];
+  const allowed = ["url", "username", "token", "enabled", "packageName", "packageByPlan", "panelByPlan"];
   if (Object.keys(value).some((key) => !allowed.includes(key))) throw new WhmError("invalid");
   if (
     typeof value.url !== "string" ||
@@ -202,6 +256,7 @@ export async function saveProvisionConfiguration(input: unknown): Promise<Provis
   const packageName = value.packageName.trim();
   if (packageName && !PACKAGE_RE.test(packageName)) throw new WhmError("invalid");
   const packageByPlan = parsePackageMap(value.packageByPlan);
+  const panelByPlan = parsePanelMap(value.panelByPlan);
 
   const endpoint = whmBase(value.url);
   const username = value.username.trim();
@@ -234,16 +289,24 @@ export async function saveProvisionConfiguration(input: unknown): Promise<Provis
         enabled: value.enabled,
         packageName,
         packageByPlan,
+        panelByPlan,
       },
-      update: { enabled: value.enabled, packageName, packageByPlan },
+      update: { enabled: value.enabled, packageName, packageByPlan, panelByPlan },
     }),
     db.adminAudit.create({
       data: {
         action: "whm.provision.updated",
-        details: `WHM provisioning ${value.enabled ? "enabled" : "disabled"}; secrets omitted`,
+        details: sanitizeAudit(`WHM provisioning ${value.enabled ? "enabled" : "disabled"}; secrets omitted`),
       },
     }),
   ]);
+  // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+  void writeAuditLog({
+    actorType: "admin",
+    action: "whm.provision.updated",
+    resourceType: "provisionSetting",
+    details: `WHM provisioning ${value.enabled ? "enabled" : "disabled"}; secrets omitted`,
+  });
   return provisionConfiguration();
 }
 
@@ -345,6 +408,29 @@ export function packageFor(config: ProvisionPublicConfig, planId: string): strin
   return config.packageByPlan[planId] || config.packageName;
 }
 
+/** Panel del plan según `panelByPlan`; por defecto "whm": nada existente cambia. */
+export function panelFor(config: ProvisionPublicConfig, planId: string): PanelKey {
+  return config.panelByPlan?.[planId] ?? "whm";
+}
+
+/**
+ * Alta automática y mapa de paquetes/planes sin tocar la configuración WHM.
+ * Los paneles Plesk/DirectAdmin no dependen del servidor ni del token WHM:
+ * si la configuración WHM está rota o ausente, su alta sigue funcionando.
+ * Las credenciales de cada panel las exige su propio adaptador con su doble
+ * cerrojo (entorno + plugin activo + secretos).
+ */
+async function provisionPanelSettings(): Promise<{
+  enabled: boolean;
+  packageByPlan: Record<string, string>;
+}> {
+  const setting = await db.provisionSetting.findUnique({ where: { id: SETTING_ID } });
+  return {
+    enabled: Boolean(setting?.enabled),
+    packageByPlan: parsePackageMap(setting?.packageByPlan),
+  };
+}
+
 /**
  * Cuenta que WHM ya tiene para este usuario, si existe. Se usa solo cuando el
  * alta devolvió un error incierto: si WHM creó la cuenta pero la respuesta se
@@ -391,25 +477,33 @@ async function finishProvision(input: {
   createdUser: string;
   domain: string;
   planName: string;
-  whmPackage: string;
+  /** Paquete WHM o plan/paquete del panel (Plesk: plan-name; DirectAdmin: package). */
+  planPackage: string;
   password: string;
-  /** Contraseña ya cifrada (se cifra antes de llamar a WHM). */
+  /** Contraseña ya cifrada (se cifra antes de llamar al panel). */
   sealedPassword: string;
   customerEmail: string;
   customerName: string | null;
   actor: string;
   adopted: boolean;
+  /** Panel del alta; por defecto "whm". Solo WHM guarda `cpanelUser`: en los
+   * demás paneles el usuario queda solo en `panelAccountId`. */
+  panelKey?: PanelKey;
 }): Promise<ProvisionOutcome> {
+  const panelKey = input.panelKey ?? "whm";
+  const accountLabel = panelKey === "whm" ? "cPanel" : panelLabel(panelKey);
   await db.$transaction([
     db.customerService.update({
       where: { id: input.serviceId },
       data: {
         status: "active",
-        cpanelUser: input.createdUser,
+        // Para WHM el usuario en el panel es el usuario cPanel.
+        ...(panelKey === "whm" ? { cpanelUser: input.createdUser } : {}),
+        panelAccountId: input.createdUser,
         cpanelPasswordEncrypted: input.sealedPassword,
         provisionedAt: new Date(),
         provisionError: null,
-        note: `Cuenta cPanel ${input.createdUser} creada para ${input.domain}.`,
+        note: `Cuenta ${accountLabel} ${input.createdUser} creada para ${input.domain}.`,
       },
     }),
     db.commerceEvent.create({
@@ -417,10 +511,20 @@ async function finishProvision(input: {
         actor: input.actor,
         action: "service.provisioned",
         entityId: input.serviceId,
-        details: `user=${input.createdUser};domain=${input.domain};package=${input.whmPackage}${input.adopted ? ";adopted=1" : ""}`,
+        details: sanitizeAudit(`user=${input.createdUser};domain=${input.domain};package=${input.planPackage}${input.adopted ? ";adopted=1" : ""}`),
       },
     }),
   ]);
+
+  // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+  void writeAuditLog({
+    actorType: actorTypeFor(input.actor),
+    actorId: input.actor,
+    action: "service.provisioned",
+    resourceType: "service",
+    resourceId: input.serviceId,
+    details: `user=${input.createdUser};domain=${input.domain};package=${input.planPackage}`,
+  });
 
   let credentialsSent = false;
   try {
@@ -432,7 +536,7 @@ async function finishProvision(input: {
         "",
         `Tu plan ${input.planName} ya está activo para ${input.domain}.`,
         "",
-        `Usuario cPanel: ${input.createdUser}`,
+        `Usuario ${accountLabel}: ${input.createdUser}`,
         `Contraseña inicial: ${input.password}`,
         "",
         "Cambia la contraseña al entrar por primera vez. Si ya la cambiaste, usa la nueva.",
@@ -475,8 +579,14 @@ export type ProvisionOutcome = {
 };
 
 /**
- * Da de alta el servicio en WHM. Devuelve el resultado o lanza `ProvisionError`
- * con un motivo que el panel puede mostrar. No reintenta por su cuenta.
+ * Da de alta el servicio en su panel (`panelKey`, por defecto WHM).
+ * Devuelve el resultado o lanza `ProvisionError` con un motivo que el panel
+ * puede mostrar. No reintenta por su cuenta.
+ *
+ * En WHM el camino es el de siempre; en Plesk/DirectAdmin resuelve el
+ * adaptador con `getControlPanel` y llama a `createAccount` con los mismos
+ * datos (dominio, usuario derivado, contraseña generada y cifrada,
+ * paquete/plan, correo).
  *
  * Vale para un servicio pendiente de alta y para uno activo sin usuario
  * cPanel (por ejemplo, reactivado a mano o con el alta manual): en el segundo
@@ -495,11 +605,13 @@ export async function provisionService(input: {
     },
   });
   if (!service) fail("notfound");
-  if (service.cpanelUser) {
-    // Ya existe la cuenta: no se vuelve a crear.
+  // Ya existe la cuenta: no se vuelve a crear. Vale el usuario cPanel (WHM)
+  // o el usuario en su panel (Plesk/DirectAdmin, `panelAccountId`).
+  const existingUser = service.cpanelUser ?? service.panelAccountId;
+  if (existingUser) {
     return {
       serviceId: service.id,
-      cpanelUser: service.cpanelUser,
+      cpanelUser: existingUser,
       status: "active",
       credentialsSent: true,
     };
@@ -511,15 +623,33 @@ export async function provisionService(input: {
   if (service.status !== "pending_provision" && !(service.status === "active" && !service.cpanelUser)) {
     fail("state");
   }
+  // Panel del servicio: por defecto WHM. "none" o una clave desconocida no se
+  // dan de alta en ningún panel: fallo explícito antes del cerrojo, sin
+  // llamar a nada y sin tocar el servicio.
+  const panelKey = service.panelKey ?? "whm";
+  if (!isPanelKey(panelKey) || panelKey === "none") fail("panel");
 
   const domain = service.order.domain;
   if (!domain) fail("domain");
 
-  const config = await provisionConfiguration();
-  if (!config.enabled) fail("disabled");
-  if (!config.hasToken || !config.url) fail("credentials");
-  const whmPackage = packageFor(config, service.planId);
-  if (!whmPackage) fail("package");
+  // Paquete/plan del servicio. En WHM vale además el paquete por defecto y
+  // hacen falta servidor y token de escritura; en Plesk/DirectAdmin solo
+  // vale la entrada explícita del mapa por plan (el paquete WHM por defecto
+  // no es un nombre de plan de Plesk ni de paquete de DirectAdmin) y las
+  // credenciales las exige el adaptador con su doble cerrojo.
+  let planPackage: string;
+  if (panelKey === "whm") {
+    const config = await provisionConfiguration();
+    if (!config.enabled) fail("disabled");
+    if (!config.hasToken || !config.url) fail("credentials");
+    planPackage = packageFor(config, service.planId);
+    if (!planPackage) fail("package");
+  } else {
+    const settings = await provisionPanelSettings();
+    if (!settings.enabled) fail("disabled");
+    planPackage = settings.packageByPlan[service.planId] ?? "";
+    if (!planPackage) fail("package");
+  }
 
   const customer = await db.user.findUnique({
     where: { id: service.userId },
@@ -547,78 +677,286 @@ export async function provisionService(input: {
       status: "provisioning",
       provisionAttempts: { increment: 1 },
       provisionError: null,
-      note: "Alta en curso en WHM.",
+      note: `Alta en curso en ${panelLabel(panelKey)}.`,
     },
   });
   if (claimed.count !== 1) fail("state");
 
-  const row = await db.integrationConfig.findUnique({ where: { id: CONFIG_ID } });
-  if (!row) {
-    await releaseLock(service.id, "credentials");
-    fail("credentials");
-  }
-  const credentials = decryptProvisionCredentials(row.encryptedCredentials);
+  // WHM: el camino de siempre, sin cambios (createacct directo + adopción
+  // si la respuesta se pierde). Los demás paneles van por su adaptador.
+  if (panelKey === "whm") {
+    const row = await db.integrationConfig.findUnique({ where: { id: CONFIG_ID } });
+    if (!row) {
+      await releaseLock(service.id, "credentials");
+      fail("credentials");
+    }
+    const credentials = decryptProvisionCredentials(row.encryptedCredentials);
 
+    try {
+      const result = await writeWhm(row.endpoint, credentials, "createacct", {
+        username,
+        domain,
+        plan: planPackage,
+        password,
+        contactemail: customer.email,
+        useregns: "0",
+        reseller: "0",
+      });
+      return await finishProvision({
+        serviceId: service.id,
+        createdUser: result.user || username,
+        domain,
+        planName: service.planName,
+        planPackage,
+        password,
+        sealedPassword,
+        customerEmail: customer.email,
+        customerName: customer.name,
+        actor: input.actor,
+        adopted: false,
+      });
+    } catch (error) {
+      // El alta pudo completarse aunque la respuesta se perdiera: antes de darla
+      // por fallida se comprueba si WHM ya tiene la cuenta para este servicio.
+      try {
+        const existing = await findWhmAccount(username);
+        if (existing && existing.domain.toLowerCase() === domain.toLowerCase()) {
+          return await finishProvision({
+            serviceId: service.id,
+            createdUser: existing.user,
+            domain,
+            planName: service.planName,
+            planPackage,
+            password,
+            sealedPassword,
+            customerEmail: customer.email,
+            customerName: customer.name,
+            actor: input.actor,
+            adopted: true,
+          });
+        }
+      } catch {
+        // Sin lectura disponible no se puede adoptar: cae al fallo visible.
+      }
+      const code = error instanceof WhmError ? error.code : "network";
+      await releaseLock(service.id, code);
+      await db.commerceEvent
+        .create({
+          data: {
+            actor: input.actor,
+            action: "service.provision_failed",
+            entityId: service.id,
+            details: sanitizeAudit(`code=${code};domain=${domain}`),
+          },
+        })
+        .catch(() => {});
+      // Doble escritura (Fase 6) y alerta de fallo de aprovisionamiento.
+      void writeAuditLog({
+        actorType: actorTypeFor(input.actor),
+        actorId: input.actor,
+        action: "service.provision_failed",
+        resourceType: "service",
+        resourceId: service.id,
+        details: `code=${code};domain=${domain}`,
+      });
+      void raiseAlert({
+        ruleKey: "provision.failed",
+        severity: "warning",
+        title: `El alta del servicio ${service.id} falló`,
+        body: `El alta en WHM del servicio ${service.id} para ${domain} falló (código ${code}). El servicio queda pendiente de alta con el motivo en el panel.`,
+        resourceType: "service",
+        resourceId: service.id,
+      }).catch(() => {});
+      throw error;
+    }
+  }
+
+  return await provisionViaPanel({
+    serviceId: service.id,
+    panelKey,
+    domain,
+    planName: service.planName,
+    username,
+    password,
+    sealedPassword,
+    planPackage,
+    customerEmail: customer.email,
+    customerName: customer.name,
+    actor: input.actor,
+  });
+}
+
+/**
+ * Alta en un panel que no es WHM, con el mismo patrón que el alta WHM:
+ * llama a `createAccount` del adaptador con los mismos datos (dominio,
+ * usuario derivado, contraseña generada y cifrada, paquete/plan, correo),
+ * y si el panel falla, el pago queda registrado, el servicio vuelve a
+ * `pending_provision` con el motivo en `provisionError` y el reintento
+ * manual desde el admin (`provisionService`) funciona igual.
+ *
+ * El doble cerrojo del panel (entorno + plugin activo + secretos) lo
+ * comprueba el propio adaptador antes de llamar: sin él, `createAccount`
+ * lanza `unconfigured` sin hacer ninguna llamada y el alta queda como
+ * fallo visible, no como salto silencioso.
+ */
+async function provisionViaPanel(input: {
+  serviceId: string;
+  panelKey: PanelKey;
+  domain: string;
+  planName: string;
+  username: string;
+  password: string;
+  sealedPassword: string;
+  planPackage: string;
+  customerEmail: string;
+  customerName: string | null;
+  actor: string;
+}): Promise<ProvisionOutcome> {
+  const label = panelLabel(input.panelKey);
+  const panel = getControlPanel(input.panelKey);
+  if (!panel) fail("panel");
   try {
-    const result = await writeWhm(row.endpoint, credentials, "createacct", {
-      username,
-      domain,
-      plan: whmPackage,
-      password,
-      contactemail: customer.email,
-      useregns: "0",
-      reseller: "0",
+    const created = await panel.createAccount({
+      domain: input.domain,
+      username: input.username,
+      password: input.password,
+      plan: input.planPackage,
+      email: input.customerEmail,
     });
     return await finishProvision({
-      serviceId: service.id,
-      createdUser: result.user || username,
-      domain,
-      planName: service.planName,
-      whmPackage,
-      password,
-      sealedPassword,
-      customerEmail: customer.email,
-      customerName: customer.name,
+      serviceId: input.serviceId,
+      createdUser: created.username || input.username,
+      domain: input.domain,
+      planName: input.planName,
+      planPackage: input.planPackage,
+      password: input.password,
+      sealedPassword: input.sealedPassword,
+      customerEmail: input.customerEmail,
+      customerName: input.customerName,
       actor: input.actor,
       adopted: false,
+      panelKey: input.panelKey,
     });
   } catch (error) {
-    // El alta pudo completarse aunque la respuesta se perdiera: antes de darla
-    // por fallida se comprueba si WHM ya tiene la cuenta para este servicio.
+    // El alta pudo completarse aunque la respuesta se perdiera: antes de
+    // darla por fallida se comprueba si el panel ya tiene la cuenta para
+    // este servicio (mismo patrón que `findWhmAccount` en el alta WHM).
     try {
-      const existing = await findWhmAccount(username);
-      if (existing && existing.domain.toLowerCase() === domain.toLowerCase()) {
+      const existing = await findPanelAccount(panel, input.username, input.domain);
+      if (existing) {
         return await finishProvision({
-          serviceId: service.id,
-          createdUser: existing.user,
-          domain,
-          planName: service.planName,
-          whmPackage,
-          password,
-          sealedPassword,
-          customerEmail: customer.email,
-          customerName: customer.name,
+          serviceId: input.serviceId,
+          createdUser: existing.username,
+          domain: input.domain,
+          planName: input.planName,
+          planPackage: input.planPackage,
+          password: input.password,
+          sealedPassword: input.sealedPassword,
+          customerEmail: input.customerEmail,
+          customerName: input.customerName,
           actor: input.actor,
           adopted: true,
+          panelKey: input.panelKey,
         });
       }
     } catch {
       // Sin lectura disponible no se puede adoptar: cae al fallo visible.
     }
-    const code = error instanceof WhmError ? error.code : "network";
-    await releaseLock(service.id, code);
+    const code = panelErrorCode(error);
+    const detail = panelErrorMessage(error);
+    await releaseLock(input.serviceId, code, { panelKey: input.panelKey, detail });
     await db.commerceEvent
       .create({
         data: {
           actor: input.actor,
           action: "service.provision_failed",
-          entityId: service.id,
-          details: `code=${code};domain=${domain}`,
+          entityId: input.serviceId,
+          details: sanitizeAudit(`code=${code};domain=${input.domain};panel=${input.panelKey}`),
         },
       })
       .catch(() => {});
-    throw error;
+    // Doble escritura (Fase 6) y alerta de fallo de aprovisionamiento.
+    void writeAuditLog({
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "service.provision_failed",
+      resourceType: "service",
+      resourceId: input.serviceId,
+      details: `code=${code};domain=${input.domain};panel=${input.panelKey}`,
+    });
+    void raiseAlert({
+      ruleKey: "provision.failed",
+      severity: "warning",
+      title: `El alta del servicio ${input.serviceId} falló`,
+      body: `El alta en ${panelLabel(input.panelKey)} del servicio ${input.serviceId} para ${input.domain} falló (código ${code}). El servicio queda pendiente de alta con el motivo en el panel.`,
+      resourceType: "service",
+      resourceId: input.serviceId,
+    }).catch(() => {});
+    // ProvisionError (no el error crudo del adaptador) para que la ruta del
+    // admin devuelva el motivo con 409: un PleskError/DirectAdminError crudo
+    // caería en un 500 sin mensaje para el admin.
+    throw new ProvisionError(
+      "upstream",
+      `El alta en ${label} no se completó (${code}).${detail ? ` ${detail}` : ""}`,
+    );
   }
+}
+
+/**
+ * Cuenta que el panel ya tiene para este usuario y dominio, si existe.
+ * Se usa solo cuando el alta devolvió un error incierto: si el panel creó
+ * la cuenta pero la respuesta se perdió, el reintento la readopta en lugar
+ * de chocar con "ya existe". Nunca lanza: sin lectura disponible, la
+ * respuesta es "no consta".
+ */
+async function findPanelAccount(
+  panel: ControlPanel,
+  username: string,
+  domain: string,
+): Promise<{ username: string; domain: string } | null> {
+  try {
+    const accounts = await panel.listAccounts();
+    const wantedUser = username.toLowerCase();
+    const wantedDomain = domain.toLowerCase();
+    const found = accounts.find(
+      (entry) =>
+        entry.username.toLowerCase() === wantedUser &&
+        entry.domain.toLowerCase() === wantedDomain,
+    );
+    return found ? { username: found.username, domain: found.domain } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Código corto del fallo de un panel. Se lee sin `instanceof`: los
+ * adaptadores pueden lanzar errores de otro reino (p. ej. en pruebas) y
+ * `instanceof` no los reconocería. Sin código legible, "network".
+ */
+function panelErrorCode(error: unknown): string {
+  if (error && typeof error === "object") {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && /^[a-z0-9-]{1,32}$/.test(code)) return code;
+  }
+  return "network";
+}
+
+/**
+ * Mensaje del fallo de un panel, en una línea y sin texto del servidor: los
+ * adaptadores solo ponen su mensaje fijo en español (como mucho el código
+ * numérico del panel), nunca el cuerpo crudo.
+ */
+function panelErrorMessage(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    const cleaned = (error as { message: string }).message.replace(/\s+/g, " ").trim();
+    if (cleaned) return cleaned.slice(0, 300);
+  }
+  return "El panel no completó la operación.";
 }
 
 export type SuspendOutcome = {
@@ -628,6 +966,170 @@ export type SuspendOutcome = {
   /** Motivo en lenguaje del panel, sin tokens ni texto del servidor. */
   reason: string;
 };
+
+export type UnsuspendOutcome = {
+  attempted: boolean;
+  unsuspended: boolean;
+  reason: string;
+};
+
+export type TerminateOutcome = {
+  attempted: boolean;
+  terminated: boolean;
+  reason: string;
+};
+
+type WhmAccountAction = "suspendacct" | "unsuspendacct" | "terminateacct";
+
+type WhmAccountActionSpec = {
+  action: WhmAccountAction;
+  doneEvent: string;
+  failedEvent: string;
+  skippedEvent: string;
+  /** Estado en el que queda la cuenta si no se actúa. */
+  stillState: string;
+  /** Verbo en infinitivo para el motivo de salto ("suspenderla", ...). */
+  verb: string;
+  /** Qué hacer a mano si WHM no lo hace. */
+  manual: string;
+  doneReason: (user: string) => string;
+  failReason: (user: string, code: string) => string;
+};
+
+const WHM_ACCOUNT_SPECS: Record<WhmAccountAction, WhmAccountActionSpec> = {
+  suspendacct: {
+    action: "suspendacct",
+    doneEvent: "service.suspended",
+    failedEvent: "service.suspend_failed",
+    skippedEvent: "service.suspend_skipped",
+    stillState: "activa",
+    verb: "suspenderla",
+    manual: "Suspéndela a mano en WHM.",
+    doneReason: (user) => `Cuenta cPanel ${user} suspendida en WHM.`,
+    failReason: (user, code) =>
+      `La cuenta cPanel ${user} NO se suspendió en WHM (${code}): sigue activa.`,
+  },
+  unsuspendacct: {
+    action: "unsuspendacct",
+    doneEvent: "service.unsuspended",
+    failedEvent: "service.unsuspend_failed",
+    skippedEvent: "service.unsuspend_skipped",
+    stillState: "suspendida",
+    verb: "reactivarla",
+    manual: "Reactivarla a mano en WHM.",
+    doneReason: (user) => `Cuenta cPanel ${user} reactivada en WHM.`,
+    failReason: (user, code) =>
+      `La cuenta cPanel ${user} NO se reactivó en WHM (${code}): sigue suspendida.`,
+  },
+  terminateacct: {
+    action: "terminateacct",
+    doneEvent: "service.terminated",
+    failedEvent: "service.terminate_failed",
+    skippedEvent: "service.terminate_skipped",
+    stillState: "existiendo",
+    verb: "terminarla",
+    manual: "Termínala a mano en WHM.",
+    doneReason: (user) => `Cuenta cPanel ${user} terminada en WHM.`,
+    failReason: (user, code) =>
+      `La cuenta cPanel ${user} NO se terminó en WHM (${code}): sigue existiendo.`,
+  },
+};
+
+/**
+ * Núcleo común de suspender, reactivar y terminar una cuenta WHM por
+ * usuario. Mismo patrón que el `suspendServiceAccount` original: nunca
+ * lanza, registra el intento en el diario (`service.suspended`,
+ * `service.unsuspended`, `service.terminated` o sus variantes `_failed` /
+ * `_skipped`) y deja el motivo visible en `provisionError` cuando hay un
+ * servicio al que atarlo (`serviceId` nulo = llamada del adaptador de
+ * panel, sin servicio: no hay dónde dejar constancia).
+ *
+ * Si WHM rechaza la llamada (`rejected`), el motivo recuerda que el token
+ * de escritura necesita la ACL `createacct`, `suspendacct`, `unsuspendacct`
+ * y `terminateacct`: sin ella el rechazo es lo esperado, no un fallo de red.
+ */
+async function runWhmAccountAction(input: {
+  serviceId: string | null;
+  username: string;
+  actor: string;
+  spec: WhmAccountActionSpec;
+  params: Record<string, string>;
+  /** Limpieza extra tras el éxito (terminar borra el usuario guardado). */
+  afterDone?: () => Promise<void>;
+}): Promise<{ attempted: boolean; done: boolean; reason: string }> {
+  const { spec } = input;
+  const user = input.username;
+  const record = async (action: string, details: string) => {
+    if (!input.serviceId) return;
+    await db.commerceEvent
+      .create({ data: { actor: input.actor, action, entityId: input.serviceId, details: sanitizeAudit(details) } })
+      .catch(() => {});
+  };
+  const flag = async (message: string | null) => {
+    if (!input.serviceId) return;
+    await db.customerService
+      .update({ where: { id: input.serviceId }, data: { provisionError: message } })
+      .catch(() => {});
+  };
+
+  let config: ProvisionPublicConfig;
+  try {
+    config = await provisionConfiguration();
+  } catch {
+    const reason =
+      `La cuenta cPanel ${user} sigue ${spec.stillState} en WHM: no se pudo leer la configuración de escritura. ${spec.manual}`;
+    await record(spec.skippedEvent, `user=${user};config=no-disponible`);
+    await flag(reason);
+    return { attempted: false, done: false, reason };
+  }
+  if (!config.enabled || !config.hasToken || !config.url) {
+    // Solo las piezas que hacen falta para actuar: el paquete WHM y el
+    // correo no intervienen aquí y no se nombran.
+    const missing = [
+      !config.enabled ? "alta desactivada" : null,
+      !config.url ? "sin servidor WHM" : null,
+      !config.hasToken ? "sin token WHM" : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const reason =
+      `La cuenta cPanel ${user} sigue ${spec.stillState} en WHM: no hay alta automática configurada para ${spec.verb}` +
+      (missing ? ` (falta ${missing}).` : ".") +
+      ` ${spec.manual}`;
+    await record(spec.skippedEvent, `user=${user};${missing}`);
+    await flag(reason);
+    return { attempted: false, done: false, reason };
+  }
+
+  try {
+    const row = await db.integrationConfig.findUnique({ where: { id: CONFIG_ID } });
+    if (!row) throw new Error("sin configuración");
+    const credentials = decryptProvisionCredentials(row.encryptedCredentials);
+    await writeWhm(row.endpoint, credentials, spec.action, input.params);
+  } catch (error) {
+    const code = error instanceof WhmError ? error.code : "network";
+    const aclHint =
+      code === "rejected"
+        ? " Revisa que el token de escritura tenga la ACL necesaria (createacct, suspendacct, unsuspendacct y terminateacct)."
+        : "";
+    const reason = `${spec.failReason(user, code)}${aclHint} ${spec.manual}`;
+    await record(spec.failedEvent, `user=${user};code=${code}`);
+    await flag(reason);
+    return { attempted: true, done: false, reason };
+  }
+  await input.afterDone?.().catch(() => {});
+  await record(spec.doneEvent, `user=${user}`);
+  await flag(null);
+  return { attempted: true, done: true, reason: spec.doneReason(user) };
+}
+
+/** Usuario de la cuenta en su panel: para WHM, `panelAccountId` o el `cpanelUser` heredado. */
+function panelUserOf(service: {
+  panelAccountId?: string | null;
+  cpanelUser?: string | null;
+}): string | null {
+  return service.panelAccountId ?? service.cpanelUser ?? null;
+}
 
 /**
  * Suspende en WHM la cuenta cPanel de un servicio cancelado (`suspendacct`).
@@ -654,70 +1156,136 @@ export async function suspendServiceAccount(input: {
   const service = await db.customerService
     .findUnique({ where: { id: input.serviceId } })
     .catch(() => null);
-  if (!service?.cpanelUser) {
+  const user = service ? panelUserOf(service) : null;
+  if (!service || !user) {
     return { attempted: false, suspended: false, reason: "sin cuenta cPanel" };
   }
-  const user = service.cpanelUser;
-  const record = async (action: string, details: string) => {
-    await db.commerceEvent
-      .create({ data: { actor: input.actor, action, entityId: service.id, details } })
-      .catch(() => {});
-  };
-  const flag = async (message: string | null) => {
-    await db.customerService
-      .update({ where: { id: service.id }, data: { provisionError: message } })
-      .catch(() => {});
-  };
+  const result = await runWhmAccountAction({
+    serviceId: service.id,
+    username: user,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.suspendacct,
+    params: { user, reason: "Cancelado en CaluServers" },
+  });
+  return { attempted: result.attempted, suspended: result.done, reason: result.reason };
+}
 
-  let config: ProvisionPublicConfig;
-  try {
-    config = await provisionConfiguration();
-  } catch {
-    const reason =
-      `La cuenta cPanel ${user} sigue activa en WHM: no se pudo leer la configuración de escritura. Suspéndela a mano en WHM.`;
-    await record("service.suspend_skipped", `user=${user};config=no-disponible`);
-    await flag(reason);
-    return { attempted: false, suspended: false, reason };
+/**
+ * Reactiva en WHM la cuenta cPanel de un servicio (`unsuspendacct`). Mismo
+ * patrón que `suspendServiceAccount`: nunca lanza, registra
+ * `service.unsuspended` / `service.unsuspend_failed` /
+ * `service.unsuspend_skipped` y deja el motivo en `provisionError`. No
+ * cambia el estado del servicio en base: reactivar la cuenta en el panel
+ * no es lo mismo que reactivar el servicio (eso es `service-status`).
+ */
+export async function unsuspendServiceAccount(input: {
+  serviceId: string;
+  actor: string;
+}): Promise<UnsuspendOutcome> {
+  const service = await db.customerService
+    .findUnique({ where: { id: input.serviceId } })
+    .catch(() => null);
+  const user = service ? panelUserOf(service) : null;
+  if (!service || !user) {
+    return { attempted: false, unsuspended: false, reason: "sin cuenta cPanel" };
   }
-  if (!config.enabled || !config.hasToken || !config.url) {
-    // Solo las piezas que hacen falta para suspender: el paquete WHM y el
-    // correo no intervienen aquí y no se nombran.
-    const missing = [
-      !config.enabled ? "alta desactivada" : null,
-      !config.url ? "sin servidor WHM" : null,
-      !config.hasToken ? "sin token WHM" : null,
-    ]
-      .filter(Boolean)
-      .join("; ");
-    const reason =
-      `La cuenta cPanel ${user} sigue activa en WHM: no hay alta automática configurada para suspenderla` +
-      (missing ? ` (falta ${missing}).` : ".") +
-      " Suspéndela a mano en WHM.";
-    await record("service.suspend_skipped", `user=${user};${missing}`);
-    await flag(reason);
-    return { attempted: false, suspended: false, reason };
-  }
+  const result = await runWhmAccountAction({
+    serviceId: service.id,
+    username: user,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.unsuspendacct,
+    params: { user },
+  });
+  return { attempted: result.attempted, unsuspended: result.done, reason: result.reason };
+}
 
-  let row;
-  try {
-    row = await db.integrationConfig.findUnique({ where: { id: CONFIG_ID } });
-    if (!row) throw new Error("sin configuración");
-    const credentials = decryptProvisionCredentials(row.encryptedCredentials);
-    await writeWhm(row.endpoint, credentials, "suspendacct", {
-      user,
-      reason: "Cancelado en CaluServers",
-    });
-  } catch (error) {
-    const code = error instanceof WhmError ? error.code : "network";
-    const reason =
-      `La cuenta cPanel ${user} NO se suspendió en WHM (${code}): sigue activa. Suspéndela a mano en WHM.`;
-    await record("service.suspend_failed", `user=${user};code=${code}`);
-    await flag(reason);
-    return { attempted: true, suspended: false, reason };
+/**
+ * Termina en WHM la cuenta cPanel de un servicio (`terminateacct`,
+ * `keepdns=0`: la zona DNS se borra con la cuenta). Mismo patrón que
+ * `suspendServiceAccount`: nunca lanza, registra `service.terminated` /
+ * `service.terminate_failed` / `service.terminate_skipped` y deja el motivo
+ * en `provisionError`. Si WHM acepta, el usuario guardado se borra del
+ * servicio (`cpanelUser` y `panelAccountId` a nulo): la cuenta ya no existe
+ * y un alta posterior puede crear otra. La cancelación del servicio en base
+ * no depende de esto: quien llama cancela primero y terminar después no la
+ * deshace.
+ */
+export async function terminateServiceAccount(input: {
+  serviceId: string;
+  actor: string;
+}): Promise<TerminateOutcome> {
+  const service = await db.customerService
+    .findUnique({ where: { id: input.serviceId } })
+    .catch(() => null);
+  const user = service ? panelUserOf(service) : null;
+  if (!service || !user) {
+    return { attempted: false, terminated: false, reason: "sin cuenta cPanel" };
   }
-  await record("service.suspended", `user=${user}`);
-  await flag(null);
-  return { attempted: true, suspended: true, reason: `Cuenta cPanel ${user} suspendida en WHM.` };
+  const result = await runWhmAccountAction({
+    serviceId: service.id,
+    username: user,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.terminateacct,
+    params: { user, keepdns: "0" },
+    afterDone: async () => {
+      await db.customerService.update({
+        where: { id: service.id },
+        data: { cpanelUser: null, panelAccountId: null },
+      });
+    },
+  });
+  return { attempted: result.attempted, terminated: result.done, reason: result.reason };
+}
+
+/**
+ * Variantes por usuario para el adaptador de panel (`lib/whm-panel.ts`):
+ * la misma acción WHM sin cargar el servicio. `serviceId` es opcional:
+ * con él, el intento queda en el diario y en `provisionError` como en las
+ * variantes por servicio; sin él, solo se ejecuta la llamada a WHM.
+ */
+export async function suspendWhmAccount(input: {
+  username: string;
+  actor: string;
+  serviceId?: string;
+}): Promise<SuspendOutcome> {
+  const result = await runWhmAccountAction({
+    serviceId: input.serviceId ?? null,
+    username: input.username,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.suspendacct,
+    params: { user: input.username, reason: "Suspendido en CaluServers" },
+  });
+  return { attempted: result.attempted, suspended: result.done, reason: result.reason };
+}
+
+export async function unsuspendWhmAccount(input: {
+  username: string;
+  actor: string;
+  serviceId?: string;
+}): Promise<UnsuspendOutcome> {
+  const result = await runWhmAccountAction({
+    serviceId: input.serviceId ?? null,
+    username: input.username,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.unsuspendacct,
+    params: { user: input.username },
+  });
+  return { attempted: result.attempted, unsuspended: result.done, reason: result.reason };
+}
+
+export async function terminateWhmAccount(input: {
+  username: string;
+  actor: string;
+  serviceId?: string;
+}): Promise<TerminateOutcome> {
+  const result = await runWhmAccountAction({
+    serviceId: input.serviceId ?? null,
+    username: input.username,
+    actor: input.actor,
+    spec: WHM_ACCOUNT_SPECS.terminateacct,
+    params: { user: input.username, keepdns: "0" },
+  });
+  return { attempted: result.attempted, terminated: result.done, reason: result.reason };
 }
 
 /**
@@ -735,26 +1303,55 @@ export async function maybeAutoProvision(input: {
   invoiceId: string;
   actor: string;
 }): Promise<{ attempted: boolean; provisioned: boolean; reason?: string }> {
-  let config: ProvisionPublicConfig;
-  try {
-    config = await provisionConfiguration();
-  } catch {
-    return { attempted: false, provisioned: false, reason: "configuración no disponible" };
-  }
-
   const invoice = await db.customerInvoice
     .findUnique({
       where: { id: input.invoiceId },
-      select: { order: { select: { service: { select: { id: true } } } } },
+      select: { order: { select: { service: { select: { id: true, panelKey: true, planId: true } } } } },
     })
     .catch(() => null);
-  const serviceId = invoice?.order?.service?.id;
+  const panelService = invoice?.order?.service;
+  const serviceId = panelService?.id;
   if (!serviceId) {
     return { attempted: false, provisioned: false, reason: "sin servicio asociado a la factura" };
   }
+  const panelKey = panelService.panelKey ?? "whm";
 
-  if (!config.ready) {
-    const reason = `Alta automática no intentada: falta ${missingProvisionPieces(config).join("; ")}.`;
+  if (panelKey === "whm") {
+    let config: ProvisionPublicConfig;
+    try {
+      config = await provisionConfiguration();
+    } catch {
+      return { attempted: false, provisioned: false, reason: "configuración no disponible" };
+    }
+
+    if (!config.ready) {
+      const reason = `Alta automática no intentada: falta ${missingProvisionPieces(config).join("; ")}.`;
+      await recordProvisionSkipped({ serviceId, actor: input.actor, reason });
+      return { attempted: false, provisioned: false, reason };
+    }
+  } else if (panelKey === "plesk" || panelKey === "directadmin") {
+    // En estos paneles no hace falta nada de WHM: basta la activación y el
+    // paquete/plan del servicio. El doble cerrojo del panel (entorno +
+    // plugin activo + secretos) lo comprueba el adaptador dentro de
+    // `provisionService`: si falta, el intento queda como fallo visible
+    // (`service.provision_failed`), no como salto.
+    const settings = await provisionPanelSettings().catch(() => null);
+    if (!settings) {
+      return { attempted: false, provisioned: false, reason: "configuración no disponible" };
+    }
+    const missing: string[] = [];
+    if (!settings.enabled) missing.push("alta desactivada");
+    if (!settings.packageByPlan[panelService.planId ?? ""]) {
+      missing.push("sin paquete/plan para ese plan");
+    }
+    if (missing.length > 0) {
+      const reason = `Alta automática no intentada: falta ${missing.join("; ")}.`;
+      await recordProvisionSkipped({ serviceId, actor: input.actor, reason });
+      return { attempted: false, provisioned: false, reason };
+    }
+  } else {
+    // "none" u otro: no hay alta automática en ningún panel.
+    const reason = "Alta automática no intentada: el servicio no tiene panel de alta automática.";
     await recordProvisionSkipped({ serviceId, actor: input.actor, reason });
     return { attempted: false, provisioned: false, reason };
   }
@@ -786,14 +1383,14 @@ async function recordProvisionSkipped(input: {
   const service = await db.customerService
     .findUnique({
       where: { id: input.serviceId },
-      select: { status: true, cpanelUser: true },
+      select: { status: true, cpanelUser: true, panelAccountId: true },
     })
     .catch(() => null);
   if (!service) return;
-  if (service.cpanelUser) return;
+  if (service.cpanelUser || service.panelAccountId) return;
   if (
     service.status !== "pending_provision" &&
-    !(service.status === "active" && !service.cpanelUser)
+    !(service.status === "active" && !service.cpanelUser && !service.panelAccountId)
   ) {
     return;
   }
@@ -803,7 +1400,7 @@ async function recordProvisionSkipped(input: {
         actor: input.actor,
         action: "service.provision_skipped",
         entityId: input.serviceId,
-        details: input.reason,
+        details: sanitizeAudit(input.reason),
       },
     })
     .catch(() => {});
@@ -816,13 +1413,22 @@ async function recordProvisionSkipped(input: {
 }
 
 /** Devuelve el servicio a pendiente con el motivo saneado, para poder reintentar. */
-async function releaseLock(serviceId: string, code: string) {
+async function releaseLock(
+  serviceId: string,
+  code: string,
+  opts?: { panelKey?: PanelKey; detail?: string },
+) {
+  const panelKey = opts?.panelKey ?? "whm";
+  const provisionError =
+    panelKey === "whm"
+      ? `El alta en WHM no se completó (${code}). Revisa la conexión y los permisos del token, y reintenta.`
+      : `El alta en ${panelLabel(panelKey)} no se completó (${code}).${opts?.detail ? ` ${opts.detail}` : ""} Revisa la configuración del plugin ${panelLabel(panelKey)} y reintenta.`;
   await db.customerService
     .update({
       where: { id: serviceId },
       data: {
         status: "pending_provision",
-        provisionError: `El alta en WHM no se completó (${code}). Revisa la conexión y los permisos del token, y reintenta.`,
+        provisionError,
         note: "Pago confirmado. El alta automática no se completó.",
       },
     })

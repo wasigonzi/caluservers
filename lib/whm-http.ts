@@ -1,6 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { AuthorizationError, requireAdmin, requirePermission } from "@/lib/auth";
 import { trustedWrite } from "@/lib/request";
 import { WhmError, safeWhmError } from "@/lib/whm-security";
 export function whmJson(body: unknown, status = 200) {
@@ -12,10 +12,19 @@ export function whmJson(body: unknown, status = 200) {
     },
   });
 }
-export async function whmGuard(req: NextRequest, write: boolean) {
+/**
+ * Guarda de las rutas WHM (Fase 1, tramo D — RBAC).
+ * Sin `permission`, exige solo sesión de admin (comportamiento anterior).
+ * Con `permission`, exige ese permiso: sin sesión 401; con sesión pero sin
+ * el permiso, 403 (el evento `authz.denied` lo escribe requirePermission).
+ */
+export async function whmGuard(req: NextRequest, write: boolean, permission?: string) {
   try {
-    await requireAdmin();
-  } catch {
+    if (permission) await requirePermission(permission);
+    else await requireAdmin();
+  } catch (error) {
+    if (error instanceof AuthorizationError)
+      return whmJson({ error: "Sin permiso." }, 403);
     return whmJson({ error: "No autorizado." }, 401);
   }
   if (write && !trustedWrite(req))

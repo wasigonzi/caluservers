@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateOnly, invoiceStatus, money, pageNumber, searchTerm } from "@/lib/admin-format";
 import { billingPolicy } from "@/lib/commerce";
@@ -28,7 +29,11 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ estado?: string; q?: string; p?: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("orders:view")) {
+    return <AccessDenied permission="orders:view" />;
+  }
   const params = await searchParams;
   const q = searchTerm(params.q);
   const filter: Filter = (STATES as readonly string[]).includes(params.estado ?? "")

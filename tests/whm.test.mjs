@@ -52,7 +52,24 @@ function loader(mocks = {}) {
       if (id in mocks) return mocks[id];
       if (id === "server-only") return {};
       if (id === "react") return hooks;
-      if (id === "@/lib/auth") return { requireAdmin: async () => {} };
+      if (id === "@/lib/auth")
+        return {
+          requireAdmin: async () => {},
+          requirePermission: async () => ({
+            userId: "admin_1",
+            email: "admin@example.com",
+            roles: ["owner"],
+            permissions: ["whm:read", "whm:write"],
+            stepUpAt: null,
+          }),
+          AuthorizationError: class AuthorizationError extends Error {
+            constructor(permission) {
+              super("FORBIDDEN");
+              this.status = 403;
+              this.permission = permission;
+            }
+          },
+        };
       if (id === "@/lib/db") return { db: {} };
       if (id === "node:dns/promises")
         return {
@@ -546,6 +563,23 @@ test("routes enforce admin then same HTTPS Origin before any storage or upstream
         requireAdmin: async () => {
           if (scenario === "unauth") throw Error(TOKEN);
         },
+        requirePermission: async () => {
+          if (scenario === "unauth") throw Error(TOKEN);
+          return {
+            userId: "admin_1",
+            email: "admin@example.com",
+            roles: ["owner"],
+            permissions: ["whm:read", "whm:write"],
+            stepUpAt: null,
+          };
+        },
+        AuthorizationError: class AuthorizationError extends Error {
+          constructor(permission) {
+            super("FORBIDDEN");
+            this.status = 403;
+            this.permission = permission;
+          }
+        },
       },
       "@/lib/whm": {
         whmRead: async () => {
@@ -710,7 +744,7 @@ test("DNS and HTTPS have bounded deadlines and clean up timers without retry", a
 test("configuration GET and save are admin guarded before storage, save additionally requires Origin",async()=>{
   for(const scenario of ["unauth","bad-origin"]){
     let storage=0;
-    const h=loader({"@/lib/auth":{requireAdmin:async()=>{if(scenario==="unauth")throw Error(TOKEN);}},"@/lib/whm":{whmConfiguration:async()=>{storage++;return {};},saveWhmConfiguration:async()=>{storage++;return {};}}});
+    const h=loader({"@/lib/auth":{requireAdmin:async()=>{if(scenario==="unauth")throw Error(TOKEN);},requirePermission:async()=>{if(scenario==="unauth")throw Error(TOKEN);return {userId:"admin_1",email:"admin@example.com",roles:["owner"],permissions:["whm:read","whm:write"],stepUpAt:null};},AuthorizationError:class AuthorizationError extends Error{constructor(permission){super("FORBIDDEN");this.status=403;this.permission=permission;}}},"@/lib/whm":{whmConfiguration:async()=>{storage++;return {};},saveWhmConfiguration:async()=>{storage++;return {};}}});
     const route=h.load("app/api/admin/whm/settings/route.ts");
     const response=await route.POST(request({url:HOST,username:"root",token:TOKEN},"https://evil.example.net"));
     assert.equal(response.status,scenario==="unauth"?401:403);assert.equal(storage,0);

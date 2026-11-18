@@ -68,6 +68,8 @@ export default function ProSiteStudio({
   blobConfigured = false,
   storageReady = true,
   initialTab = "branding",
+  allowedTabs = [...STUDIO_TABS],
+  basePath = "/admin/site",
 }: {
   initialSettings: SiteSettings;
   initialCatalog: CatalogPayload;
@@ -75,19 +77,36 @@ export default function ProSiteStudio({
   storageReady?: boolean;
   /** Sección pedida en la URL (`?seccion=`). El menú lateral enlaza cada una. */
   initialTab?: string;
+  /**
+   * Pestañas que puede mostrar el estudio (Fase 1, tramo D). El panel de
+   * apariencia pasa solo `["branding", "appearance"]`; /admin/site no lo
+   * pasa y ve todas. La pestaña inicial cae a la primera permitida.
+   */
+  allowedTabs?: string[];
+  /** Prefijo de la URL que sigue a la pestaña (`/admin/site` o `/admin/apariencia`). */
+  basePath?: string;
 }) {
+  const allowed = useMemo(
+    () => TABS.filter((t) => allowedTabs.includes(t.id)),
+    [allowedTabs],
+  );
+  const firstAllowed: Tab = allowed[0]?.id ?? "branding";
   const router = useRouter();
   const [tab, setTabState] = useState<Tab>(
-    STUDIO_TABS.includes(initialTab) ? (initialTab as Tab) : "branding",
+    STUDIO_TABS.includes(initialTab) && allowedTabs.includes(initialTab)
+      ? (initialTab as Tab)
+      : firstAllowed,
   );
   // Al llegar desde el menú con otra sección, se cambia sin perder lo editado.
   useEffect(() => {
-    if (STUDIO_TABS.includes(initialTab)) setTabState(initialTab as Tab);
-  }, [initialTab]);
+    if (STUDIO_TABS.includes(initialTab) && allowedTabs.includes(initialTab))
+      setTabState(initialTab as Tab);
+  }, [initialTab, allowedTabs]);
   function setTab(next: Tab) {
+    if (!allowedTabs.includes(next)) return;
     setTabState(next);
     // La URL sigue a la pestaña: se puede compartir y el menú marca la sección activa.
-    const url = next === "branding" ? "/admin/site" : `/admin/site?seccion=${next}`;
+    const url = next === "branding" ? basePath : `${basePath}?seccion=${next}`;
     router.replace(url, { scroll: false });
   }
   const [compareSaved, setCompareSaved] = useState(false);
@@ -125,11 +144,11 @@ export default function ProSiteStudio({
 
   const visibleTabs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return TABS;
-    return TABS.filter(
+    if (!q) return allowed;
+    return allowed.filter(
       (t) => t.label.toLowerCase().includes(q) || t.keywords.includes(q),
     );
-  }, [query]);
+  }, [query, allowed]);
 
   function patchSettings<K extends keyof SiteSettings>(
     key: K,
@@ -485,13 +504,15 @@ export default function ProSiteStudio({
                 ))}
           </div>
               <BrandContrast theme={settings.theme} />
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => setTab("appearance")}
-              >
-                Tipografía y estilo →
-              </button>
+              {allowedTabs.includes("appearance") ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setTab("appearance")}
+                >
+                  Tipografía y estilo →
+                </button>
+              ) : null}
             </div>
             <aside
               className="brand-preview-aside"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { trustedWrite } from "@/lib/request";
 import {
   getCatalogPayload,
@@ -12,12 +12,25 @@ import { seedCatalogPayload } from "@/lib/catalog-validate";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+/**
+ * El catálogo no tiene permiso de vista propio: leerlo y guardarlo exigen
+ * `catalog:write` (Fase 1, tramo D — RBAC).
+ */
+async function assertCatalogWrite(): Promise<NextResponse | null> {
   try {
-    await requireAdmin();
-  } catch {
+    await requirePermission("catalog:write");
+    return null;
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: "Sin permiso para esta acción." }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+}
+
+export async function GET() {
+  const denied = await assertCatalogWrite();
+  if (denied) return denied;
   const catalog = await getCatalogPayload();
   return NextResponse.json(
     { catalog, defaults: seedCatalogPayload() },
@@ -26,11 +39,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    await requireAdmin();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await assertCatalogWrite();
+  if (denied) return denied;
   if (!trustedWrite(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

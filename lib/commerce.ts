@@ -1,6 +1,15 @@
 import { randomBytes } from "node:crypto";
+import { sanitizeAudit } from "./audit-sanitize";
+import { actorTypeFor, writeAuditLog, writeAuditLogTx } from "./audit-log";
+import {
+  advanceSubscriptionAfterPayment,
+  applyPromo,
+  consumePromoUse,
+  createSubscriptionForService,
+} from "./billing-recurring";
 import { parseCatalogPayload, seedCatalogPayload } from "./catalog-validate";
 import { db } from "./db";
+import { isPanelKey, parsePanelMap } from "./whm-provision";
 import { DomainNameError, normalizeDomainName } from "./domain-name";
 import { isOrderablePlan } from "./orderable";
 
@@ -13,6 +22,9 @@ export class CommerceError extends Error {
     this.name = "CommerceError";
   }
 }
+
+/** Pedidos de dominio (Fase 3): no crean servicio ni suscripción de hosting. */
+export const DOMAIN_PLAN_IDS = ["domain", "domain-renewal", "domain-transfer"] as const;
 
 async function sellableCatalog() {
   try {
@@ -81,6 +93,10 @@ export async function createCustomerOrder(input: {
   planId: string;
   idempotencyKey: string;
   domain?: string;
+  /** Código promocional opcional: solo del primer pedido, nunca de renovaciones. */
+  promoCode?: string;
+  /** SHA-256 de la IP del cliente, si quien llama la conoce (regla de IP de fraude). */
+  ipHash?: string;
 }) {
   const key = input.idempotencyKey.trim();
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(key)) {
@@ -114,13 +130,48 @@ export async function createCustomerOrder(input: {
   const taxMode = policy.ok ? "none" : "unconfigured";
   const taxCents = policy.ok ? 0 : null;
   const payable = policy.ok;
+  // La promo se valida antes de crear nada (validar no gasta el uso) y el
+  // uso se incrementa dentro de la transacción, al confirmar el pedido.
+  let discountCents = 0;
+  let promo: { id: string; code: string; maxUses: number | null } | null = null;
+  if (input.promoCode?.trim()) {
+    const applied = await applyPromo(input.promoCode, unitCents, plan.id);
+    discountCents = applied.discountCents;
+    promo = applied.promo;
+  }
+  const orderTotalCents = unitCents - discountCents;
 
   // Un choque de token único es casi imposible, pero si ocurre se reintenta
   // con otro token; el segundo intento además resuelve la carrera de dos
   // pedidos con la misma clave de idempotencia devolviendo el ya creado.
+  let created: Awaited<ReturnType<typeof createOrderTx>> | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await db.$transaction(async (tx) => {
+      created = await createOrderTx();
+      break;
+    } catch (error) {
+      if (attempt === 0 && isUniqueViolation(error)) continue;
+      throw error;
+    }
+  }
+  if (!created) throw new CommerceError("No se pudo crear el pedido.", 503);
+  // Evaluación de fraude (Fase 6): DESPUÉS de crear el pedido y ANTES de
+  // cobrar (el cobro es otra llamada posterior). Si marca, el pedido queda
+  // señalado para revisión con el evento `fraud.flagged`; el pago NO se
+  // bloquea por defecto y el pedido sigue su flujo normal. La evaluación
+  // nunca tumba la creación del pedido: cualquier fallo se traga aquí.
+  await flagOrderForReview(created, input).catch(() => {
+    // Ni el pedido ni su factura dependen de esta revisión.
+  });
+  return created;
+
+  async function createOrderTx() {
+    // El narrowing del ámbito exterior no cruza a esta función interna:
+    // se repiten aquí las dos comprobaciones que ya se hicieron fuera.
+    if (!plan) throw new CommerceError("Ese plan no está disponible para contratación nativa.", 404);
+    const cents = unitCents;
+    if (cents === null) throw new CommerceError("El precio público de ese plan no es contratable.", 409);
+    return db.$transaction(async (tx) => {
         const existing = await tx.customerOrder.findUnique({
           where: { idempotencyKey: key },
           include: { invoice: true },
@@ -131,6 +182,27 @@ export async function createCustomerOrder(input: {
           }
           return existing;
         }
+        const planLine = {
+          planId: plan.id,
+          description: `${plan.name} · ciclo mensual`,
+          quantity: 1,
+          unitCents: cents,
+          totalCents: cents,
+        };
+        // El descuento queda congelado en una línea negativa del pedido y de
+        // la factura; el subtotal ya lo descuenta, así que total = subtotal +
+        // impuesto sigue cuadrando en recordPayment.
+        const discountLine =
+          discountCents > 0 && promo
+            ? {
+                planId: plan.id,
+                description: `Descuento ${promo.code}`,
+                quantity: 1,
+                unitCents: -discountCents,
+                totalCents: -discountCents,
+              }
+            : null;
+        const orderLines = discountLine ? [planLine, discountLine] : [planLine];
         const order = await tx.customerOrder.create({
           data: {
             userId: input.userId,
@@ -140,17 +212,9 @@ export async function createCustomerOrder(input: {
         planName: plan.name,
         domain,
         currency,
-        totalCents: unitCents,
+        totalCents: orderTotalCents,
         status: "submitted",
-        lines: {
-          create: {
-            planId: plan.id,
-            description: `${plan.name} · ciclo mensual`,
-            quantity: 1,
-            unitCents,
-            totalCents: unitCents,
-          },
-        },
+        lines: { create: orderLines },
       },
     });
     const invoice = await tx.customerInvoice.create({
@@ -159,37 +223,75 @@ export async function createCustomerOrder(input: {
         orderId: order.id,
         number: `PF-${order.id.slice(-8).toUpperCase()}`,
         currency,
-        subtotalCents: unitCents,
+        subtotalCents: orderTotalCents,
         taxMode,
         taxCents,
-        totalCents: unitCents,
+        totalCents: orderTotalCents,
         status: payable ? "issued" : "proforma",
         lines: {
-          create: {
-            description: `${plan.name} · ciclo mensual`,
-            quantity: 1,
-            unitCents,
-            totalCents: unitCents,
-          },
+          create: orderLines.map(({ planId: _planId, ...line }) => line),
         },
       },
     });
+    if (promo) await consumePromoUse(tx, promo);
     await tx.commerceEvent.create({
       data: {
         actor: input.userId,
         action: "order.created",
         entityId: order.id,
-        details: `plan=${plan.id};cents=${unitCents};currency=${currency};tax=${taxMode};domain=${domain ?? "-"}`,
+        details: sanitizeAudit(`plan=${plan.id};cents=${orderTotalCents};currency=${currency};tax=${taxMode};domain=${domain ?? "-"}${promo ? `;promo=${promo.code}` : ""}`),
       },
+    });
+    // Doble escritura (Fase 6): también a AuditLog, en la misma transacción.
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.userId),
+      actorId: input.userId,
+      action: "order.created",
+      resourceType: "order",
+      resourceId: order.id,
+      details: `plan=${plan.id};cents=${orderTotalCents};currency=${currency};tax=${taxMode};domain=${domain ?? "-"}`,
     });
     return { ...order, invoice };
       });
-    } catch (error) {
-      if (attempt === 0 && isUniqueViolation(error)) continue;
-      throw error;
-    }
   }
-  throw new CommerceError("No se pudo crear el pedido.", 503);
+}
+
+/**
+ * Revisión de fraude de un pedido recién creado (Fase 6). Importación
+ * dinámica para no crear un ciclo entre commerce y fraud. No lanza nunca:
+ * si la evaluación o el evento fallan, el pedido sigue su flujo normal.
+ * No reevalúa un pedido ya marcado: si el mismo pedido se devuelve por
+ * idempotencia, no se duplican los flags.
+ */
+async function flagOrderForReview(
+  created: { id: string; userId: string; totalCents: number },
+  input: { userId: string; ipHash?: string },
+): Promise<void> {
+  const already = await db.commerceEvent
+    .findFirst({ where: { action: "fraud.flagged", entityId: created.id } })
+    .catch(() => null);
+  if (already) return;
+  const { evaluateFraud } = await import("./fraud");
+  const user = await db.user
+    .findUnique({ where: { id: input.userId }, select: { email: true } })
+    .catch(() => null);
+  const result = await evaluateFraud({
+    userId: input.userId,
+    orderId: created.id,
+    email: user?.email ?? null,
+    ipHash: input.ipHash ?? null,
+    totalCents: created.totalCents,
+    db,
+  });
+  if (!result.flagged) return;
+  await db.commerceEvent.create({
+    data: {
+      actor: input.userId,
+      action: "fraud.flagged",
+      entityId: created.id,
+      details: sanitizeAudit(`order=${created.id};flags=${result.flags.length}`),
+    },
+  });
 }
 
 /**
@@ -204,7 +306,7 @@ async function recordPayment(input: {
   actor: string;
   invoiceId: string;
   note: string;
-  provider: "manual" | "paypal";
+  provider: "manual" | "paypal" | "stripe" | "bank_transfer";
   providerRef?: string;
   /** Importe cobrado de verdad. La pasarela lo aporta; el manual usa el de la factura. */
   paidCents?: number;
@@ -213,15 +315,21 @@ async function recordPayment(input: {
 }) {
   const policy = billingPolicy();
   if (!policy.ok) throw new CommerceError(policy.error, 409);
-  return db.$transaction(async (tx) => {
+  // El hook de dominios (Fase 3) corre DESPUÉS de confirmar la transacción:
+  // solo si este cobro creó el pago, y solo si el pedido es de dominio.
+  let createdPayment = false;
+  let domainOrderId: string | null = null;
+  const payment = await db.$transaction(async (tx) => {
     const invoice = await tx.customerInvoice.findUnique({
       where: { id: input.invoiceId },
-      include: { payment: true, order: true },
+      include: { payment: true, order: true, lines: true },
     });
     if (!invoice) throw new CommerceError("Factura no encontrada.", 404);
     if (invoice.payment?.status === "confirmed") return invoice.payment;
     if (invoice.status === "void") throw new CommerceError("La factura está anulada.", 409);
-    if (invoice.taxMode !== "none" || invoice.taxCents !== 0) {
+    // Solo se cobra con el impuesto decidido: "none" (sin TaxRule activa)
+    // o "tax" (con TaxRule activa). "unconfigured" nunca se cobra.
+    if (invoice.taxMode !== "none" && invoice.taxMode !== "tax") {
       throw new CommerceError("No se confirma un pago mientras el impuesto no esté decidido.", 409);
     }
     if (
@@ -249,6 +357,12 @@ async function recordPayment(input: {
         providerRef: input.providerRef ?? null,
       },
     });
+    createdPayment = true;
+    // Pedido de dominio: el registro/renovación lo ejecuta el hook de
+    // dominios tras confirmar la transacción (ver abajo).
+    if ((DOMAIN_PLAN_IDS as readonly string[]).includes(invoice.order.planId)) {
+      domainOrderId = invoice.orderId;
+    }
     await tx.customerInvoice.update({
       where: { id: invoice.id },
       data: { status: "paid" },
@@ -257,26 +371,120 @@ async function recordPayment(input: {
       where: { id: invoice.orderId },
       data: { status: "paid" },
     });
-    await tx.customerService.create({
-      data: {
+    if (invoice.type === "renewal") {
+      // La renovación no crea otro servicio ni otra suscripción: el servicio
+      // ya existe y la suscripción solo avanza un ciclo y vuelve a activa.
+      // (El pedido de renovación es propio; su estado ya se marcó "paid".)
+      if (invoice.subscriptionId) {
+        const subscription = await tx.subscription.findUnique({
+          where: { id: invoice.subscriptionId },
+        });
+        if (subscription) {
+          await advanceSubscriptionAfterPayment(tx, subscription);
+        }
+      }
+    } else if (!(DOMAIN_PLAN_IDS as readonly string[]).includes(invoice.order.planId)) {
+      // Un pedido de dominio NO da de alta hosting: ni CustomerService ni
+      // Subscription (invariante de lib/domains.ts). El registro, la
+      // renovación o la transferencia los ejecuta afterDomainPayment tras
+      // la transacción (hook al final de recordPayment).
+      //
+      // El precio recurrente es el del plan sin el descuento del primer
+      // pedido: las líneas positivas suman el precio del plan (la promo
+      // es una línea negativa). Sin líneas (datos viejos), el total.
+      const baseCents = (invoice.lines ?? []).reduce(
+        (sum, line) => sum + Math.max(0, line.totalCents),
+        0,
+      );
+      const priceCents = baseCents > 0 ? baseCents : invoice.totalCents;
+      // Panel del servicio según el plan (`panelByPlan` en la configuración
+      // de alta): si no hay nada guardado, "whm". Sin configuración no se
+      // bloquea el cobro: el servicio nace con el panel por defecto.
+      let panelKey = "whm";
+      try {
+        const provisionSetting = await tx.provisionSetting.findUnique({
+          where: { id: "whm" },
+        });
+        const byPlan = parsePanelMap(provisionSetting?.panelByPlan);
+        if (isPanelKey(byPlan[invoice.order.planId])) panelKey = byPlan[invoice.order.planId];
+      } catch {
+        panelKey = "whm";
+      }
+      const service = await tx.customerService.create({
+        data: {
+          userId: invoice.userId,
+          orderId: invoice.orderId,
+          planId: invoice.order.planId,
+          planName: invoice.order.planName,
+          status: "pending_provision",
+          panelKey,
+          note: input.serviceNote,
+        },
+      });
+      await createSubscriptionForService(tx, {
         userId: invoice.userId,
+        serviceId: service.id,
         orderId: invoice.orderId,
         planId: invoice.order.planId,
-        planName: invoice.order.planName,
-        status: "pending_provision",
-        note: input.serviceNote,
-      },
-    });
+        priceCents,
+        currency: invoice.currency,
+        gatewayKey: input.provider === "manual" ? null : input.provider,
+      });
+    }
     await tx.commerceEvent.create({
       data: {
         actor: input.actor,
         action: "payment.confirmed",
         entityId: payment.id,
-        details: `invoice=${invoice.id};cents=${payment.amountCents};currency=${payment.currency};provider=${input.provider}`,
+        details: sanitizeAudit(`invoice=${invoice.id};cents=${payment.amountCents};currency=${payment.currency};provider=${input.provider}`),
       },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "payment.confirmed",
+      resourceType: "payment",
+      resourceId: payment.id,
+      details: `invoice=${invoice.id};cents=${payment.amountCents};currency=${payment.currency};provider=${input.provider}`,
     });
     return payment;
   });
+  // Hook de dominios (Fase 3): tras la transacción, si el pedido es de
+  // dominio, se registra/renueva/transfiere en el registrador. La
+  // importación es dinámica para no crear un ciclo entre commerce y
+  // domains. Un fallo del registrador NUNCA tumba el pago: queda en el
+  // diario como domain.register_failed y el admin lo reintenta.
+  if (createdPayment && domainOrderId) {
+    try {
+      const { afterDomainPayment } = await import("./domains");
+      await afterDomainPayment(domainOrderId);
+    } catch (error) {
+      await db.commerceEvent
+        .create({
+          data: {
+            actor: input.actor,
+            action: "domain.register_failed",
+            entityId: domainOrderId,
+            details: sanitizeAudit(
+              `order=${domainOrderId};error=${error instanceof Error ? error.message : "registro no completado"}`,
+            ),
+          },
+        })
+        .catch(() => {
+          // Ni el pago ni su evento dependen de esta traza.
+        });
+      // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+      void writeAuditLog({
+        actorType: actorTypeFor(input.actor),
+        actorId: input.actor,
+        action: "domain.register_failed",
+        resourceType: "order",
+        resourceId: domainOrderId,
+        details: `order=${domainOrderId}`,
+      });
+    }
+  }
+  return payment;
 }
 
 /** Devuelve el cobro ya guardado cuando dos vías llegan a la vez a la misma factura. */
@@ -293,27 +501,87 @@ function isUniqueViolation(error: unknown): boolean {
   return Object.getOwnPropertyDescriptor(error, "code")?.value === "P2002";
 }
 
+/**
+ * Marca un cobro confirmado como reembolsado, solo en BD, con nota y
+ * evento en el diario. No borra nada y no toca la factura, el pedido ni
+ * el servicio: el reembolso real en la pasarela lo hace quien llama
+ * (Stripe) o el admin a mano (PayPal, transferencia). Un cobro ya
+ * reembolsado no se vuelve a marcar.
+ */
+export async function markPaymentRefunded(input: {
+  actor: string;
+  paymentId: string;
+  note: string;
+}) {
+  const note = input.note.trim();
+  if (note.length < 8 || note.length > 500) {
+    throw new CommerceError("La nota del reembolso debe explicar el motivo.", 400);
+  }
+  return db.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({
+      where: { id: input.paymentId },
+    });
+    if (!payment) throw new CommerceError("Cobro no encontrado.", 404);
+    if (payment.status === "refunded") {
+      throw new CommerceError("Ese cobro ya está reembolsado.", 409);
+    }
+    if (payment.status !== "confirmed") {
+      throw new CommerceError("Solo se reembolsa un cobro confirmado.", 409);
+    }
+    const updated = await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: "refunded" },
+    });
+    await tx.commerceEvent.create({
+      data: {
+        actor: input.actor,
+        action: "payment.refunded",
+        entityId: payment.id,
+        details: sanitizeAudit(
+          `invoice=${payment.invoiceId};cents=${payment.amountCents};provider=${payment.provider};note=${note}`,
+        ),
+      },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "payment.refunded",
+      resourceType: "payment",
+      resourceId: payment.id,
+      details: `invoice=${payment.invoiceId};cents=${payment.amountCents};provider=${payment.provider}`,
+    });
+    return updated;
+  });
+}
+
 export async function confirmManualPayment(input: {
   actor: string;
   invoiceId: string;
   note: string;
+  /** Por defecto "manual". "bank_transfer" es el cobro por transferencia que el admin confirma a mano. */
+  provider?: "manual" | "bank_transfer";
 }) {
   const note = input.note.trim();
   if (note.length < 8 || note.length > 500) {
     throw new CommerceError("La nota de confirmación debe explicar el cobro recibido.", 400);
   }
+  const provider = input.provider ?? "manual";
+  const via =
+    provider === "bank_transfer" ? "transferencia bancaria" : "manual";
   return recordPayment({
     actor: input.actor,
     invoiceId: input.invoiceId,
     note,
-    provider: "manual",
-    serviceNote: "Pago confirmado por un administrador. Falta el alta del servicio.",
+    provider,
+    serviceNote: `Pago por ${via} confirmado por un administrador. Falta el alta del servicio.`,
   });
 }
 
 /**
- * Registra una captura de PayPal ya verificada. `providerRef` es el id de captura:
- * es único en la tabla, así que un webhook repetido no duplica el cobro.
+ * Registra una captura de pasarela ya verificada. `providerRef` es el id de
+ * captura (PayPal) o el payment_intent (Stripe): es único en la tabla, así
+ * que un webhook repetido no duplica el cobro. La nota y el actor reflejan
+ * la pasarela real.
  */
 export async function recordGatewayPayment(input: {
   invoiceId: string;
@@ -321,7 +589,10 @@ export async function recordGatewayPayment(input: {
   amountCents: number;
   currency: string;
   source: "capture" | "webhook";
+  /** Por defecto "paypal": es la vía que ya existía antes de generalizar. */
+  provider?: "paypal" | "stripe";
 }) {
+  const provider = input.provider ?? "paypal";
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(input.providerRef)) {
     throw new CommerceError("La referencia de la pasarela no es válida.", 400);
   }
@@ -329,16 +600,17 @@ export async function recordGatewayPayment(input: {
     where: { providerRef: input.providerRef },
   });
   if (already) return already;
+  const label = provider === "stripe" ? "Stripe" : "PayPal";
   try {
     return await recordPayment({
-      actor: "paypal",
+      actor: provider,
       invoiceId: input.invoiceId,
-      note: `Cobro con PayPal (${input.source}). Captura ${input.providerRef}.`,
-      provider: "paypal",
+      note: `Cobro con ${label} (${input.source}). Referencia ${input.providerRef}.`,
+      provider,
       providerRef: input.providerRef,
       paidCents: input.amountCents,
       paidCurrency: input.currency,
-      serviceNote: "Pago recibido por PayPal. Pendiente de alta del servicio.",
+      serviceNote: `Pago recibido por ${label}. Pendiente de alta del servicio.`,
     });
   } catch (error) {
     // Carrera entre la vuelta del cliente y el webhook: gana la primera inserción.
@@ -388,13 +660,89 @@ export async function setServiceStatus(input: {
       where: { id: service.id },
       data: { status: input.status, note },
     });
+    if (input.status === "cancelled") {
+      // Cancelar el servicio marca su suscripción como cancelled para que
+      // el cron no genere más facturas de renovación: solo se facturan las
+      // suscripciones activas (`runBillingCron` filtra por status "active").
+      // Si no hay suscripción, no pasa nada. La cancelación en BD nunca se
+      // deshace aunque luego falle la suspensión/terminación en el panel:
+      // eso ocurre fuera de esta transacción (ver la ruta).
+      await tx.subscription.updateMany({
+        where: { serviceId: service.id },
+        data: { status: "cancelled" },
+      });
+    }
     await tx.commerceEvent.create({
       data: {
         actor: input.actor,
         action: "service.status",
         entityId: service.id,
-        details: `${service.status}->${input.status}`,
+        details: sanitizeAudit(`${service.status}->${input.status}`),
       },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "service.status",
+      resourceType: "service",
+      resourceId: service.id,
+      details: `${service.status}->${input.status}`,
+    });
+    return updated;
+  });
+}
+
+/**
+ * Cambia el panel de un servicio (`panelKey`), con nota y evento en el
+ * diario. Al cambiar de panel, el usuario guardado pertenece al panel
+ * anterior y se limpia para no actuar en el panel nuevo con el usuario del
+ * viejo; en WHM se recupera del `cpanelUser` heredado. No toca el estado
+ * del servicio ni llama a ningún panel: solo cambia dónde se actuará a
+ * partir de ahora. Valores válidos solo whm/plesk/directadmin/none.
+ */
+export async function setServicePanel(input: {
+  actor: string;
+  serviceId: string;
+  panelKey: string;
+  note: string;
+}) {
+  const note = input.note.trim();
+  if (note.length < 8) throw new CommerceError("Indica por qué cambia el panel del servicio.", 400);
+  if (!isPanelKey(input.panelKey)) {
+    throw new CommerceError("Panel no válido: whm, plesk, directadmin o none.", 400);
+  }
+  return db.$transaction(async (tx) => {
+    const service = await tx.customerService.findUnique({
+      where: { id: input.serviceId },
+    });
+    if (!service) throw new CommerceError("Servicio no encontrado.", 404);
+    if ((service.panelKey ?? "whm") === input.panelKey) {
+      throw new CommerceError("El servicio ya está en ese panel.", 409);
+    }
+    const updated = await tx.customerService.update({
+      where: { id: service.id },
+      data: {
+        panelKey: input.panelKey,
+        panelAccountId:
+          input.panelKey === "whm" ? (service.cpanelUser ?? null) : null,
+        note,
+      },
+    });
+    await tx.commerceEvent.create({
+      data: {
+        actor: input.actor,
+        action: "service.panel",
+        entityId: service.id,
+        details: sanitizeAudit(`${service.panelKey ?? "whm"}->${input.panelKey}`),
+      },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "service.panel",
+      resourceType: "service",
+      resourceId: service.id,
+      details: `${service.panelKey ?? "whm"}->${input.panelKey}`,
     });
     return updated;
   });
@@ -432,8 +780,16 @@ export async function voidInvoice(input: { actor: string; invoiceId: string; not
         actor: input.actor,
         action: "invoice.voided",
         entityId: invoice.id,
-        details: `number=${invoice.number};note=${note}`,
+        details: sanitizeAudit(`number=${invoice.number};note=${note}`),
       },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: "invoice.voided",
+      resourceType: "invoice",
+      resourceId: invoice.id,
+      details: `number=${invoice.number}`,
     });
     return updated;
   });
@@ -459,8 +815,16 @@ export async function setTicketStatus(input: {
         actor: input.actor,
         action: input.status === "closed" ? "ticket.closed" : "ticket.reopened",
         entityId: ticket.id,
-        details: `${ticket.status}->${input.status}`,
+        details: sanitizeAudit(`${ticket.status}->${input.status}`),
       },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: actorTypeFor(input.actor),
+      actorId: input.actor,
+      action: input.status === "closed" ? "ticket.closed" : "ticket.reopened",
+      resourceType: "ticket",
+      resourceId: ticket.id,
+      details: `${ticket.status}->${input.status}`,
     });
     return updated;
   });

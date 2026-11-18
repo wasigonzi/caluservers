@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TicketReplyForm } from "@/components/account/AccountForms";
+import { TicketAttachmentForm, TicketReplyForm } from "@/components/account/AccountForms";
 import { requireCustomer } from "@/lib/account-data";
-import { dateTime } from "@/lib/admin-format";
+import { dateTime, formatBytes } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/admin/ui";
 
@@ -15,7 +15,10 @@ export default async function TicketThreadPage({ params }: { params: Promise<{ i
   // El filtro por dueño va en la consulta: un ticket ajeno es un 404, no un 403.
   const ticket = await db.supportTicket.findFirst({
     where: { id, userId: user.id },
-    include: { messages: { orderBy: { createdAt: "asc" } } },
+    include: {
+      messages: { orderBy: { createdAt: "asc" } },
+      attachments: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!ticket) notFound();
 
@@ -56,6 +59,24 @@ export default async function TicketThreadPage({ params }: { params: Promise<{ i
           <TicketReplyForm ticketId={ticket.id} />
         </div>
       )}
+      <section className="panel" aria-label="Adjuntos">
+        <h2>Adjuntos ({ticket.attachments.length})</h2>
+        {ticket.attachments.length === 0 ? (
+          <p className="muted">Sin adjuntos. Máx. 10 MB por archivo: imágenes, PDF, TXT o ZIP.</p>
+        ) : (
+          <ul>
+            {ticket.attachments.map((attachment) => (
+              <li key={attachment.id}>
+                <a href={`/api/tickets/attachments/${attachment.id}`}>{attachment.fileName}</a>{" "}
+                <span className="muted">
+                  · {formatBytes(attachment.sizeBytes)} · {dateTime(attachment.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {ticket.status === "closed" ? null : <TicketAttachmentForm ticketId={ticket.id} />}
+      </section>
     </>
   );
 }

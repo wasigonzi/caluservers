@@ -3,7 +3,7 @@ import { whmConfiguration, saveWhmConfiguration } from "@/lib/whm";
 import { whmGuard, whmBody, whmJson, whmFailure } from "@/lib/whm-http";
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
-  const denied = await whmGuard(req, false);
+  const denied = await whmGuard(req, false, "whm:read");
   if (denied) return denied;
   try {
     return whmJson(await whmConfiguration());
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   }
 }
 export async function POST(req: NextRequest) {
-  const denied = await whmGuard(req, true);
+  const denied = await whmGuard(req, true, "whm:write");
   if (denied) return denied;
   try {
     return whmJson(await saveWhmConfiguration(await whmBody(req)));

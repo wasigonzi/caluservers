@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { whmConfiguration, type WhmPublicConfig } from "@/lib/whm";
 import { safeWhmError } from "@/lib/whm-security";
 import SettingsForm from "@/components/SettingsForm";
@@ -7,7 +8,11 @@ import { PageHeader } from "@/components/admin/ui";
 
 export const dynamic = "force-dynamic";
 export default async function Settings() {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("whm:read")) {
+    return <AccessDenied permission="whm:read" />;
+  }
   let initial: WhmPublicConfig = {
       url: "",
       username: "",
