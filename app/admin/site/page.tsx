@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings-db";
 import { getCatalogPayload } from "@/lib/catalog-db";
 import { cmsStorageReady } from "@/lib/page-content-db";
 import { isBlobConfiguredEnv } from "@/lib/branding-upload";
 import ProSiteStudio from "@/components/admin/ProSiteStudio";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { STUDIO_TABS } from "@/lib/studio-tabs";
 import { PageHeader } from "@/components/admin/ui";
 
@@ -50,7 +51,18 @@ export default async function SiteAdminPage({
 }: {
   searchParams: Promise<{ seccion?: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  // El estudio mezcla contenido, catálogo y apariencia: basta uno de los
+  // tres permisos de escritura para entrar (Fase 1, tramo D — RBAC). Cada
+  // guardado lo exige además en su ruta (site-settings, catalog).
+  if (
+    !session.permissions.includes("content:write") &&
+    !session.permissions.includes("catalog:write") &&
+    !session.permissions.includes("appearance:write")
+  ) {
+    return <AccessDenied permission="content:write" />;
+  }
   const [settings, catalog, storage] = await Promise.all([
     getSiteSettings(),
     getCatalogPayload(),

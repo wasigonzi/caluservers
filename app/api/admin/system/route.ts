@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { sanitizeAudit } from "@/lib/audit-sanitize";
+import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { BillingSettingsError, savePaymentInstructions } from "@/lib/billing-settings";
 import { db } from "@/lib/db";
 import { deliverNotice, mailerConfigured } from "@/lib/mailer";
@@ -13,8 +14,13 @@ export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   if (!trustedWrite(req)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
-    await requireAdmin();
-  } catch {
+    // Probar el correo, probar la base y guardar el texto de pago son
+    // ajustes de la plataforma: exigen `settings:write` (Fase 1, tramo D).
+    await requirePermission("settings:write");
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: "Sin permiso para esta acción." }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json().catch(() => null);
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "El correo no salió." }, { status: 502 });
       }
       await db.adminAudit
-        .create({ data: { action: "system.test_email", details: `via=${result.reason}` } })
+        .create({ data: { action: "system.test_email", details: sanitizeAudit(`via=${result.reason}`) } })
         .catch(() => {});
       return NextResponse.json({ ok: true, to, via: result.reason });
     } catch {

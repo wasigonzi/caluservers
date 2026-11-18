@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import type { ContactMessage } from "@prisma/client";
 import MessageActions from "@/components/admin/MessageActions";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { loadFailure, PAGE_SIZE, type LoadFailure } from "@/lib/admin-data";
 import { dateTime, pageNumber } from "@/lib/admin-format";
 import { noticeRecipient } from "@/lib/contact-intake";
@@ -29,7 +30,11 @@ export default async function MessagesAdminPage({
 }: {
   searchParams: Promise<{ estado?: string; p?: string }>;
 }) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("tickets:view")) {
+    return <AccessDenied permission="tickets:view" />;
+  }
   const params = await searchParams;
   const status = params.estado === "read" || params.estado === "archived" ? params.estado : "new";
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Aup } from "@/components/site/LegalPages";
+import LegalLanguageNotice from "@/components/site/LegalLanguageNotice";
 import { getPageContent } from "@/lib/page-content-db";
 import { PageContentProvider } from "@/lib/page-content-context";
 
@@ -9,6 +10,7 @@ export default async function Page() {
   const payload = await getPageContent("/aup");
   return (
     <PageContentProvider payload={payload}>
+      <LegalLanguageNotice />
       <Aup />
     </PageContentProvider>
   );

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleAlert, CircleCheck, CircleDashed } from "lucide-react";
-import { isAdmin } from "@/lib/auth";
+import { adminIdentityStatus, getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { isBlobConfiguredEnv } from "@/lib/branding-upload";
 import { paymentInstructions, PAYMENT_INSTRUCTIONS_MAX } from "@/lib/billing-settings";
 import { billingPolicy } from "@/lib/commerce";
@@ -61,9 +62,13 @@ function Rows({ rows }: { rows: Row[] }) {
 }
 
 export default async function ConfigPage() {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("settings:write")) {
+    return <AccessDenied permission="settings:write" />;
+  }
   const policy = billingPolicy();
-  const [whm, provision, inbox, gaps, migrations] = await Promise.all([
+  const [whm, provision, inbox, gaps, migrations, identity] = await Promise.all([
     whmConfiguration().catch(() => null),
     provisionConfiguration().catch(() => null),
     noticeRecipient().catch(() => ""),
@@ -72,6 +77,7 @@ export default async function ConfigPage() {
       .$queryRaw<{ count: bigint }[]>`SELECT COUNT(*)::bigint AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`
       .then((rows) => Number(rows[0]?.count ?? 0))
       .catch(() => null),
+    adminIdentityStatus().catch(() => null),
   ]);
   const instructions = await paymentInstructions();
   const mfa = totpConfig(process.env.ADMIN_TOTP_SECRET);
@@ -140,13 +146,46 @@ export default async function ConfigPage() {
     },
   ];
 
+  // Identidad de administrador (Fase 1, tramo B): el login por entorno es
+  // un fallback temporal. Mientras siga activo, el aviso no se quita.
+  const identityRow: Row =
+    identity === null
+      ? {
+          label: "Cuenta de administrador",
+          state: "warn",
+          value: "No se pudo leer el estado de la identidad. La sesión dura 8 horas.",
+          env: "ADMIN_EMAIL · ADMIN_PASSWORD_HASH",
+        }
+      : identity.envConfigured && !identity.ownerMigrated
+        ? {
+            label: "Cuenta de administrador",
+            state: "warn",
+            value: `El acceso sigue por variables de entorno (${process.env.ADMIN_EMAIL || "sin correo"}). Migra el propietario a la base con «node scripts/admin-migrate.mjs» dentro de los 7 días siguientes al despliegue; las sesiones anteriores ya no valen y hay que entrar de nuevo.`,
+            env: "ADMIN_EMAIL · ADMIN_PASSWORD_HASH",
+          }
+        : identity.envConfigured && identity.ownerMigrated
+          ? {
+              label: "Cuenta de administrador",
+              state: "warn",
+              value:
+                "La cuenta del propietario ya está en la base (Argon2id), pero las variables de entorno siguen definidas: quítalas para cerrar el acceso por entorno.",
+              env: "ADMIN_EMAIL · ADMIN_PASSWORD_HASH",
+            }
+          : identity.ownerMigrated
+            ? {
+                label: "Cuenta de administrador",
+                state: "ok",
+                value: `${identity.dbAdminCount ?? 1} cuenta(s) de administrador en la base con Argon2id. La sesión dura 8 horas.`,
+              }
+            : {
+                label: "Cuenta de administrador",
+                state: "warn",
+                value: "Sin acceso de administrador configurado.",
+                env: "ADMIN_EMAIL · ADMIN_PASSWORD_HASH",
+              };
+
   const security: Row[] = [
-    {
-      label: "Cuenta de administrador",
-      state: "ok",
-      value: `${process.env.ADMIN_EMAIL || "sin correo"}. La sesión dura 8 horas.`,
-      env: "ADMIN_EMAIL · ADMIN_PASSWORD_HASH",
-    },
+    identityRow,
     {
       label: "Verificación en dos pasos",
       state: mfa === "ready" ? "ok" : "warn",

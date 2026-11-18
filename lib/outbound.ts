@@ -44,6 +44,21 @@ export type OutboundRequest = {
   body?: string;
   timeoutMs?: number;
   bodyLimit?: number;
+  /**
+   * Content-Type del cuerpo. Por defecto `application/json` cuando hay
+   * cuerpo (Plesk usa `text/xml` y DirectAdmin
+   * `application/x-www-form-urlencoded`).
+   */
+  contentType?: string;
+  /** Accept. Por defecto `application/json`. */
+  accept?: string;
+};
+
+/** Respuesta cruda: estado, cuerpo como texto y cabeceras en minúsculas. */
+export type OutboundTextResult = {
+  status: number;
+  text: string;
+  headers: Record<string, string>;
 };
 
 const DNS_TIMEOUT_MS = 3000;
@@ -93,13 +108,21 @@ export async function pinnedTarget(host: string) {
   }
 }
 
-export async function requestJson(options: OutboundRequest): Promise<OutboundResult> {
+/**
+ * Una petición HTTPS con las mismas reglas que `requestJson`: solo https,
+ * host en `allowHosts`, DNS resuelto a direcciones públicas y conexión
+ * fijada a la dirección validada, sin redirecciones automáticas, sin
+ * bypass de TLS, con plazo y tamaño máximo de respuesta. Devuelve el
+ * cuerpo como texto: lo usan los paneles (Plesk devuelve XML y
+ * DirectAdmin url-encoded o JSON según `?json=yes`).
+ */
+export async function requestText(options: OutboundRequest): Promise<OutboundTextResult> {
   const url = assertOutboundUrl(options.url, options.allowHosts);
   const limit = options.bodyLimit ?? DEFAULT_BODY_LIMIT;
   const target = await pinnedTarget(url.hostname);
   const payload = options.body ? Buffer.from(options.body, "utf8") : null;
 
-  return new Promise<OutboundResult>((resolve, reject) => {
+  return new Promise<OutboundTextResult>((resolve, reject) => {
     const fail = (code: OutboundCode) => reject(new OutboundError(code));
     const req = request(
       url,
@@ -109,10 +132,10 @@ export async function requestJson(options: OutboundRequest): Promise<OutboundRes
         rejectUnauthorized: true,
         family: target.family,
         headers: {
-          Accept: "application/json",
+          Accept: options.accept ?? "application/json",
           ...(payload
             ? {
-                "Content-Type": "application/json",
+                "Content-Type": options.contentType ?? "application/json",
                 "Content-Length": String(payload.length),
               }
             : {}),
@@ -138,16 +161,14 @@ export async function requestJson(options: OutboundRequest): Promise<OutboundRes
         });
         res.on("error", () => fail("network"));
         res.on("end", () => {
-          const text = Buffer.concat(parts).toString("utf8");
-          let json: unknown = null;
-          if (text.trim()) {
-            try {
-              json = JSON.parse(text);
-            } catch {
-              json = null;
-            }
+          const headers: Record<string, string> = {};
+          // `res.headers` puede no existir en respuestas de prueba.
+          for (const [name, value] of Object.entries(res.headers ?? {})) {
+            headers[name.toLowerCase()] = Array.isArray(value)
+              ? value.join(", ")
+              : String(value ?? "");
           }
-          resolve({ status, json });
+          resolve({ status, text: Buffer.concat(parts).toString("utf8"), headers });
         });
       },
     );
@@ -160,4 +181,17 @@ export async function requestJson(options: OutboundRequest): Promise<OutboundRes
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+export async function requestJson(options: OutboundRequest): Promise<OutboundResult> {
+  const { status, text } = await requestText(options);
+  let json: unknown = null;
+  if (text.trim()) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+  }
+  return { status, json };
 }

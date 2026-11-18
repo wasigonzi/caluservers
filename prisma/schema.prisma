@@ -70,6 +70,9 @@ model ProvisionSetting {
   packageName String   @default("")
   /// Paquete por plan: { planId: "paquete" }. Si falta uno, se usa packageName.
   packageByPlan Json?
+  /// Panel por plan: { planId: "whm" | "plesk" | "directadmin" | "none" }.
+  /// Si falta uno, el servicio nace con panel "whm".
+  panelByPlan   Json?
   updatedAt   DateTime @updatedAt
 }
 
@@ -105,15 +108,81 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
+  /// 2FA TOTP del cliente (plugin two-factor de better-auth). Solo se exige
+  /// cuando el propio cliente lo activa y verifica (ver lib/customer-auth.ts).
+  twoFactorEnabled Boolean @default(false)
+  /// Idioma preferido del portal (es|en). Lo elige el cliente en su perfil;
+  /// la cookie `calu-locale` tiene prioridad para visitantes sin sesión.
+  locale String @default("es")
+  /// Diseño del portal elegido por el cliente: preset de APPEARANCE_PRESETS
+  /// (default|ocean|midnight). Si el admin cambia el preset por defecto del
+  /// portal, este valor personal sigue mandando.
+  portalTheme String @default("default")
+  /// Densidad del portal: comfortable|compact|relaxed (alto/medio/bajo).
+  portalDensity String @default("comfortable")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
   orders        CustomerOrder[]
   tickets       SupportTicket[]
+  passkeys      Passkey[]
+  twoFactors    TwoFactor[]
 
   @@unique([email])
   @@map("user")
+}
+
+/// Reto WebAuthn de un solo uso para el admin (Fase 1, tramo C). En BD y no
+/// en memoria: en serverless cada instancia vería solo sus retos.
+/// `ownerKey` es el ownerId del admin (id de AdminUser o `env:<correo>`).
+model WebauthnChallenge {
+  id        String   @id @default(cuid())
+  purpose   String
+  ownerKey  String
+  challenge String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([purpose, ownerKey])
+}
+
+/// Passkey de CLIENTE (Fase 1, tramo C). Almacén propio del plugin oficial
+/// `@better-auth/passkey`: sus campos son los que exige el plugin, no los
+/// de PasskeyCredential (que es solo del admin). La tabla se llama `passkey`.
+model Passkey {
+  id           String   @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String   @unique
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime @default(now())
+  aaguid       String?
+
+  @@index([userId])
+  @@map("passkey")
+}
+
+/// Segundo factor TOTP del CLIENTE (Fase 1, tramo C). Almacén propio del
+/// plugin two-factor de better-auth: secreto TOTP + códigos de respaldo
+/// cifrados por el plugin. La tabla se llama `twoFactor`.
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  secret                  String
+  backupCodes             String
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+
+  @@index([userId])
+  @@map("twoFactor")
 }
 
 model Session {
@@ -212,9 +281,183 @@ model CustomerInvoice {
   taxCents   Int?
   totalCents Int
   status     String
+  /// Facturación recurrente (Fase 2): vencimiento, suscripción origen,
+  /// tipo initial|renewal|credit, último recordatorio enviado y etapa de
+  /// dunning (0 = al día). periodStart/periodEnd delimitan el periodo
+  /// facturado; (subscriptionId, periodStart) es único: el cron nunca
+  /// emite dos facturas de renovación para el mismo periodo.
+  dueDate        DateTime?
+  subscriptionId String?
+  type           String   @default("initial")
+  reminderSentAt DateTime?
+  dunningStage   Int      @default(0)
+  periodStart    DateTime?
+  periodEnd      DateTime?
   createdAt  DateTime @default(now())
   lines      InvoiceLine[]
   payment    Payment?
+
+  @@unique([subscriptionId, periodStart])
+  @@index([userId, status])
+  @@index([subscriptionId])
+}
+
+/// Registro de plugins (Fase 2). `key` es el identificador del plugin
+/// (p. ej. "stripe", "bank_transfer", "whm"); `kind` es
+/// payment|registrar|panel. `configJson` guarda solo opciones no secretas;
+/// las credenciales van cifradas con secret-box en `secretRef` (AAD
+/// `plugin:<key>:v1`), nunca en claro ni en logs. Un plugin desactivado o
+/// sin credenciales no se usa: el core responde 503 honesto, sin simular.
+model Plugin {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  kind          String
+  label         String
+  enabled       Boolean  @default(false)
+  configJson    Json?
+  secretRef     String?  @db.Text
+  lastRotatedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([kind, enabled])
+}
+
+/// Precio de un TLD en un registrador (Fase 3). Una fila existe por TLD
+/// aunque no tenga precio: `active` false significa "no se vende" y nunca
+/// se vende sin precio (register/renew/transferCents en 0 = sin precio).
+/// `registrarKey` es "porkbun" hoy; otros registradores (GoDaddy) llegan
+/// como filas nuevas con su propia clave. Precios en céntimos de USD.
+model TldPrice {
+  id            String   @id @default(cuid())
+  tld           String
+  registrarKey  String   @default("porkbun")
+  registerCents Int
+  renewCents    Int
+  transferCents Int
+  currency      String   @default("USD")
+  years         Int      @default(1)
+  active        Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tld, registrarKey])
+  @@index([active])
+}
+
+/// Dominio registrado (o en curso) a través de un registrador (Fase 3).
+/// `status`: active | pending | pending_transfer | expired | redemption |
+/// cancelled. `autoRenew` es SOLO un flag local: Porkbun no expone un
+/// endpoint verificado para el auto-renew (se gestiona en su panel); el
+/// auto-renew automático de CaluServers solo usa saldo de crédito (ver
+/// lib/domains.ts `tryAutoRenewWithCredit` y docs/DOMINIOS.md).
+/// `authCodeEncrypted` guarda el código EPP de una transferencia entrante,
+/// cifrado con secret-box (AAD `domain:auth-code:v1`); se borra al
+/// iniciarse la transferencia. `registryId` es el orderId de Porkbun.
+model RegisteredDomain {
+  id                String    @id @default(cuid())
+  domain            String    @unique
+  userId            String
+  registrarKey      String    @default("porkbun")
+  registryId        String?
+  status            String
+  registeredAt      DateTime?
+  expiresAt         DateTime?
+  autoRenew         Boolean   @default(false)
+  nameservers       Json?
+  locked            Boolean   @default(false)
+  authCodeEncrypted String?   @db.Text
+  failureReason     String?
+  orderId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Suscripción de facturación recurrente (Fase 2). Se crea al confirmarse
+/// el primer pago. `gatewaySubscriptionId` es la suscripción en la pasarela
+/// (Stripe Billing) cuando el cobro automático usa la pasarela.
+model Subscription {
+  id                    String   @id @default(cuid())
+  userId                String
+  serviceId             String?  @unique
+  orderId               String
+  planId                String
+  billingCycle          String
+  priceCents            Int
+  currency              String
+  nextInvoiceAt         DateTime
+  status                String
+  gatewayKey            String?
+  gatewaySubscriptionId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, nextInvoiceAt])
+}
+
+/// Saldo a favor del cliente (Fase 2). Se aplica a la siguiente factura
+/// antes de cobrar la pasarela; el importe aplicado queda congelado en la
+/// línea de factura.
+model Credit {
+  id         String   @id @default(cuid())
+  userId     String
+  amountCents Int
+  reason     String
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Código promocional (Fase 2). `kind` es percent|fixed; `value` es el
+/// porcentaje (0-100) o los céntimos de descuento. El descuento aplicado
+/// queda congelado en la línea de factura al crear el pedido.
+model PromoCode {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  kind       String
+  value      Int
+  maxUses    Int?
+  usedCount  Int      @default(0)
+  validFrom  DateTime?
+  validTo    DateTime?
+  appliesTo  String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// Corrida del cron de facturación (Fase 2). `runDay` es YYYY-MM-DD;
+/// (kind, runDay) es único: un día = una corrida por tipo, así que un
+/// reintento del cron no duplica facturas ni recordatorios.
+model BillingRun {
+  id         String   @id @default(cuid())
+  runDay     String
+  runAt      DateTime @default(now())
+  kind       String
+  processed  Int      @default(0)
+  succeeded  Int      @default(0)
+  failed     Int      @default(0)
+  details    String?  @db.Text
+
+  @@unique([kind, runDay])
+}
+
+/// Regla de impuestos (Fase 2). Sin regla activa, sigue TAX_MODE=none y
+/// nunca se cobra una factura con taxMode "unconfigured".
+model TaxRule {
+  id           String   @id @default(cuid())
+  jurisdiction String
+  rateBps      Int
+  appliesTo    String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([active])
 }
 
 model InvoiceLine {
@@ -260,6 +503,12 @@ model CustomerService {
   note              String
   /// Usuario cPanel creado en WHM. Si existe, el alta ya ocurrió y no se repite.
   cpanelUser        String?       @unique
+  /// Panel de hosting del servicio: "whm" (por defecto), "plesk",
+  /// "directadmin" o "none" (sin panel, alta manual). Lo elige el admin por
+  /// plan (`ProvisionSetting.panelByPlan`) o por servicio.
+  panelKey          String        @default("whm")
+  /// Usuario de la cuenta en ese panel. Para WHM es el `cpanelUser`.
+  panelAccountId    String?
   /// Contraseña inicial de cPanel: aleatoria por servicio, generada una sola
   /// vez al provisionar y guardada CIFRADA con AES-256-GCM (secret-box, AAD
   /// propio). Nunca en claro en BD, nunca en logs. Los servicios dados de
@@ -284,6 +533,7 @@ model SupportTicket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   messages  TicketMessage[]
+  attachments TicketAttachment[]
 
   @@index([userId])
 }
@@ -295,6 +545,7 @@ model TicketMessage {
   author    String
   body      String
   createdAt DateTime      @default(now())
+  attachments TicketAttachment[]
 }
 
 model CommerceEvent {
@@ -306,3 +557,321 @@ model CommerceEvent {
   createdAt DateTime @default(now())
 }
 
+/// Identidad de administración (Fase 1, tramo B; restaurada en el tramo D
+/// tras reescribirse el schema con los modelos del tramo C — las tablas ya
+/// existen por la migración 20261118010000_admin_identity_rbac). La
+/// contraseña vive aquí con Argon2id; el login por variables de entorno
+/// sigue solo como fallback durante la ventana de migración (ver
+/// lib/auth.ts y docs/SEGURIDAD-RBAC.md).
+model AdminUser {
+  id                  String         @id @default(cuid())
+  email               String         @unique
+  passwordHash        String
+  mfaRequired         Boolean        @default(true)
+  totpSecretEncrypted String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  lastLoginAt         DateTime?
+  disabledAt          DateTime?
+  sessions            AdminSession[]
+  roles               AdminUserRole[]
+}
+
+/// Sesión de administrador en BD. En la cookie solo viaja el token aleatorio;
+/// aquí solo se guarda su hash SHA-256. Las cookies HMAC anteriores
+/// (`payload.firma`) dejan de valer con este cambio.
+/// `adminUserId` es nulo solo en sesiones del fallback por entorno (aún sin
+/// AdminUser en BD); esas sesiones tienen permisos de owner hasta que el
+/// propietario migre (ver docs/SEGURIDAD-RBAC.md).
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  lastSeenAt  DateTime?
+  ipHash      String?
+  userAgent   String?
+  revokedAt   DateTime?
+  stepUpAt    DateTime?
+
+  @@index([adminUserId, expiresAt])
+}
+
+/// Credencial WebAuthn/passkey. `ownerType` es "admin" o "client" y `ownerId`
+/// el id del AdminUser o del User. La tabla existe en este tramo; el
+/// enrolamiento y la verificación llegan en un tramo posterior.
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  ownerType    String
+  ownerId      String
+  credentialId String    @unique
+  publicKey    String    @db.Text
+  counter      Int       @default(0)
+  transports   String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  label        String?
+
+  @@index([ownerType, ownerId])
+}
+
+/// Código de recuperación de un solo uso. Solo se guarda su hash SHA-256;
+/// `usedAt` marca el consumo. El enrolamiento llega en un tramo posterior.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  ownerType String
+  ownerId   String
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  permissions RolePermission[]
+  admins      AdminUserRole[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model AdminUserRole {
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, roleId])
+}
+
+/// Contenido editable por tipo e idioma (Fase 5, frente B): testimonios,
+/// socios, proyectos, FAQ y secciones de página. NO reutiliza PageContent:
+/// PageContent es un CMS de campos fijos por ruta (texto plano, una sola
+/// fila por página, sin idioma ni orden ni publicado); aquí hacen falta
+/// listas ordenables, publicadas o no, en es/en, con campos libres
+/// (fieldsJson: autor, empresa, URL, imagen...). Las filas de ejemplo se
+/// siembran con published=false y deben reemplazarse por contenido real.
+model ContentItem {
+  id        String   @id @default(cuid())
+  kind      String
+  slug      String
+  locale    String   @default("es")
+  title     String
+  body      String   @db.Text
+  fieldsJson Json?
+  order     Int      @default(0)
+  published Boolean  @default(false)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, slug, locale])
+  @@index([kind, locale, published, order])
+}
+
+/// Secciones de contenido del portal (testimonios, socios, proyectos, FAQ).
+/// Una sección solo se muestra en público cuando visible=true Y tiene al
+/// menos un ContentItem publicado de su tipo; vacía o sin publicar se oculta
+/// sin texto de relleno (ver lib/content-kb.ts).
+model ContentSection {
+  id       String   @id @default(cuid())
+  key      String
+  locale   String   @default("es")
+  title    String
+  subtitle String?
+  visible  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, locale])
+  @@index([key, locale])
+}
+
+/// Artículo de la base de conocimientos pública (/kb). Solo los publicados
+/// se ven en público. El cuerpo es markdown simple. `views` cuenta lecturas
+/// del artículo (best effort, sin identificar al lector).
+model KbArticle {
+  id        String   @id @default(cuid())
+  slug      String
+  locale    String   @default("es")
+  category  String
+  title     String
+  body      String   @db.Text
+  order     Int      @default(0)
+  published Boolean  @default(false)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([slug, locale])
+  @@index([locale, category, published, order])
+}
+
+/// Plantillas de correo editables (Fase 5, frente C). `key` identifica el
+/// envío (p. ej. `password-reset`); `locale` es `es` o `en`. El asunto y el
+/// cuerpo usan variables {{nombre}}; una variable sin valor se renderiza
+/// vacía. Solo una plantilla activa por key+locale: el mailer la usa y, si
+/// no hay ninguna, cae al texto del código.
+model MailTemplate {
+  id            String   @id @default(cuid())
+  key           String
+  locale        String   @default("es")
+  subject       String
+  body          String   @db.Text
+  /// Nombres de variable que acepta la plantilla (JSON: ["resetUrl"]).
+  variablesJson Json?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([key, locale])
+  @@index([key, active])
+}
+
+/// Respuesta predefinida para tickets (Fase 5, frente C). El agente la
+/// inserta en la respuesta desde un desplegable; `category` agrupa (por
+/// ahora todo es `general`) y `order` ordena el desplegable. Textos de
+/// partida genéricos en español: el dueño debe revisarlos.
+model CannedReply {
+  id        String   @id @default(cuid())
+  title     String
+  body      String   @db.Text
+  locale    String   @default("es")
+  category  String   @default("general")
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locale, active, order])
+}
+
+/// Adjunto de un ticket (Fase 5, frente C). En BD solo viven metadatos: el
+/// archivo está en TICKET_ATTACHMENTS_DIR con `storageKey` como nombre y
+/// su hash SHA-256. Se sirve solo a quien tenga acceso al ticket (dueño o
+/// admin con tickets:reply); un ajeno recibe 404.
+model TicketAttachment {
+  id         String         @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messageId  String?
+  message    TicketMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  sha256     String
+  storageKey String         @unique
+  /// Quién lo subió: email del admin o id del cliente.
+  uploadedBy String
+  createdAt  DateTime       @default(now())
+
+  @@index([ticketId])
+  @@index([messageId])
+}
+
+/// Detección de fraude propia (Fase 6). Las reglas solo marcan por
+/// defecto (action "flag"): nunca bloquean un pago real salvo que el
+/// dueño active "block" para una regla concreta. MaxMind queda como
+/// esqueleto documentado en docs/FRAUDE.md (sin cuenta no se llama).
+model FraudRule {
+  id         String      @id @default(cuid())
+  name       String
+  kind       String
+  configJson Json?
+  action     String      @default("flag")
+  active     Boolean     @default(true)
+  order      Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  flags      FraudFlag[]
+
+  @@index([active, order])
+}
+
+model FraudFlag {
+  id         String    @id @default(cuid())
+  userId     String
+  orderId    String?
+  ruleId     String?
+  rule       FraudRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  reason     String
+  status     String    @default("open")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@index([userId])
+}
+
+/// Auditoría unificada (Fase 6). Reúne lo que hoy escriben AdminAudit y
+/// CommerceEvent; esas tablas se conservan y sus escritores escriben
+/// TAMBIÉN aquí (lib/audit-log.ts). `details` siempre pasa por
+/// sanitizeAudit: nunca contraseñas ni tokens. `ipHash` es el SHA-256 de
+/// la IP, nunca la IP en claro.
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorType    String
+  actorId      String?
+  action       String
+  resourceType String?
+  resourceId   String?
+  ipHash       String?
+  userAgent    String?
+  details      String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([actorType, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+/// Reglas de alerta (Fase 6). `key` es el identificador del disparador
+/// (p. ej. "admin.password_changed"); `channel` es "admin_panel" y, si
+/// hay SMTP, "email". Sin SMTP las alertas solo viven en el panel.
+model AlertRule {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  channel   String   @default("admin_panel")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  alerts    Alert[]
+
+  @@index([active])
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  ruleKey      String
+  rule         AlertRule @relation(fields: [ruleKey], references: [key], onDelete: Cascade)
+  severity     String    @default("info")
+  title        String
+  body         String
+  resourceType String?
+  resourceId   String?
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([readAt, createdAt])
+  @@index([ruleKey, createdAt])
+}

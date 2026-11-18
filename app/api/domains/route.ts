@@ -58,7 +58,40 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await lookupDomain(name, tld);
-    return json({ ok: true, ...result });
+    // Precio publicado del TLD, si lo hay: nunca se inventa. La consulta
+    // de disponibilidad no depende de él: si lib/domains falla, el precio
+    // queda en null y la disponibilidad se devuelve igual.
+    let price: {
+      priceCents: number | null;
+      registerCents: number | null;
+      renewCents: number | null;
+      transferCents: number | null;
+      currency: string | null;
+    } = {
+      priceCents: null,
+      registerCents: null,
+      renewCents: null,
+      transferCents: null,
+      currency: null,
+    };
+    try {
+      const { getTldPrice } = await import("@/lib/domains");
+      const row = await getTldPrice(result.tld);
+      // Solo el precio de una fila ACTIVA: una fila inactiva (sin precio
+      // de venta) es "sin precio", nunca una cifra a medias.
+      if (row?.active) {
+        price = {
+          priceCents: row.registerCents,
+          registerCents: row.registerCents,
+          renewCents: row.renewCents,
+          transferCents: row.transferCents,
+          currency: row.currency,
+        };
+      }
+    } catch {
+      // Sin precio: null, sin romper la consulta.
+    }
+    return json({ ok: true, ...result, ...price });
   } catch (error) {
     if (error instanceof DomainQueryError) {
       return json({ ok: false, error: error.message, tlds: supportedTlds() }, error.status);

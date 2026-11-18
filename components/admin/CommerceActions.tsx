@@ -1,7 +1,17 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+/** Error de API con el código de la respuesta, si lo trae. */
+export class AdminApiError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "AdminApiError";
+    this.code = code;
+  }
+}
 
 async function post(body: Record<string, string>) {
   const response = await fetch("/api/admin/commerce", {
@@ -10,8 +20,104 @@ async function post(body: Record<string, string>) {
     body: JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error || "No se pudo completar la operación.");
+  if (!response.ok) {
+    throw new AdminApiError(
+      data?.error === "step-up-required"
+        ? data?.message || "Confirma tu identidad para continuar."
+        : data?.error || "No se pudo completar la operación.",
+      data?.error,
+    );
+  }
   return data;
+}
+
+/**
+ * Reautenticación (step-up, Fase 6 frente C): contraseña del admin y, si
+ * tiene MFA enrolado, el código TOTP o de recuperación. Al verificar, la
+ * sesión queda marcada 15 minutos y `onVerified` reintenta la acción que
+ * se quedó a medias.
+ */
+export function StepUpForm({
+  onVerified,
+  onCancel,
+}: {
+  onVerified: () => void;
+  onCancel: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setError("");
+        try {
+          const response = await fetch("/api/admin/step-up", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ password, code: code || undefined }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(
+              data?.mfaRequired
+                ? "Falta el código de verificación o no es válido."
+                : data?.error || "No se pudo confirmar tu identidad.",
+            );
+          }
+          onVerified();
+        } catch (err) {
+          setError(messageOf(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <h2>Confirma tu identidad</h2>
+      <p className="muted">
+        Esta operación es delicada y tu última confirmación caducó. Escribe tu contraseña de
+        administrador para continuar.
+      </p>
+      <label className="field">
+        Contraseña de administrador
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          required
+          autoComplete="current-password"
+        />
+      </label>
+      <label className="field">
+        Código de verificación (solo si tienes MFA activado)
+        <input
+          type="text"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+        />
+      </label>
+      {error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="dialog-actions">
+        <button className="btn secondary small" type="button" onClick={onCancel} disabled={busy}>
+          Volver
+        </button>
+        <button className="btn small" type="submit" disabled={busy}>
+          {busy ? "Confirmando…" : "Confirmar identidad"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 function messageOf(error: unknown) {
@@ -46,6 +152,33 @@ export function NoteAction({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
+  const [needsStepUp, setNeedsStepUp] = useState(false);
+
+  async function runAction() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await post({ ...payload, note });
+      setNote("");
+      setNeedsStepUp(false);
+      dialog.current?.close();
+      // El cobro quedó registrado aunque el alta automática no saliera.
+      setWarning(
+        data?.provisionNote ? `Hecho, pero el alta automática no salió: ${data.provisionNote}` : "",
+      );
+      router.refresh();
+    } catch (err) {
+      if (err instanceof AdminApiError && err.code === "step-up-required") {
+        setNeedsStepUp(true);
+        setError("");
+      } else {
+        setError(messageOf(err));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <button
@@ -53,6 +186,7 @@ export function NoteAction({
         type="button"
         onClick={() => {
           setError("");
+          setNeedsStepUp(false);
           dialog.current?.showModal();
         }}
       >
@@ -64,26 +198,19 @@ export function NoteAction({
         </p>
       ) : null}
       <dialog ref={dialog} className="admin-dialog" aria-labelledby={titleId}>
+        {needsStepUp ? (
+          <StepUpForm
+            onVerified={() => void runAction()}
+            onCancel={() => {
+              setNeedsStepUp(false);
+              setError("La operación quedó sin hacer: confirma tu identidad para continuar.");
+            }}
+          />
+        ) : (
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            if (busy) return;
-            setBusy(true);
-            setError("");
-            try {
-              const data = await post({ ...payload, note });
-              setNote("");
-              dialog.current?.close();
-              // El cobro quedó registrado aunque el alta automática no saliera.
-              setWarning(
-                data?.provisionNote ? `Hecho, pero el alta automática no salió: ${data.provisionNote}` : "",
-              );
-              router.refresh();
-            } catch (err) {
-              setError(messageOf(err));
-            } finally {
-              setBusy(false);
-            }
+            await runAction();
           }}
         >
           <h2 id={titleId}>{title}</h2>
@@ -117,6 +244,7 @@ export function NoteAction({
             </button>
           </div>
         </form>
+        )}
       </dialog>
     </>
   );
@@ -176,6 +304,29 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  // Respuestas predefinidas activas (Fase 5, frente C): se cargan del
+  // endpoint con permiso `tickets:reply`; si no cargan, el formulario
+  // sigue funcionando sin desplegable.
+  const [canned, setCanned] = useState<{ id: string; title: string; body: string }[]>([]);
+  const [cannedId, setCannedId] = useState("");
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/admin/canned-replies?active=true&locale=es")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (alive && data?.replies) setCanned(data.replies);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  function insertCanned(id: string) {
+    setCannedId(id);
+    const found = canned.find((entry) => entry.id === id);
+    if (!found) return;
+    setReply((current) => (current.trim() ? `${current.trim()}\n\n${found.body}` : found.body));
+  }
   return (
     <form
       className="ticket-reply"
@@ -188,6 +339,7 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
         try {
           const data = await post({ action: "reply-ticket", ticketId, body: reply });
           setReply("");
+          setCannedId("");
           setInfo(
             data.notified
               ? "Respuesta guardada y cliente avisado por correo."
@@ -201,6 +353,19 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
         }
       }}
     >
+      {canned.length > 0 ? (
+        <label className="field">
+          Respuesta predefinida
+          <select value={cannedId} onChange={(event) => insertCanned(event.target.value)}>
+            <option value="">Sin predefinida…</option>
+            {canned.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label className="field">
         Respuesta
         <textarea
@@ -213,6 +378,72 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
       </label>
       <button className="btn" type="submit" disabled={busy}>
         {busy ? "Enviando…" : "Responder"}
+      </button>
+      {error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {info ? (
+        <p className="notice" role="status">
+          {info}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+/**
+ * Subida de adjuntos al ticket por el agente (Fase 5, frente C). Límite
+ * 10 MB; solo imágenes, PDF, TXT y ZIP. Sin TICKET_ATTACHMENTS_DIR el
+ * servidor rechaza la subida: no se guarda nada en disco sin control.
+ */
+export function TicketAttachmentForm({ ticketId }: { ticketId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  return (
+    <form
+      className="ticket-reply"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        const form = event.currentTarget;
+        const input = form.querySelector<HTMLInputElement>('input[type="file"]');
+        const file = input?.files?.[0];
+        if (!file) {
+          setError("Elige un archivo.");
+          return;
+        }
+        setBusy(true);
+        setError("");
+        setInfo("");
+        try {
+          const data = new FormData();
+          data.append("file", file);
+          const response = await fetch(`/api/admin/tickets/${ticketId}/attachments`, {
+            method: "POST",
+            body: data,
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "No se pudo subir el adjunto.");
+          form.reset();
+          setInfo(`Adjunto guardado: ${result.attachment?.fileName ?? file.name}.`);
+          router.refresh();
+        } catch (err) {
+          setError(messageOf(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="field">
+        Adjuntar archivo (máx. 10 MB: imágenes, PDF, TXT o ZIP)
+        <input type="file" accept="image/*,.pdf,.txt,.zip" />
+      </label>
+      <button className="btn secondary" type="submit" disabled={busy}>
+        {busy ? "Subiendo…" : "Subir adjunto"}
       </button>
       {error ? (
         <p className="error" role="alert">

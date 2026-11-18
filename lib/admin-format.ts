@@ -14,6 +14,14 @@ export function money(cents: number, currency: string): string {
   }
 }
 
+/** Tamaño de archivo legible (B, KB o MB, un decimal). */
+export function formatBytes(sizeBytes: number): string {
+  if (!Number.isFinite(sizeBytes) || sizeBytes < 0) return "0 B";
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function dateTime(date: Date): string {
   return new Intl.DateTimeFormat("es", {
     dateStyle: "medium",
@@ -87,6 +95,13 @@ const ACTIONS: Record<string, string> = {
   "page.content.updated": "Contenido de página guardado",
   "catalog.updated": "Catálogo actualizado",
   "catalog.restored": "Catálogo restaurado",
+  "billing.run": "Corrida de facturación",
+  "billing.reminder": "Recordatorio de factura",
+  "billing.dunning": "Cobro de mora (dunning)",
+  "billing.renewal_created": "Factura de renovación creada",
+  "billing.renewal_paid": "Renovación cobrada",
+  "billing.renewal_failed": "Renovación fallida",
+  "billing.charge_failed": "Cobro automático fallido",
 };
 export function actionLabel(action: string): string {
   return ACTIONS[action] ?? action;

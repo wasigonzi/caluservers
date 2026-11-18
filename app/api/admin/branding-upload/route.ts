@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { put, del } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { AuthorizationError, requirePermission } from "@/lib/auth";
 import { trustedWrite } from "@/lib/request";
 import {
   BRANDING_SLOTS,
@@ -24,9 +24,14 @@ export const dynamic = "force-dynamic";
 
 async function assertAdmin() {
   try {
-    await requireAdmin();
+    // Subir o borrar branding es apariencia: exige `appearance:write`
+    // (Fase 1, tramo D — RBAC).
+    await requirePermission("appearance:write");
     return null;
-  } catch {
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json({ error: "Sin permiso para esta acción." }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

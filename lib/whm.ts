@@ -1,4 +1,6 @@
 import "server-only";
+import { sanitizeAudit } from "@/lib/audit-sanitize";
+import { writeAuditLog } from "@/lib/audit-log";
 import { db } from "@/lib/db";
 import { openSecret, sealSecret, SecretBoxError } from "@/lib/secret-box";
 import { whmBase, validateIdentity, WhmError } from "@/lib/whm-security";
@@ -132,10 +134,17 @@ export async function saveWhmConfiguration(input: unknown) {
     db.adminAudit.create({
       data: {
         action: "whm.settings.updated",
-        details: "WHM read-only settings updated; secrets omitted",
+        details: sanitizeAudit("WHM read-only settings updated; secrets omitted"),
       },
     }),
   ]);
+  // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+  void writeAuditLog({
+    actorType: "admin",
+    action: "whm.settings.updated",
+    resourceType: "integration",
+    details: "WHM read-only settings updated; secrets omitted",
+  });
   return publicWhmConfig(candidate.endpoint, candidate.credentials);
 }
 /** Called only by the admin+Origin guarded POST route, never during public rendering. */

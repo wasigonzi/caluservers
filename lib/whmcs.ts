@@ -1,5 +1,7 @@
 import "server-only";
 import {createCipheriv,createDecipheriv,randomBytes} from "node:crypto";
+import {sanitizeAudit} from "@/lib/audit-sanitize";
+import {writeAuditLog} from "@/lib/audit-log";
 import {db} from "@/lib/db";
 type Credentials={identifier:string;secret:string;accessKey?:string};
 function key(){const raw=process.env.SETTINGS_ENCRYPTION_KEY||"";if(!/^[a-f0-9]{64}$/i.test(raw))throw new Error("SETTINGS_ENCRYPTION_KEY must be a 64-character hex string");return Buffer.from(raw,"hex")}
@@ -13,7 +15,9 @@ export async function saveConfiguration(input:{url:string;identifier?:string;sec
  if(!identifier||!secret)throw new Error("Identifier and Secret are required");
  const credentials={identifier,secret,accessKey:input.accessKey!==undefined?input.accessKey:previous?.accessKey};
  await db.integrationConfig.upsert({where:{id:"whmcs"},create:{id:"whmcs",endpoint,encryptedCredentials:encrypt(credentials)},update:{endpoint,encryptedCredentials:encrypt(credentials)}});
- await db.adminAudit.create({data:{action:"whmcs.settings.updated",details:"WHMCS endpoint and credentials updated (secrets omitted)"}});
+ await db.adminAudit.create({data:{action:"whmcs.settings.updated",details:sanitizeAudit("WHMCS endpoint and credentials updated (secrets omitted)")}});
+ // Doble escritura (Fase 6): también a AuditLog, mejor esfuerzo.
+ void writeAuditLog({actorType:"admin",action:"whmcs.settings.updated",resourceType:"integration",details:"WHMCS endpoint and credentials updated (secrets omitted)"});
 }
 export const READ_ACTIONS={clients:"GetClients",orders:"GetOrders",invoices:"GetInvoices",products:"GetProducts",tickets:"GetTickets",services:"GetClientsProducts"} as const;
 export type Section=keyof typeof READ_ACTIONS;

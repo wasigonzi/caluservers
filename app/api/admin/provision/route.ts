@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Configuración del alta automática. Admin + mismo origen en la escritura. */
 export async function GET(req: NextRequest) {
-  const denied = await whmGuard(req, false);
+  const denied = await whmGuard(req, false, "whm:read");
   if (denied) return denied;
   try {
     return whmJson(await provisionConfiguration());
@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = await whmGuard(req, true);
+  // Guardar la configuración del alta automática escribe en WHM.
+  const denied = await whmGuard(req, true, "whm:write");
   if (denied) return denied;
   try {
     return whmJson(await saveProvisionConfiguration(await whmBody(req)));

@@ -1,4 +1,5 @@
 import "server-only";
+import { sanitizeAudit } from "./audit-sanitize";
 import { db } from "./db";
 import { billingPolicy, CommerceError, recordGatewayPayment } from "./commerce";
 import {
@@ -28,7 +29,8 @@ export function siteOrigin(): string {
   }
 }
 
-async function payableInvoice(invoiceId: string, userId: string) {
+/** La factura manda: importe, moneda y dueño salen de la base, nunca del cliente. */
+export async function payableInvoice(invoiceId: string, userId: string) {
   if (!/^[A-Za-z0-9_-]{8,40}$/.test(invoiceId)) {
     throw new CommerceError("Factura no válida.", 400);
   }
@@ -81,7 +83,7 @@ export async function startPaypalCheckout(input: { invoiceId: string; userId: st
         actor: input.userId,
         action: "payment.started",
         entityId: invoice.id,
-        details: `provider=paypal;order=${order.id};cents=${invoice.totalCents}`,
+        details: sanitizeAudit(`provider=paypal;order=${order.id};cents=${invoice.totalCents}`),
       },
     })
     .catch(() => {

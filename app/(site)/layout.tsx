@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getPublicCatalog } from "@/lib/catalog-db";
 import { CatalogProvider } from "@/lib/catalog-context";
 import { SiteShell } from "@/components/site/SiteShell";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +37,10 @@ export default async function SiteLayout({
   children: React.ReactNode;
 }) {
   const catalog = await getPublicCatalog();
+  const locale = await getRequestLocale();
   return (
     <CatalogProvider catalog={catalog}>
-      <SiteShell settings={catalog.settings}>{children}</SiteShell>
+      <SiteShell settings={catalog.settings} locale={locale}>{children}</SiteShell>
     </CatalogProvider>
   );
 }

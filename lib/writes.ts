@@ -1,4 +1,6 @@
 import type { CatalogPayload } from "./catalog-validate";
+import { sanitizeAudit } from "./audit-sanitize";
+import { writeAuditLogTx } from "./audit-log";
 import { db } from "./db";
 import { mergePagePayload } from "./page-content";
 import { settingsToRows, type SiteSettings } from "./site-settings";
@@ -17,8 +19,15 @@ export async function commitSiteSettings(settings: SiteSettings): Promise<void> 
     await tx.adminAudit.create({
       data: {
         action: "site.settings.updated",
-        details: "Site settings updated (no secrets)",
+        details: sanitizeAudit("Site settings updated (no secrets)"),
       },
+    });
+    // Doble escritura (Fase 6): también a AuditLog, en la misma transacción.
+    await writeAuditLogTx(tx, {
+      actorType: "admin",
+      action: "site.settings.updated",
+      resourceType: "siteSetting",
+      details: "Site settings updated (no secrets)",
     });
   });
 }
@@ -38,8 +47,15 @@ export async function commitPageContent(
       data: {
         action: "page.content.updated",
         entityId: path,
-        details: `Page content updated for ${path}`,
+        details: sanitizeAudit(`Page content updated for ${path}`),
       },
+    });
+    await writeAuditLogTx(tx, {
+      actorType: "admin",
+      action: "page.content.updated",
+      resourceType: "page",
+      resourceId: path,
+      details: `Page content updated for ${path}`,
     });
   });
   return merged;
@@ -56,6 +72,12 @@ export async function commitCatalog(
       create: { id: "default", payload: parsed as object },
       update: { payload: parsed as object },
     });
-    await tx.adminAudit.create({ data: { action, details } });
+    await tx.adminAudit.create({ data: { action, details: sanitizeAudit(details) } });
+    await writeAuditLogTx(tx, {
+      actorType: "admin",
+      action,
+      resourceType: "catalog",
+      details,
+    });
   });
 }

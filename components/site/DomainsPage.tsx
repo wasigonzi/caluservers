@@ -2,7 +2,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { TLDS } from "@/lib/catalog";
-import { useCatalog } from "@/lib/catalog-context";
 import { PageHero } from "@/components/site/SiteShell";
 import { SectionHead, Steps } from "@/components/site/Sections";
 import { useCopy } from "@/lib/page-content-context";
@@ -10,7 +9,7 @@ import { useCopy } from "@/lib/page-content-context";
 type Lookup =
   | { state: "idle" }
   | { state: "checking"; domain: string }
-  | { state: "available"; domain: string }
+  | { state: "available"; domain: string; priceCents: number | null; currency: string | null }
   | { state: "registered"; domain: string }
   | { state: "unverified"; domain: string; reason?: string }
   | { state: "error"; message: string };
@@ -24,7 +23,6 @@ const UNVERIFIED_REASONS: Record<string, string> = {
 };
 
 export default function Domains() {
-  const { catalog } = useCatalog();
   const [name, setName] = useState("");
   const [lookup, setLookup] = useState<Lookup>({ state: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
@@ -107,7 +105,15 @@ export default function Domains() {
     try {
       const response = await fetch(`/api/domains?name=${encodeURIComponent(query)}`);
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; domain?: string; state?: string; reason?: string }
+        | {
+            ok?: boolean;
+            error?: string;
+            domain?: string;
+            state?: string;
+            reason?: string;
+            priceCents?: number | null;
+            currency?: string | null;
+          }
         | null;
       if (!response.ok || !payload?.ok || !payload.domain) {
         setLookup({
@@ -116,8 +122,17 @@ export default function Domains() {
         });
         return;
       }
-      if (payload.state === "available" || payload.state === "registered") {
-        setLookup({ state: payload.state, domain: payload.domain });
+      if (payload.state === "available") {
+        setLookup({
+          state: "available",
+          domain: payload.domain,
+          priceCents: typeof payload.priceCents === "number" ? payload.priceCents : null,
+          currency: typeof payload.currency === "string" ? payload.currency : null,
+        });
+        return;
+      }
+      if (payload.state === "registered") {
+        setLookup({ state: "registered", domain: payload.domain });
         return;
       }
       setLookup({ state: "unverified", domain: payload.domain, reason: payload.reason });
@@ -127,7 +142,20 @@ export default function Domains() {
   }
 
   const registerUrl = (domain: string) =>
-    `${catalog.settings.whmcs}/cart.php?a=add&domain=register&query=${encodeURIComponent(domain)}`;
+    `/cuenta/dominios?domain=${encodeURIComponent(domain)}`;
+
+  function priceLabel(priceCents: number | null, currency: string | null): string {
+    if (priceCents === null || !currency) return "Precio a confirmar";
+    try {
+      return new Intl.NumberFormat("es", {
+        style: "currency",
+        currency,
+        currencyDisplay: "code",
+      }).format(priceCents / 100);
+    } catch {
+      return `${(priceCents / 100).toFixed(2)} ${currency}`;
+    }
+  }
 
   return (
     <>
@@ -177,24 +205,25 @@ export default function Domains() {
           {lookup.state === "available" ? (
             <p>
               <strong>{lookup.domain} está libre.</strong>{" "}
-              <a className="btn primary" href={registerUrl(lookup.domain)} rel="noopener">
-                Registrarlo en el portal ↗
+              {priceLabel(lookup.priceCents, lookup.currency)}
+              {lookup.priceCents !== null ? " al año." : "."}{" "}
+              <a className="btn primary" href={registerUrl(lookup.domain)}>
+                Registrarlo en tu cuenta
               </a>
             </p>
           ) : null}
           {lookup.state === "registered" ? (
             <p>
               <strong>{lookup.domain} ya está registrado.</strong> Prueba otra extensión o otro
-              nombre.
+              nombre. Si es tuyo,{" "}
+              <a href="/cuenta/dominios">gestiona tus dominios en tu cuenta</a>.
             </p>
           ) : null}
           {lookup.state === "unverified" ? (
             <p>
               No pudimos confirmar {lookup.domain}.{" "}
               {UNVERIFIED_REASONS[lookup.reason ?? ""] || "El registro no respondió."}{" "}
-              <a href={registerUrl(lookup.domain)} rel="noopener">
-                Comprobarlo en el portal ↗
-              </a>
+              <a href={registerUrl(lookup.domain)}>Comprobarlo en tu cuenta</a>
             </p>
           ) : null}
           {lookup.state === "error" ? <p>{lookup.message}</p> : null}

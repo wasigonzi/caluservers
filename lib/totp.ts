@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { db } from "@/lib/db";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -54,14 +55,40 @@ export function totpAt(secret: Buffer, nowMs: number, step = 30, digits = 6): st
   return hotp(secret, Math.floor(nowMs / 1000 / step), digits);
 }
 
-export type TotpConfig = "off" | "ready" | "invalid";
+export type TotpConfig = "off" | "ready" | "invalid" | "required-but-missing";
 
-export function totpConfig(raw: string | undefined): TotpConfig {
+/**
+ * ADMIN_MFA_REQUIRED=true exige MFA al administrador. Solo acepta el valor
+ * literal "true" (sin distinguir mayúsculas); cualquier otro valor es "no".
+ */
+export function adminMfaRequired(raw: string | undefined): boolean {
+  return (raw || "").trim().toLowerCase() === "true";
+}
+
+export function totpConfig(raw: string | undefined, required = false): TotpConfig {
   const value = (raw || "").trim();
-  if (!value) return "off";
+  if (!value) return required ? "required-but-missing" : "off";
   const decoded = base32Decode(value);
   if (!decoded || decoded.length < 10) return "invalid";
   return "ready";
+}
+
+/**
+ * Fase 1, tramo C: true si el propietario tiene al menos una passkey
+ * enrolada en PasskeyCredential (admin) o, en general, en la tabla del
+ * tramo B. `ownerType` es "admin" o "client" y `ownerId` el id del
+ * AdminUser/User (para el admin por entorno, `env:<correo>`, ver
+ * lib/webauthn.ts `adminOwnerId`). Sin BD no se puede afirmar nada: se
+ * devuelve false y el login sigue el camino TOTP (fail-closed para el
+ * bloqueo de MFA, que exige un método enrolado).
+ */
+export async function hasPasskeyEnrolled(ownerType: string, ownerId: string): Promise<boolean> {
+  try {
+    const count = await db.passkeyCredential.count({ where: { ownerType, ownerId } });
+    return count > 0;
+  } catch {
+    return false;
+  }
 }
 
 export function verifyTotp(secretBase32: string, code: string, nowMs = Date.now()): boolean {

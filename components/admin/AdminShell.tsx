@@ -5,22 +5,32 @@ import {
   Palette,
   Brush,
   PenLine,
+  BookOpen,
   LayoutList,
   Tags,
   SearchCheck,
   Navigation,
   FileText,
   Users,
+  Globe,
   Server,
   ServerCog,
   Package,
   Inbox,
+  Mail,
+  MessagesSquare,
   Receipt,
+  ShieldAlert,
+  ChartColumn,
   LifeBuoy,
   History,
+  ScrollText,
+  Bell,
   Boxes,
   Settings,
+  Plug,
   SlidersHorizontal,
+  UserCog,
   ExternalLink,
   Menu,
   LogOut,
@@ -30,7 +40,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
-export type NavBadges = Partial<Record<"facturas" | "servicios" | "tickets" | "mensajes", number>>;
+export type NavBadges = Partial<
+  Record<"facturas" | "servicios" | "tickets" | "mensajes" | "alertas", number>
+>;
 type NavItem = {
   label: string;
   href: string;
@@ -38,13 +50,20 @@ type NavItem = {
   badge?: keyof NavBadges;
   /** Sección del estudio del sitio (`/admin/site?seccion=`). */
   section?: string;
+  /**
+   * Permiso que exige la sección (Fase 1, tramo D — RBAC). Sin permiso, el
+   * enlace se oculta y la página rechaza además por su cuenta. Sin este
+   * campo, la sección la ve cualquier admin (p. ej. el Dashboard).
+   */
+  permission?: string;
 };
 type NavGroup = { title: string; items: NavItem[] };
 
-const site = (label: string, section: string, icon: LucideIcon): NavItem => ({
+const site = (label: string, section: string, icon: LucideIcon, permission: string): NavItem => ({
   label,
   icon,
   section,
+  permission,
   href: section === "branding" ? "/admin/site" : `/admin/site?seccion=${section}`,
 });
 
@@ -53,44 +72,61 @@ const GROUPS: NavGroup[] = [
     title: "Resumen",
     items: [
       { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-      { label: "Actividad", href: "/admin/actividad", icon: History },
+      { label: "Actividad", href: "/admin/actividad", icon: History, permission: "audit:view" },
+      // Auditoría unificada y alertas (Fase 6, frente B): mismo permiso
+      // que Actividad. El contador de alertas sin leer se lee en el
+      // cliente (ver `unreadAlerts` abajo) y solo se muestra con ese permiso.
+      { label: "Auditoría", href: "/admin/auditoria", icon: ScrollText, permission: "audit:view" },
+      { label: "Alertas", href: "/admin/alertas", icon: Bell, badge: "alertas", permission: "audit:view" },
     ],
   },
   {
     title: "Negocio",
     items: [
-      { label: "Clientes", href: "/admin/clientes", icon: Users },
-      { label: "Pedidos y facturas", href: "/admin/facturas", icon: Receipt, badge: "facturas" },
-      { label: "Servicios", href: "/admin/servicios", icon: Boxes, badge: "servicios" },
-      { label: "Tickets", href: "/admin/tickets", icon: LifeBuoy, badge: "tickets" },
-      { label: "Mensajes", href: "/admin/mensajes", icon: Inbox, badge: "mensajes" },
+      { label: "Clientes", href: "/admin/clientes", icon: Users, permission: "clients:view" },
+      { label: "Pedidos y facturas", href: "/admin/facturas", icon: Receipt, badge: "facturas", permission: "orders:view" },
+      { label: "Servicios", href: "/admin/servicios", icon: Boxes, badge: "servicios", permission: "services:view" },
+      { label: "Dominios", href: "/admin/dominios", icon: Globe, permission: "domains:view" },
+      { label: "Tickets", href: "/admin/tickets", icon: LifeBuoy, badge: "tickets", permission: "tickets:view" },
+      { label: "Fraude", href: "/admin/fraude", icon: ShieldAlert, permission: "orders:view" },
+      { label: "Informes", href: "/admin/informes", icon: ChartColumn, permission: "reports:view" },
+      { label: "Respuestas predefinidas", href: "/admin/respuestas-predefinidas", icon: MessagesSquare, permission: "tickets:reply" },
+      { label: "Mensajes", href: "/admin/mensajes", icon: Inbox, badge: "mensajes", permission: "tickets:view" },
     ],
   },
   {
     title: "Sitio web",
     items: [
-      site("Branding", "branding", Palette),
-      site("Apariencia", "appearance", Brush),
-      site("Contenido y contacto", "content", PenLine),
-      site("Secciones del inicio", "sections", LayoutList),
-      site("Catálogo y precios", "catalog", Tags),
-      site("SEO", "seo", SearchCheck),
-      site("Navegación", "nav", Navigation),
-      { label: "Textos de páginas", href: "/admin/pages", icon: FileText },
+      site("Branding", "branding", Palette, "appearance:write"),
+      // Panel de apariencia separado de /admin/site (tramo D).
+      { label: "Apariencia", href: "/admin/apariencia", icon: Brush, permission: "appearance:write" },
+      site("Contenido y contacto", "content", PenLine, "content:write"),
+      site("Secciones del inicio", "sections", LayoutList, "content:write"),
+      site("Catálogo y precios", "catalog", Tags, "catalog:write"),
+      site("SEO", "seo", SearchCheck, "content:write"),
+      site("Navegación", "nav", Navigation, "content:write"),
+      { label: "Textos de páginas", href: "/admin/pages", icon: FileText, permission: "content:write" },
+      { label: "Contenido", href: "/admin/contenido", icon: PenLine, permission: "content:write" },
+      { label: "Base de conocimientos", href: "/admin/kb", icon: BookOpen, permission: "kb:write" },
     ],
   },
   {
     title: "Servidor WHM",
     items: [
-      { label: "Cuentas cPanel", href: "/admin/accounts", icon: Server },
-      { label: "Paquetes", href: "/admin/packages", icon: Package },
-      { label: "Conexión WHM", href: "/admin/settings", icon: Settings },
-      { label: "Alta automática", href: "/admin/provision", icon: ServerCog },
+      { label: "Cuentas cPanel", href: "/admin/accounts", icon: Server, permission: "whm:read" },
+      { label: "Paquetes", href: "/admin/packages", icon: Package, permission: "whm:read" },
+      { label: "Conexión WHM", href: "/admin/settings", icon: Settings, permission: "whm:read" },
+      { label: "Alta automática", href: "/admin/provision", icon: ServerCog, permission: "whm:read" },
     ],
   },
   {
     title: "Configuración",
-    items: [{ label: "General", href: "/admin/configuracion", icon: SlidersHorizontal }],
+    items: [
+      { label: "General", href: "/admin/configuracion", icon: SlidersHorizontal, permission: "settings:write" },
+      { label: "Plantillas de correo", href: "/admin/plantillas-correo", icon: Mail, permission: "mail:write" },
+      { label: "Plugins", href: "/admin/plugins", icon: Plug, permission: "settings:write" },
+      { label: "Usuarios", href: "/admin/usuarios", icon: UserCog, permission: "users:manage" },
+    ],
   },
 ];
 
@@ -104,11 +140,18 @@ export default function AdminShell({
   children,
   email,
   badges = {},
+  permissions,
 }: {
   children: React.ReactNode;
   email?: string;
   /** Pendientes por sección. Se omiten si la base no respondió. */
   badges?: NavBadges;
+  /**
+   * Permisos de la sesión (los pasa el layout del servidor). Sin esta prop
+   * se muestra todo (compatibilidad); con ella, se ocultan las secciones
+   * sin permiso. El fallback por entorno llega como owner y ve todo.
+   */
+  permissions?: string[];
 }) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -119,6 +162,24 @@ export default function AdminShell({
   const titleId = useId();
   const asideRef = useRef<HTMLElement>(null);
   const [mobile, setMobile] = useState(false);
+  // Contador de alertas sin leer (Fase 6, frente B): se lee del API en el
+  // cliente, solo cuando la sesión puede ver la sección (permiso
+  // `audit:view`; sin `permissions` se muestra todo por compatibilidad).
+  // Si la lectura falla, el contador queda en 0 y el enlace sigue ahí.
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  useEffect(() => {
+    if (permissions !== undefined && !permissions.includes("audit:view")) return;
+    let cancelled = false;
+    void fetch("/api/admin/alerts?unread=1", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.unread === "number") setUnreadAlerts(data.unread);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [permissions, pathname]);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1024px)");
     const update = () => {
@@ -167,8 +228,18 @@ export default function AdminShell({
     };
   }, [open]);
 
+  const visibleGroups =
+    permissions === undefined
+      ? GROUPS
+      : GROUPS.map((group) => ({
+          ...group,
+          items: group.items.filter(
+            (item) => !item.permission || permissions.includes(item.permission),
+          ),
+        })).filter((group) => group.items.length > 0);
+
   const crumb =
-    GROUPS.flatMap((g) => g.items).find((i) => isActive(pathname, section, i))
+    visibleGroups.flatMap((g) => g.items).find((i) => isActive(pathname, section, i))
       ?.label || "Admin";
 
   const nav = (
@@ -186,10 +257,19 @@ export default function AdminShell({
       </Link>
       <p className="admin-side-sub muted">Panel de administración</p>
       <nav className="admin-nav" aria-label="Admin">
-        {GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div className="admin-nav-group" key={group.title}>
             <p className="admin-nav-title">{group.title}</p>
-            {group.items.map((item) => (
+            {group.items.map((item) => {
+              // El contador de alertas viene del estado local (API en el
+              // cliente); los demás vienen de `badges` (servidor).
+              const badgeCount =
+                item.badge === "alertas"
+                  ? unreadAlerts
+                  : item.badge
+                    ? badges[item.badge]
+                    : 0;
+              return (
               <Link
                 key={item.href}
                 href={item.href}
@@ -205,14 +285,15 @@ export default function AdminShell({
               >
                 <item.icon size={18} aria-hidden="true" />
                 <span>{item.label}</span>
-                {item.badge && badges[item.badge] ? (
+                {item.badge && badgeCount ? (
                   <span className="nav-badge">
-                    {badges[item.badge]}
+                    {badgeCount}
                     <span className="sr-only"> pendientes</span>
                   </span>
                 ) : null}
               </Link>
-            ))}
+              );
+            })}
           </div>
         ))}
       </nav>

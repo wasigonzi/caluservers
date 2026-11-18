@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { navCounts } from "@/lib/admin-data";
 import AdminShell from "@/components/admin/AdminShell";
 
@@ -13,11 +13,11 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  if (!(await isAdmin())) return children;
-  const email = process.env.ADMIN_EMAIL || undefined;
+  const session = await getAdminSession();
+  if (!session) return children;
   const badges = await navCounts();
   return (
-    <AdminShell email={email} badges={badges}>
+    <AdminShell email={session.email} badges={badges} permissions={session.permissions}>
       {children}
     </AdminShell>
   );

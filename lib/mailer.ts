@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { renderMailWithTemplate } from "@/lib/mail-templates";
 
 export type AuthMailKind = "reset";
 
@@ -31,12 +32,21 @@ export async function deliverAuthLink(input: {
   kind: AuthMailKind;
   url: string;
 }): Promise<{ delivered: boolean; reason: "smtp" | "sink" | "unconfigured" }> {
-  const subject = "Restablece tu contraseña de CaluServers";
-  const text = [
-    "Este enlace es de un solo uso y caduca.",
-    "Si no solicitaste este mensaje, ignóralo.",
-    input.url,
-  ].join("\n");
+  // Plantilla activa `password-reset` si existe; si no, el texto de siempre.
+  const rendered = await renderMailWithTemplate({
+    key: "password-reset",
+    variables: { resetUrl: input.url },
+    fallback: {
+      subject: "Restablece tu contraseña de CaluServers",
+      text: [
+        "Este enlace es de un solo uso y caduca.",
+        "Si no solicitaste este mensaje, ignóralo.",
+        input.url,
+      ].join("\n"),
+    },
+  });
+  const subject = rendered.subject;
+  const text = rendered.text;
   const smtp = (process.env.SMTP_URL || "").trim();
   if (smtp) {
     await sendSmtp({ to: input.to, subject, text, smtp });
@@ -62,13 +72,30 @@ export async function deliverNotice(input: {
   subject: string;
   text: string;
   replyTo?: string;
+  /**
+   * Plantilla activa a usar (p. ej. `ticket-reply`). Si se pasa y existe,
+   * sustituye asunto y texto; si no existe, se usa el asunto/texto dados.
+   */
+  templateKey?: string;
+  variables?: Record<string, string | undefined | null>;
 }): Promise<{ delivered: boolean; reason: "smtp" | "sink" | "unconfigured" }> {
+  let subject = input.subject;
+  let text = input.text;
+  if (input.templateKey) {
+    const rendered = await renderMailWithTemplate({
+      key: input.templateKey,
+      variables: input.variables ?? {},
+      fallback: { subject, text },
+    });
+    subject = rendered.subject;
+    text = rendered.text;
+  }
   const smtp = (process.env.SMTP_URL || "").trim();
   if (smtp) {
     await sendSmtp({
       to: input.to,
-      subject: input.subject,
-      text: input.text,
+      subject,
+      text,
       smtp,
       replyTo: input.replyTo,
     });
@@ -80,7 +107,7 @@ export async function deliverNotice(input: {
     const file = path.join(sink, `${Date.now()}-notice.txt`);
     await writeFile(
       file,
-      `to:${input.to}\nsubject:${input.subject}\n${input.text}\n`,
+      `to:${input.to}\nsubject:${subject}\n${text}\n`,
       { mode: 0o600 },
     );
     return { delivered: true, reason: "sink" };

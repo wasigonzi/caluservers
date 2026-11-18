@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import ProvisionForm from "@/components/admin/ProvisionForm";
-import { isAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import AccessDenied from "@/components/admin/AccessDenied";
 import { getCatalogPayload } from "@/lib/catalog-db";
 import { safeWhmError } from "@/lib/whm-security";
 import { provisionConfiguration, type ProvisionPublicConfig } from "@/lib/whm-provision";
@@ -21,7 +22,11 @@ const EMPTY: ProvisionPublicConfig = {
 };
 
 export default async function ProvisionAdminPage() {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!session.permissions.includes("whm:read")) {
+    return <AccessDenied permission="whm:read" />;
+  }
   let initial = EMPTY;
   let error = "";
   try {

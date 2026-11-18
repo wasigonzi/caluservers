@@ -13,14 +13,16 @@ import { applySiteTheme, logoSrc, socialEntries } from "@/lib/site-settings";
 import { resolveHref } from "@/lib/safe-links";
 import { useRevealOnScroll } from "@/components/site/Interactive";
 import AnimatedBackdrop from "@/components/site/AnimatedBackdrop";
+import LanguageSelector from "@/components/site/LanguageSelector";
+import { getDictionary, type Locale } from "@/lib/i18n";
 
-const NAV_LINKS: { href: string; label: string }[] = [
-  { href: "/", label: "Inicio" },
-  { href: "/web-hosting", label: "Alojamientos" },
-  { href: "/vps", label: "VPS" },
-  { href: "/dedicated", label: "Dedicados" },
-  { href: "/domains", label: "Dominios" },
-  { href: "/about", label: "Nosotros" },
+const NAV_LINKS: { href: string; labelKey: keyof ReturnType<typeof getDictionary>["nav"] }[] = [
+  { href: "/", labelKey: "home" },
+  { href: "/web-hosting", labelKey: "hosting" },
+  { href: "/vps", labelKey: "vps" },
+  { href: "/dedicated", labelKey: "dedicated" },
+  { href: "/domains", labelKey: "domains" },
+  { href: "/about", labelKey: "about" },
 ];
 
 type TabIconProps = SVGProps<SVGSVGElement>;
@@ -76,8 +78,9 @@ function TopBar({ settings }: { settings: SiteSettings }) {
   );
 }
 
-function Nav({ settings }: { settings: SiteSettings }) {
+function Nav({ settings, locale }: { settings: SiteSettings; locale: Locale }) {
   const pathname = usePathname();
+  const dict = getDictionary(locale);
   return (
     <header className="nav glass">
       <div className="nav-in">
@@ -102,7 +105,7 @@ function Nav({ settings }: { settings: SiteSettings }) {
           <nav className="links open" aria-label="Principal">
             {NAV_LINKS.map((l) => (
               <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""} aria-current={pathname === l.href ? "page" : undefined}>
-                {l.label}
+                {dict.nav[l.labelKey]}
               </Link>
             ))}
           </nav>
@@ -110,11 +113,12 @@ function Nav({ settings }: { settings: SiteSettings }) {
         <nav className="links desktop-links" aria-label="Principal">
           {NAV_LINKS.map((l) => (
             <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : ""} aria-current={pathname === l.href ? "page" : undefined}>
-              {l.label}
+              {dict.nav[l.labelKey]}
             </Link>
           ))}
         </nav>
         <div className="nav-actions">
+          <LanguageSelector locale={locale} />
           <Link className="btn secondary" href="/cuenta">
             {settings.chrome.clientAreaLabel.replace(/\s*↗\s*$/, "")}
           </Link>
@@ -169,8 +173,9 @@ function MobileTabBar({ settings }: { settings: SiteSettings }) {
   );
 }
 
-function Footer({ settings }: { settings: SiteSettings }) {
+function Footer({ settings, locale = "es" }: { settings: SiteSettings; locale?: Locale }) {
   const whmcs = settings.whmcs;
+  const dict = getDictionary(locale);
   return (
     <footer className="footer">
       <div className="wrap">
@@ -216,6 +221,7 @@ function Footer({ settings }: { settings: SiteSettings }) {
             <h4>Explorar</h4>
             <Link href="/cuenta">Área de Cliente</Link>
             <Link href="/cuenta/tickets">Soporte</Link>
+            <Link href="/kb">{dict.nav.knowledgeBase}</Link>
             <Link href="/aup">Política de uso</Link>
             <Link href="/abuse">Abuso</Link>
           </div>
@@ -236,9 +242,11 @@ function Footer({ settings }: { settings: SiteSettings }) {
 export function SiteShell({
   settings,
   children,
+  locale = "es",
 }: {
   settings: SiteSettings;
   children: ReactNode;
+  locale?: Locale;
 }) {
   const mainRef = useRef<HTMLElement>(null);
   useRevealOnScroll(mainRef);
@@ -295,11 +303,11 @@ export function SiteShell({
       />
       <AnimatedBackdrop />
       <TopBar settings={settings} />
-      <Nav settings={settings} />
+      <Nav settings={settings} locale={locale} />
       <main id="contenido-principal" className="site-main" ref={mainRef} tabIndex={-1}>
         {children}
       </main>
-      <Footer settings={settings} />
+      <Footer settings={settings} locale={locale} />
       <MobileTabBar settings={settings} />
     </div>
   );

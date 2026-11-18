@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
-import { dateTime, ticketStatus } from "@/lib/admin-format";
+import { dateTime, formatBytes, ticketStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
-import { TicketReplyForm, TicketStatusButton } from "@/components/admin/CommerceActions";
+import { TicketAttachmentForm, TicketReplyForm, TicketStatusButton } from "@/components/admin/CommerceActions";
 import { PageHeader, StatusBadge } from "@/components/admin/ui";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,11 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const ticket = await db.supportTicket.findUnique({
     where: { id },
-    include: { user: true, messages: { orderBy: { createdAt: "asc" } } },
+    include: {
+      user: true,
+      messages: { orderBy: { createdAt: "asc" } },
+      attachments: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!ticket) notFound();
   const closed = ticket.status === "closed";
@@ -61,6 +65,29 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
           <TicketReplyForm ticketId={ticket.id} />
         </div>
       )}
+
+      <section className="panel" aria-label="Adjuntos">
+        <h2>Adjuntos ({ticket.attachments.length})</h2>
+        {ticket.attachments.length === 0 ? (
+          <p className="muted">
+            Sin adjuntos. Máx. 10 MB por archivo: imágenes, PDF, TXT o ZIP.
+          </p>
+        ) : (
+          <ul>
+            {ticket.attachments.map((attachment) => (
+              <li key={attachment.id}>
+                <a href={`/api/tickets/attachments/${attachment.id}`}>
+                  {attachment.fileName}
+                </a>{" "}
+                <span className="muted">
+                  · {formatBytes(attachment.sizeBytes)} · {dateTime(attachment.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {closed ? null : <TicketAttachmentForm ticketId={ticket.id} />}
+      </section>
     </>
   );
 }

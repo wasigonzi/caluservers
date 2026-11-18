@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ArrowUpRight, CircleCheck, LifeBuoy, Receipt, ServerCog } from "lucide-react";
 import { requireCustomer } from "@/lib/account-data";
 import { dateOnly, customerInvoiceStatus, money, serviceStatus } from "@/lib/admin-format";
 import { db } from "@/lib/db";
 import { EmptyState, StatusBadge } from "@/components/admin/ui";
+import PortalContentSections from "@/components/account/PortalContentSections";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Resumen" };
@@ -40,15 +43,25 @@ export default async function AccountHome({
   const answered = tickets.filter((ticket) => ticket.status === "answered");
   const openTickets = tickets.filter((ticket) => ticket.status !== "closed");
   const first = (user.name || "").trim().split(/\s+/)[0];
+  const cookieValue = (await cookies()).get("calu-locale")?.value;
+  let storedLocale = "es";
+  try {
+    const row = await db.user.findUnique({ where: { id: user.id }, select: { locale: true } });
+    if (row?.locale) storedLocale = row.locale;
+  } catch {
+    // Caída a español.
+  }
+  const locale = normalizeLocale(cookieValue ?? storedLocale);
+  const dict = getDictionary(locale);
 
   return (
     <>
       <header className="page-head">
         <div>
           <p className="studio-eyebrow">ÁREA DE CLIENTE</p>
-          <h1>{first ? `Hola, ${first}` : "Tu cuenta"}</h1>
+          <h1>{first ? `${dict.portal.greeting}, ${first}` : dict.portal.title}</h1>
           <p className="muted page-head-sub">
-            Tus servicios, facturas y soporte en un solo lugar.
+            {dict.portal.subtitle}
           </p>
         </div>
         <div className="page-head-actions">
@@ -66,38 +79,36 @@ export default async function AccountHome({
 
       <section className="kpi-grid account-kpis" aria-label="Indicadores">
         <Link className="kpi kpi-link" href="/cuenta/servicios">
-          <p className="kpi-label">Servicios activos</p>
+          <p className="kpi-label">{dict.portal.activeServices}</p>
           <p className="kpi-value">{active.length}</p>
           <p className="kpi-foot">
-            {pending.length ? `${pending.length} en preparación` : `${services.length} en total`}
+            {pending.length ? `${pending.length} ${dict.portal.inPreparation}` : `${services.length} ${dict.portal.inTotal}`}
           </p>
         </Link>
         <Link className="kpi kpi-link" href="/cuenta/facturas">
-          <p className="kpi-label">Por pagar</p>
+          <p className="kpi-label">{dict.portal.due}</p>
           <p className="kpi-value">
             {dueTotals.size
               ? [...dueTotals].map(([currency, cents]) => money(cents, currency)).join(" · ")
-              : "Nada"}
+              : dict.portal.nothingDue}
           </p>
           <p className="kpi-foot">
-            {due.length} {due.length === 1 ? "factura pendiente" : "facturas pendientes"}
+            {due.length} {due.length === 1 ? dict.portal.pendingInvoice : dict.portal.pendingInvoices}
           </p>
         </Link>
         <Link className="kpi kpi-link" href="/cuenta/tickets">
-          <p className="kpi-label">Soporte</p>
+          <p className="kpi-label">{dict.portal.support}</p>
           <p className="kpi-value">{openTickets.length}</p>
           <p className="kpi-foot">
             {answered.length
-              ? `${answered.length} con respuesta nueva`
-              : openTickets.length === 1
-                ? "ticket abierto"
-                : "tickets abiertos"}
+              ? `${answered.length} ${dict.portal.newReply}`
+              : `${openTickets.length} ${dict.portal.openTickets}`}
           </p>
         </Link>
       </section>
 
       <section className="panel" aria-labelledby="acc-next">
-        <h2 id="acc-next">Qué hacer ahora</h2>
+        <h2 id="acc-next">{dict.portal.nextSteps}</h2>
         {due.length || pending.length || answered.length ? (
           <ul className="attention-list">
             {due.map((invoice) => (
@@ -206,6 +217,8 @@ export default async function AccountHome({
           )}
         </section>
       </div>
+
+      <PortalContentSections locale={locale} />
     </>
   );
 }

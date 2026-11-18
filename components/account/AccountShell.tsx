@@ -3,6 +3,7 @@
 import {
   Boxes,
   ExternalLink,
+  Globe,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -16,16 +17,22 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { customerAuthClient } from "@/lib/customer-auth-client";
+import LanguageSelector from "@/components/site/LanguageSelector";
+import { getDictionary, type Locale } from "@/lib/i18n";
+import { portalThemeClasses, type PortalDensity, type PortalTheme } from "@/lib/portal-theme";
 
 type Item = { label: string; href: string; icon: LucideIcon; badge?: "facturas" | "tickets" };
 
-const ITEMS: Item[] = [
-  { label: "Resumen", href: "/cuenta", icon: LayoutDashboard },
-  { label: "Mis servicios", href: "/cuenta/servicios", icon: Boxes },
-  { label: "Facturas", href: "/cuenta/facturas", icon: Receipt, badge: "facturas" },
-  { label: "Soporte", href: "/cuenta/tickets", icon: LifeBuoy, badge: "tickets" },
-  { label: "Mi perfil", href: "/cuenta/perfil", icon: UserRound },
-];
+function navItems(dict: ReturnType<typeof getDictionary>): Item[] {
+  return [
+    { label: dict.portal.dashboard, href: "/cuenta", icon: LayoutDashboard },
+    { label: dict.portal.services, href: "/cuenta/servicios", icon: Boxes },
+    { label: dict.portal.domains, href: "/cuenta/dominios", icon: Globe },
+    { label: dict.portal.invoices, href: "/cuenta/facturas", icon: Receipt, badge: "facturas" },
+    { label: dict.portal.support, href: "/cuenta/tickets", icon: LifeBuoy, badge: "tickets" },
+    { label: dict.portal.profile, href: "/cuenta/perfil", icon: UserRound },
+  ];
+}
 
 function isActive(pathname: string, href: string) {
   if (href === "/cuenta") return pathname === "/cuenta";
@@ -38,12 +45,22 @@ export default function AccountShell({
   name,
   email,
   badges,
+  portalTheme = "default",
+  portalDensity = "comfortable",
+  locale = "es",
 }: {
   children: React.ReactNode;
   name: string;
   email: string;
   badges: { facturas: number; tickets: number };
+  /** Diseño elegido por el cliente (User.portalTheme) o preset por defecto del portal. */
+  portalTheme?: PortalTheme;
+  /** Densidad elegida por el cliente (User.portalDensity). */
+  portalDensity?: PortalDensity;
+  locale?: Locale;
 }) {
+  const dict = getDictionary(locale);
+  const ITEMS = navItems(dict);
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -79,10 +96,10 @@ export default function AccountShell({
     };
   }, [open]);
 
-  const current = ITEMS.find((item) => isActive(pathname, item.href))?.label ?? "Mi cuenta";
+  const current = ITEMS.find((item) => isActive(pathname, item.href))?.label ?? dict.portal.title;
 
   return (
-    <div className={`admin-app account-app${open ? " drawer-open" : ""}`}>
+    <div className={`admin-app account-app ${portalThemeClasses(portalTheme, portalDensity)}${open ? " drawer-open" : ""}`}>
       <a href="#account-content" className="admin-skip-link">
         Ir al contenido
       </a>
@@ -97,9 +114,12 @@ export default function AccountShell({
           <Menu size={18} aria-hidden="true" /> Menú
         </button>
         <div className="admin-breadcrumb">
-          <span className="muted">Mi cuenta</span>
+          <span className="muted">{dict.portal.title}</span>
           <span aria-hidden="true"> / </span>
           <strong>{current}</strong>
+        </div>
+        <div className="admin-topbar-actions">
+          <LanguageSelector locale={locale} />
         </div>
       </header>
       <div className="admin-overlay" hidden={!open} onClick={() => setOpen(false)} aria-hidden="true" />
@@ -121,7 +141,7 @@ export default function AccountShell({
           </span>
         </Link>
         <p className="admin-side-sub muted">Área de cliente</p>
-        <nav className="admin-nav" aria-label="Mi cuenta">
+        <nav className="admin-nav" aria-label={dict.portal.title}>
           <div className="admin-nav-group">
             {ITEMS.map((item) => {
               const active = isActive(pathname, item.href);
