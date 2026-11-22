@@ -58,7 +58,7 @@ export default function BrandingPreview({
         }}
       >
         <div className="brand-preview-nav">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img src={logo} alt={settings.branding.siteName} />
           <span>{settings.branding.siteName}</span>
         </div>

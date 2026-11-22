@@ -37,8 +37,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 export type NavBadges = Partial<
   Record<"facturas" | "servicios" | "tickets" | "mensajes" | "alertas", number>
@@ -154,6 +155,7 @@ export default function AdminShell({
   permissions?: string[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const params = useSearchParams();
   // La vista previa es parte del estudio, no una sección del menú: resalta Branding.
   const requested = params.get("seccion") || "branding";
@@ -161,7 +163,13 @@ export default function AdminShell({
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const asideRef = useRef<HTMLElement>(null);
-  const [mobile, setMobile] = useState(false);
+  const mobile = useMediaQuery("(max-width: 1024px)");
+  // Ajuste en render (no en efecto): al volver a escritorio el cajón se cierra.
+  const [wasMobile, setWasMobile] = useState(mobile);
+  if (wasMobile !== mobile) {
+    setWasMobile(mobile);
+    if (!mobile) setOpen(false);
+  }
   // Contador de alertas sin leer (Fase 6, frente B): se lee del API en el
   // cliente, solo cuando la sesión puede ver la sección (permiso
   // `audit:view`; sin `permissions` se muestra todo por compatibilidad).
@@ -180,20 +188,15 @@ export default function AdminShell({
       cancelled = true;
     };
   }, [permissions, pathname]);
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1024px)");
-    const update = () => {
-      setMobile(media.matches);
-      if (!media.matches) setOpen(false);
-    };
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname, section]);
+
+  // Al cambiar de sección el cajón se cierra; se ajusta en render, no en efecto.
+  const navKey = `${pathname}|${section}`;
+  const [lastNavKey, setLastNavKey] = useState(navKey);
+  if (lastNavKey !== navKey) {
+    setLastNavKey(navKey);
+    if (open) setOpen(false);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -249,7 +252,7 @@ export default function AdminShell({
         href="/admin"
         onClick={() => setOpen(false)}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        { }
         <img src="/assets/monograma-cs.svg" width="36" height="36" alt="" />
         <span>
         CALU<span className="accent">SERVERS</span>
@@ -304,7 +307,9 @@ export default function AdminShell({
           type="button"
           onClick={() => {
             void fetch("/api/admin/logout", { method: "POST" }).finally(() => {
-              window.location.assign("/admin/login");
+              // Navegación interna: la hace el router de Next, no location.assign.
+              router.replace("/admin/login");
+              router.refresh();
             });
           }}
         >

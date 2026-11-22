@@ -112,8 +112,10 @@ export function AnimatedNumber({
     const el = ref.current;
     if (!el) return;
     if (prefersReducedMotion() || typeof IntersectionObserver === "undefined") {
-      setDisplay(value);
-      return;
+      // El valor final se pinta en el siguiente frame, no dentro del commit del
+      // efecto: mismo resultado en pantalla y sin render en cascada.
+      const frame = requestAnimationFrame(() => setDisplay(value));
+      return () => cancelAnimationFrame(frame);
     }
     let raf = 0;
     const io = new IntersectionObserver(

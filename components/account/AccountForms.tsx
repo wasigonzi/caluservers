@@ -448,7 +448,7 @@ export function PayInvoiceOptions({
           setBusy("");
           return;
         }
-        window.location.href = data.approveUrl;
+        window.location.assign(String(data.approveUrl));
         return;
       }
       const response = await fetch("/api/account/checkout", {
@@ -468,7 +468,7 @@ export function PayInvoiceOptions({
           setBusy("");
           return;
         }
-        window.location.href = data.url;
+        window.location.assign(String(data.url));
         return;
       }
       // Transferencia: no hay redirección; el pedido queda pendiente.

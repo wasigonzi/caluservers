@@ -73,13 +73,16 @@ export default function WhmReadPanel({
   // y al volver a ella. Tras un fallo se detiene, para no insistir contra un servidor caído.
   useEffect(() => {
     if (!canRead) return;
-    void read();
+    // La primera lectura entra en el siguiente turno para no cambiar estado
+    // dentro del commit del efecto (el indicador de carga sale igual).
+    const first = window.setTimeout(() => void read(), 0);
     const tick = () => {
       if (document.visibilityState === "visible" && !failed.current) void read();
     };
     const timer = window.setInterval(tick, REFRESH_MS);
     document.addEventListener("visibilitychange", tick);
     return () => {
+      window.clearTimeout(first);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
