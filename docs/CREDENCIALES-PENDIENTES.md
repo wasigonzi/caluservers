@@ -8,7 +8,9 @@ cada pieza.
 Flujo de punta a punta: registro en `/cuenta` → pedido en
 `/cuenta/contratar` → factura → pago con PayPal → alta automática en WHM →
 cuenta cPanel activa. El seguimiento del pedido es en el panel del cliente
-(`/cuenta/facturas/[id]`); no hay ruta `/pedido/[token]`.
+(`/cuenta/facturas/[id]`), y además cada pedido nace con un enlace público de
+seguimiento en `/pedido/[token]` que no exige entrar y solo muestra plan,
+dominio, estados y fecha.
 
 Estado en `/admin/configuracion`: muestra cada pieza (moneda, impuestos,
 PayPal, correo, base, URL pública, Blob) y botones de prueba donde aplica.

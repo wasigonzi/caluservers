@@ -4,6 +4,7 @@ const iconVps = "/icons/servicio-vps.svg";
 const iconRed = "/icons/servicio-red.svg";
 const iconSeguridad = "/icons/servicio-seguridad.svg";
 import { useCatalog } from "@/lib/catalog-context";
+import { isOrderablePlan } from "@/lib/orderable";
 import { PageHero, PlanCard } from "@/components/site/SiteShell";
 import { Faq, SectionHead } from "@/components/site/Sections";
 import { useCopy, usePageCopy } from "@/lib/page-content-context";
@@ -12,6 +13,9 @@ import { pc } from "@/lib/page-content";
 export default function Dedicated() {
   const { catalog } = useCatalog();
   const plans = catalog.dedicated.filter((p) => p.active);
+  // Los dedicados son vendibles en cuanto el propietario les pone precio
+  // confirmado y URL de compra en el catálogo (/admin/contenido → catálogo).
+  const orderable = plans.some((plan) => isOrderablePlan(plan));
   const kicker = useCopy("kicker", "Dedicated Servers");
   const title = useCopy("title", "Bare-metal");
   const titleAccent = useCopy("titleAccent", "power.");
@@ -81,10 +85,18 @@ export default function Dedicated() {
         lead={lead}
       />
       <section className="wrap">
-        <p className="notice">
-          La tienda pública no lista servidores dedicados. Aquí no hay precio
-          confirmado ni botón de pedido. La consulta sigue en el portal externo.
-        </p>
+        {orderable ? (
+          <p className="notice">
+            Contrata tu servidor dedicado aquí: el pedido se crea con el precio
+            publicado en el catálogo y su factura queda en tu área de cliente.
+          </p>
+        ) : (
+          <p className="notice">
+            Todavía no hay servidores dedicados con precio publicado, así que no
+            hay botón de pedido. Pide una configuración a medida y el equipo te
+            prepara la oferta.
+          </p>
+        )}
         <div className="plan-grid five">
           {plans.map((plan, i) => (
             <PlanCard

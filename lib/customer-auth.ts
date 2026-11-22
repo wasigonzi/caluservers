@@ -73,7 +73,6 @@ export const customerAuth = betterAuth({
   rateLimit: { enabled: false },
   trustedOrigins: [process.env.BETTER_AUTH_URL || "http://127.0.0.1:3011"],
   plugins: [
-    nextCookies(),
     // Fase 1, tramo C — passkeys de CLIENTE (plugin oficial
     // `@better-auth/passkey` 1.7.18, paquete aparte de `better-auth`).
     // El plugin exige SU PROPIO almacén: tabla `passkey` (modelo Passkey
@@ -92,6 +91,10 @@ export const customerAuth = betterAuth({
     // activar, el plugin genera códigos de respaldo (tabla `twoFactor`).
     // Sin activar, el login no cambia.
     twoFactor({ issuer: "CaluServers" }),
+    // Debe ir el ÚLTIMO: better-auth avisa de que, si queda antes que otros
+    // plugins, las cookies que esos plugins ponen en sus hooks `after`
+    // (reto de passkey, 2FA) no llegan al almacén de cookies de Next.
+    nextCookies(),
   ],
 });
 

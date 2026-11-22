@@ -16,7 +16,7 @@
     "db:backup": "node scripts/backup.mjs",
     "db:restore": "node scripts/restore.mjs",
     "test:e2e": "node e2e/prepare-db.mjs && playwright test",
-    "test": "node --import tsx --test tests/**/*.test.mjs"
+    "test": "node --import ./tests/helpers/server-only-shim.mjs --import tsx --test tests/**/*.test.mjs"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.18",

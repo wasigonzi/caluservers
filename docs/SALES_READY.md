@@ -55,6 +55,7 @@ Migraciones: `SiteSetting`, `CatalogConfig`, área propia de clientes
 ## 5. Contenido comercial
 
 - El precio público de VPS New York / Normal es «Desde $12.99/mes» (listado de tienda, 2026-11-09). No publiques `$0.00`.
+- **Servidores dedicados**: vienen sin precio publicado, así que `/dedicated` no muestra «Contratar aquí». En cuanto el propietario les pone precio confirmado y URL de compra (`/cuenta/contratar?plan=<id>`) desde el catálogo del panel, la tarjeta muestra el botón y el pedido se crea con factura, igual que el hosting y el VPS.
 - Publicar branding/SEO desde `/admin/site`.
 - Probar en móvil la bottom nav y un flujo completo hasta el pago (sin pagar en live: usa el entorno sandbox de PayPal).
 
