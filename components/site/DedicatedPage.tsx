@@ -126,7 +126,7 @@ export default function Dedicated() {
             {useCases.map((c) => (
               <article className="use-case-card glass" key={c.title}>
                 <div className="icon-chip">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img src={c.icon} alt="" />
                 </div>
                 <h3>{c.title}</h3>

@@ -20,6 +20,7 @@ import { customerAuthClient } from "@/lib/customer-auth-client";
 import LanguageSelector from "@/components/site/LanguageSelector";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { portalThemeClasses, type PortalDensity, type PortalTheme } from "@/lib/portal-theme";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 type Item = { label: string; href: string; icon: LucideIcon; badge?: "facturas" | "tickets" };
 
@@ -64,21 +65,22 @@ export default function AccountShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mobile, setMobile] = useState(false);
+  const mobile = useMediaQuery("(max-width: 1024px)");
+  // Ajuste en render (no en efecto): al volver a escritorio el cajón se cierra.
+  const [wasMobile, setWasMobile] = useState(mobile);
+  if (wasMobile !== mobile) {
+    setWasMobile(mobile);
+    if (!mobile) setOpen(false);
+  }
   const asideRef = useRef<HTMLElement>(null);
   const asideId = useId();
 
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1024px)");
-    const update = () => {
-      setMobile(media.matches);
-      if (!media.matches) setOpen(false);
-    };
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  useEffect(() => setOpen(false), [pathname]);
+  // Al cambiar de sección el cajón se cierra; se ajusta en render, no en efecto.
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    if (open) setOpen(false);
+  }
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -134,7 +136,7 @@ export default function AccountShell({
           Cerrar menú ×
         </button>
         <Link className="admin-brand" href="/cuenta">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img src="/assets/monograma-cs.svg" width="36" height="36" alt="" />
           <span>
             CALU<span className="accent">SERVERS</span>

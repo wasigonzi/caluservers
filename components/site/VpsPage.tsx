@@ -495,7 +495,7 @@ export default function Vps() {
             {details.map((d) => (
               <article className="detail-card glass" key={d.title}>
                 <div className="icon-chip">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img src={d.icon} alt="" />
                 </div>
                 <div>

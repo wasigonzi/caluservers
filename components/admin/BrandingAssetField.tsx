@@ -218,7 +218,7 @@ export default function BrandingAssetField({
       </div>
       <div className="media-preview" aria-hidden={!value}>
         {value && validUrl && !imageFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
+           
           <img
             key={value}
             src={value}

@@ -85,14 +85,14 @@ function Nav({ settings, locale }: { settings: SiteSettings; locale: Locale }) {
     <header className="nav glass">
       <div className="nav-in">
         <Link className="brand" href="/" aria-label={settings.branding.siteName + " - Inicio"}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             className="logo-desktop"
             src={logoSrc(settings.branding)}
             alt=""
             aria-hidden="true"
           />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             className="logo-mobile"
             src={logoSrc(settings.branding, true)}
@@ -181,7 +181,7 @@ function Footer({ settings, locale = "es" }: { settings: SiteSettings; locale?: 
       <div className="wrap">
         <div className="footer-grid">
           <div className="footer-brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img src={logoSrc(settings.branding)} alt={settings.branding.siteName} />
             <p>{settings.content.footerBlurb}</p>
             {settings.contact.email ? (
@@ -229,7 +229,7 @@ function Footer({ settings, locale = "es" }: { settings: SiteSettings; locale?: 
         <div className="copyright">
           <span>© {new Date().getFullYear()} CALUSERVERS. Todos los derechos reservados.</span>
           <span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img src="/assets/monograma-cs.svg" alt="" style={{ height: 22, width: "auto", verticalAlign: "middle", marginRight: 8 }} />
             Hosting • VPS • Dedicated Servers
           </span>

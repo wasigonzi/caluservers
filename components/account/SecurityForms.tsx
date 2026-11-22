@@ -57,9 +57,22 @@ export default function AccountSecurityForms() {
   }
 
   useEffect(() => {
-    refreshPasskeys();
-    // Solo al montar: el listado se refresca tras cada cambio.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Solo al montar: el listado se refresca tras cada cambio. La carga vive
+    // dentro del async para no cambiar estado en el cuerpo del efecto.
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await customerAuthClient.passkey.listUserPasskeys();
+        if (!cancelled) setPasskeys((result.data ?? []) as ClientPasskey[]);
+      } catch {
+        if (!cancelled) setPasskeys([]);
+      } finally {
+        if (!cancelled) setPasskeysLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function addPasskey() {

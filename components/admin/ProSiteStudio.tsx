@@ -98,10 +98,15 @@ export default function ProSiteStudio({
       : firstAllowed,
   );
   // Al llegar desde el menú con otra sección, se cambia sin perder lo editado.
-  useEffect(() => {
-    if (STUDIO_TABS.includes(initialTab) && allowedTabs.includes(initialTab))
+  // Ajuste en render (no en efecto), como recomienda React para estado
+  // derivado de props.
+  const [navTab, setNavTab] = useState(initialTab);
+  if (navTab !== initialTab) {
+    setNavTab(initialTab);
+    if (STUDIO_TABS.includes(initialTab) && allowedTabs.includes(initialTab)) {
       setTabState(initialTab as Tab);
-  }, [initialTab, allowedTabs]);
+    }
+  }
   function setTab(next: Tab) {
     if (!allowedTabs.includes(next)) return;
     setTabState(next);
